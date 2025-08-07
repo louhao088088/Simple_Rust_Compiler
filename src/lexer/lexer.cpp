@@ -1,14 +1,14 @@
 #include "lexer.h"
 
 #include <iostream>
-#include <regex>
 #include <unordered_map>
 
 using std::string;
 using std::vector;
 
 void Token::print() const {
-    std::cout << "Token:" << tokenTypeToString(type) << ", \"" << lexeme << "\"" << std::endl;
+    std::cout << "Token:" << tokenTypeToString(type) << ", \"" << lexeme << "\""
+              << " at line " << line << ", column " << column << std::endl;
 }
 
 std::string tokenTypeToString(TokenType type) {
@@ -112,6 +112,12 @@ std::string tokenTypeToString(TokenType type) {
         return "CHAR";
     case TokenType::NUMBER:
         return "NUMBER";
+    case TokenType::BYTE:
+        return "BYTE";
+    case TokenType::CSTRING:
+        return "CSTRING";
+    case TokenType::BSTRING:
+        return "BSTRING";
 
     // Keywords
     case TokenType::AS:
@@ -279,7 +285,9 @@ static std::unordered_map<std::string, TokenType> keywords = {
     {"virtual", TokenType::VIRTUAL},
     {"yield", TokenType::YIELD},
     {"try", TokenType::TRY},
-    {"gen", TokenType::GEN}};
+    {"gen", TokenType::GEN}
+
+};
 
 static std::unordered_map<std::string, TokenType> symbols = {
 
@@ -330,7 +338,7 @@ static std::unordered_map<std::string, TokenType> symbols = {
 
 };
 
-vector<Token> lexer_program(string &program) {
+vector<Token> lexer_program(const Program &program) {
     bool in_string = 0;
     bool in_string2 = 0;
     bool trans = 0;
@@ -338,9 +346,10 @@ vector<Token> lexer_program(string &program) {
     string token = "";
     Token new_token;
     vector<Token> result;
-    while (i < program.size()) {
-        char ch = program[i];
-        char next_ch = (i + 1 < program.size()) ? program[i + 1] : '\0';
+
+    while (i < program.content.size()) {
+        char ch = program.content[i];
+        char next_ch = (i + 1 < program.content.size()) ? program.content[i + 1] : '\0';
 
         string tmp = "";
         tmp += ch;
@@ -353,8 +362,15 @@ vector<Token> lexer_program(string &program) {
 
             } else if (ch == '"') {
                 in_string = 0;
-                new_token.type = TokenType::STRING;
+                if (token[0] == 'b')
+                    new_token.type = TokenType::BSTRING;
+                else if (token[0] == 'c')
+                    new_token.type = TokenType::CSTRING;
+                else
+                    new_token.type = TokenType::STRING;
                 new_token.lexeme = token;
+                new_token.line = program.positions[i].first;
+                new_token.column = program.positions[i].second;
                 result.push_back(new_token);
                 token = "";
             }
@@ -368,23 +384,28 @@ vector<Token> lexer_program(string &program) {
 
             } else if (ch == '\'') {
                 in_string2 = 0;
-                new_token.type = TokenType::CHAR;
+                if (token[0] == 'b')
+                    new_token.type = TokenType::BYTE;
+                else
+                    new_token.type = TokenType::CHAR;
                 new_token.lexeme = token;
+                new_token.line = program.positions[i].first;
+                new_token.column = program.positions[i].second;
                 result.push_back(new_token);
+
                 token = "";
             }
             i++;
-        } else if (ch == '"' && token.size() == 0) {
+        } else if (ch == '"' && (token.size() == 0 ||
+                                 (token.size() == 1 && (token[0] == 'b' || token[0] == 'c')))) {
             token += ch;
             in_string = 1;
             i++;
-        } else if (ch == '\'' && token.size() == 0) {
+        } else if (ch == '\'' && (token.size() == 0 || (token.size() == 1 && token[0] == 'b'))) {
             token += ch;
             in_string2 = 1;
             i++;
-
         } else if (symbols.find(tmp) != symbols.end() && token.length() == 0) {
-
             switch (ch) {
             // Single-character symbols
             case '(':
@@ -462,7 +483,7 @@ vector<Token> lexer_program(string &program) {
                     i++;
                     new_token.type = TokenType::LESS_LESS;
                     new_token.lexeme = "<<";
-                    if (i + 2 < program.size() && program[i + 2] == '=') {
+                    if (i + 2 < program.content.size() && program.content[i + 2] == '=') {
                         i++;
                         new_token.type = TokenType::LESS_LESS_EQUAL;
                         new_token.lexeme = "<<=";
@@ -482,7 +503,7 @@ vector<Token> lexer_program(string &program) {
                     i++;
                     new_token.type = TokenType::GREATER_GREATER;
                     new_token.lexeme = ">>";
-                    if (i + 2 < program.size() && program[i + 2] == '=') {
+                    if (i + 2 < program.content.size() && program.content[i + 2] == '=') {
                         i++;
                         new_token.type = TokenType::GREATER_GREATER_EQUAL;
                         new_token.lexeme = ">>=";
@@ -595,12 +616,13 @@ vector<Token> lexer_program(string &program) {
                 }
                 break;
             }
+            new_token.line = program.positions[i].first;
+            new_token.column = program.positions[i].second;
             i++;
             result.push_back(new_token);
 
         } else if (!(ch >= '0' && ch <= '9') && !(ch >= 'A' && ch <= 'Z') &&
                    !(ch >= 'a' && ch <= 'z') && ch != '_' && token.length() > 0) {
-
             if (token[0] >= '0' && token[0] <= '9') {
                 new_token.type = TokenType::NUMBER;
             } else {
@@ -611,6 +633,8 @@ vector<Token> lexer_program(string &program) {
                 }
             }
             new_token.lexeme = token;
+            new_token.line = program.positions[i - 1].first;
+            new_token.column = program.positions[i - 1].second;
             result.push_back(new_token);
 
             token = "";
@@ -631,6 +655,8 @@ vector<Token> lexer_program(string &program) {
             }
         }
         new_token.lexeme = token;
+        new_token.line = program.positions[i - 1].first;
+        new_token.column = program.positions[i - 1].second;
         result.push_back(new_token);
     }
     return result;

@@ -1,15 +1,17 @@
 #include "pre_processor.h"
 
-string read_program() {
+Program read_program() {
     string line;
-    string result;
+    Program program;
+    program.content = "";
     int multiline_comment_num = 0;
     bool in_string = 0, in_string2 = 0;
     bool trans = 0;
-
+    int line_num = 0;
     while (std::getline(std::cin, line)) {
         string processed_line = "";
         size_t i = 0;
+        line_num++;
 
         // std::cout << line << " " << std::endl;
         while (i < line.length()) {
@@ -76,11 +78,14 @@ string read_program() {
 
         processed_line.erase(0, processed_line.find_first_not_of(" \t\r\n"));
         processed_line.erase(processed_line.find_last_not_of(" \t\r\n") + 1);
-
-        result = result + processed_line + "\n";
+        for (int i = 0; i < processed_line.length(); i++) {
+            program.positions.push_back({line_num, i});
+        }
+        program.positions.push_back({line_num, processed_line.length()});
+        program.content += processed_line + "\n";
     }
 
-    return result;
+    return program;
 }
 
 void print_program(const string &program) {

@@ -1,5 +1,7 @@
 #pragma once
 
+#include "../pre_processor/pre_processor.h"
+
 #include <any>
 #include <string>
 #include <vector>
@@ -60,6 +62,9 @@ enum class TokenType {
     // Literals
     IDENTIFIER,
     STRING,
+    CSTRING,
+    BSTRING,
+    BYTE,
     CHAR,
     NUMBER,
 
@@ -127,10 +132,12 @@ string tokenTypeToString(TokenType type);
 struct Token {
     TokenType type;
     std::string lexeme;
+    int line;
+    int column;
 
     void print() const;
 };
 
-vector<Token> lexer_program(string &program);
+vector<Token> lexer_program(const Program &program);
 
 void print_lexer_result(const vector<Token> &tokens);
