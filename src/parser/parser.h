@@ -7,7 +7,7 @@
 #include <map>
 #include <vector>
 
-// 运算符优先级
+// Operator precedence
 enum Precedence {
     NONE,
     ASSIGNMENT,  // = = += -= *= /= %= &= |= ^= <<= >>=
@@ -33,11 +33,11 @@ class Parser {
     std::unique_ptr<Program> parse();
 
   private:
-    // --- 状态 ---
+    // State
     const std::vector<Token> &tokens_;
     size_t current_ = 0;
 
-    // --- Pratt 解析器所需类型 ---
+    // Pratt parser required types
     using PrefixParseFn = std::function<std::unique_ptr<Expr>()>;
     using InfixParseFn = std::function<std::unique_ptr<Expr>(std::unique_ptr<Expr>)>;
 
@@ -45,11 +45,11 @@ class Parser {
     std::map<TokenType, InfixParseFn> infix_parsers_;
     std::map<TokenType, Precedence> precedences_;
 
-    // --- Pratt 解析器注册函数 ---
+    // Pratt parser registration functions
     void register_prefix(TokenType type, PrefixParseFn fn);
     void register_infix(TokenType type, Precedence prec, InfixParseFn fn);
 
-    // --- 工具函数 ---
+    // Utility functions
     bool is_at_end();
     const Token &peek();
     const Token &previous();
@@ -60,13 +60,13 @@ class Parser {
     std::runtime_error error(const Token &token, const std::string &message);
     void synchronize();
 
-    // --- 语法规则解析函数 ---
+    // Grammar parsing functions
 
-    // 顶层
+    // Top level
     std::unique_ptr<Item> parse_item();
     std::unique_ptr<FnDecl> parse_fn_declaration();
 
-    // 语句
+    // Statements
     std::unique_ptr<Stmt> parse_statement();
     std::unique_ptr<LetStmt> parse_let_statement();
     std::unique_ptr<ReturnStmt> parse_return_statement();
@@ -75,11 +75,11 @@ class Parser {
     std::unique_ptr<BreakStmt> parse_break_statement();
     std::unique_ptr<ContinueStmt> parse_continue_statement();
 
-    // 表达式 (Pratt Parser)
+    // Expressions (Pratt Parser)
     std::unique_ptr<Expr> parse_expression(Precedence precedence);
     Precedence get_precedence(TokenType type);
 
-    // 类型解析
+    // Type parsing
     std::unique_ptr<TypeNode> parse_type();
     std::unique_ptr<TypeNode> parse_primary_type();
 };

@@ -10,8 +10,6 @@ int main() {
     print_program(program.content);
     std::cout << "\n";
 
-    // --- 2. 词法分析 ---
-    // 这部分也保持不变
     vector<Token> tokens = lexer_program(program);
     std::cout << "--- Lexer Result ---" << std::endl;
     print_lexer_result(tokens);

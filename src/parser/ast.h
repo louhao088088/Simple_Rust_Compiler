@@ -9,14 +9,14 @@
 #include <string>
 #include <vector>
 
-// --- 前向声明所有节点 ---
+// Forward declarations of all nodes
 struct Node;
 struct Expr;
 struct Stmt;
 struct Item;
 struct Program;
 
-// --- 基类 ---
+// Base classes
 
 struct Node {
     virtual ~Node() = default;
@@ -28,7 +28,7 @@ struct Stmt : public Node {};
 struct Item : public Node {};
 struct TypeNode : public Node {};
 
-// --- 表达式 (Expressions) ---
+// Expressions
 
 struct LiteralExpr : public Expr {
     Token literal;
@@ -137,7 +137,7 @@ struct AssignmentExpr : public Expr {
     void print(std::ostream &os, int indent = 0) const override;
 };
 
-// --- 语句 (Statements) ---
+// Statements
 
 struct BlockStmt : public Stmt {
     std::vector<std::unique_ptr<Stmt>> statements;
@@ -154,7 +154,7 @@ struct ExprStmt : public Stmt {
 struct LetStmt : public Stmt {
     Token name;
     bool is_mutable;
-    std::optional<std::unique_ptr<TypeNode>> type_annotation; // 可选的类型注解
+    std::optional<std::unique_ptr<TypeNode>> type_annotation;
     std::optional<std::unique_ptr<Expr>> initializer;
     LetStmt(Token name, bool is_mut, std::optional<std::unique_ptr<TypeNode>> type_ann,
             std::optional<std::unique_ptr<Expr>> init)
@@ -182,7 +182,7 @@ struct ContinueStmt : public Stmt {
     void print(std::ostream &os, int indent = 0) const override;
 };
 
-// --- 类型节点 (Type Nodes) ---
+// Type Nodes
 struct TypeNameNode : public TypeNode {
     Token name;
     explicit TypeNameNode(Token name) : name(std::move(name)) {}
@@ -208,7 +208,7 @@ struct TupleTypeNode : public TypeNode {
     void print(std::ostream &os, int indent = 0) const override;
 };
 
-// --- 顶层项 (Items) ---
+// Top-level Items
 
 struct FnDecl : public Item {
     Token name;
@@ -225,7 +225,7 @@ struct FnDecl : public Item {
     void print(std::ostream &os, int indent = 0) const override;
 };
 
-// --- 根节点 ---
+// Root node
 
 struct Program : public Node {
     std::vector<std::unique_ptr<Item>> items;

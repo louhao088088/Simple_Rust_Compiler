@@ -3,7 +3,7 @@
 
 #include <string>
 
-// 辅助函数，用于打印缩进
+// Helper function for printing indentation
 static void print_indent(std::ostream &os, int indent) { os << std::string(indent * 2, ' '); }
 
 void LiteralExpr::print(std::ostream &os, int indent) const {

@@ -3,11 +3,14 @@
 
 #include "ast.h"
 
-// --- 构造函数：设置好所有解析规则 ---
-Parser::Parser(const std::vector<Token> &tokens) : tokens_(tokens) {
-    // --- 注册 Pratt 解析器规则 ---
+using std::string;
+using std::vector;
 
-    // 注册前缀解析函数
+// Constructor: set up all parsing rules
+Parser::Parser(const std::vector<Token> &tokens) : tokens_(tokens) {
+    // Register Pratt parser rules
+
+    // Register prefix parsing functions
     register_prefix(TokenType::IDENTIFIER,
                     [this] { return std::make_unique<VariableExpr>(previous()); });
     register_prefix(TokenType::NUMBER,
@@ -96,7 +99,7 @@ Parser::Parser(const std::vector<Token> &tokens) : tokens_(tokens) {
         return std::make_unique<LoopExpr>(std::move(body));
     });
 
-    // 注册中缀解析函数和优先级
+    // Register infix parsing functions and precedence
     register_infix(TokenType::PLUS, Precedence::TERM, [this](auto left) {
         auto op = previous();
         auto right = parse_expression(Precedence::TERM);
@@ -197,24 +200,21 @@ Parser::Parser(const std::vector<Token> &tokens) : tokens_(tokens) {
     });
 }
 
-// --- 注册函数的实现 ---
+// Implementation of registration functions
 void Parser::register_prefix(TokenType type, PrefixParseFn fn) { prefix_parsers_[type] = fn; }
 void Parser::register_infix(TokenType type, Precedence prec, InfixParseFn fn) {
     infix_parsers_[type] = fn;
     precedences_[type] = prec;
 }
 std::unique_ptr<TypeNode> Parser::parse_type() {
-    // Rust 的类型系统也可能有优先级，但这里我们先简化
     return parse_primary_type();
 }
 
 std::unique_ptr<TypeNode> Parser::parse_primary_type() {
-    // 如果是标识符，那么就是命名类型
     if (match({TokenType::IDENTIFIER})) {
         return std::make_unique<TypeNameNode>(previous());
     }
 
-    // 如果是左方括号，那么就是数组类型
     if (match({TokenType::LEFT_BRACKET})) {
         auto element_type = parse_type();
         consume(TokenType::SEMICOLON, "Expect ';' in array type definition.");
@@ -223,13 +223,10 @@ std::unique_ptr<TypeNode> Parser::parse_primary_type() {
         return std::make_unique<ArrayTypeNode>(std::move(element_type), std::move(size_expr));
     }
 
-    // 如果是左括号，可能是单元类型 () 或元组类型 (T1, T2)
     if (match({TokenType::LEFT_PAREN})) {
         if (match({TokenType::RIGHT_PAREN})) {
-            // 这是单元类型 ()
             return std::make_unique<UnitTypeNode>();
         } else if (check(TokenType::IDENTIFIER)) {
-            // 这是元组类型 (T1, T2)
             std::vector<std::unique_ptr<TypeNode>> elements;
             do {
                 elements.push_back(parse_primary_type());
@@ -241,7 +238,8 @@ std::unique_ptr<TypeNode> Parser::parse_primary_type() {
 
     throw error(peek(), "Expected a type.");
 }
-// --- 主解析循环 ---
+
+// Main parsing loop
 std::unique_ptr<Program> Parser::parse() {
     auto program = std::make_unique<Program>();
     while (!is_at_end()) {
@@ -255,7 +253,7 @@ std::unique_ptr<Program> Parser::parse() {
     return program;
 }
 
-// --- 递归下降的实现 ---
+// Recursive descent implementation
 std::unique_ptr<Item> Parser::parse_item() {
     if (peek().type == TokenType::FN) {
         return parse_fn_declaration();
@@ -381,7 +379,7 @@ std::unique_ptr<ExprStmt> Parser::parse_expression_statement() {
     return std::make_unique<ExprStmt>(std::move(expr));
 }
 
-// --- Pratt 解析器的核心 ---
+// Core of Pratt parser
 Precedence Parser::get_precedence(TokenType type) {
     if (precedences_.count(type)) {
         return precedences_[type];
