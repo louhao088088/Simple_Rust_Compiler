@@ -338,7 +338,7 @@ static std::unordered_map<std::string, TokenType> symbols = {
 
 };
 
-vector<Token> lexer_program(const Program &program) {
+vector<Token> lexer_program(const Prog &program) {
     bool in_string = 0;
     bool in_string2 = 0;
     bool trans = 0;

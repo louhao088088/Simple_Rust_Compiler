@@ -1,8 +1,8 @@
 #include "pre_processor.h"
 
-Program read_program() {
+Prog read_program() {
     string line;
-    Program program;
+    Prog program;
     program.content = "";
     int multiline_comment_num = 0;
     bool in_string = 0, in_string2 = 0;

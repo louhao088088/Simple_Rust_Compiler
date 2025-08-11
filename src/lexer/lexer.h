@@ -12,12 +12,12 @@ using std::vector;
 enum class TokenType {
 
     // symbols
-    LEFT_PAREN,
-    RIGHT_PAREN,
-    LEFT_BRACE,
-    RIGHT_BRACE,
-    LEFT_BRACKET,
-    RIGHT_BRACKET,
+    LEFT_PAREN,    //(
+    RIGHT_PAREN,   //)
+    LEFT_BRACKET,  //[
+    RIGHT_BRACKET, //]
+    LEFT_BRACE,    //{
+    RIGHT_BRACE,   //}
     COMMA,
     DOT,
     MINUS,
@@ -138,6 +138,6 @@ struct Token {
     void print() const;
 };
 
-vector<Token> lexer_program(const Program &program);
+vector<Token> lexer_program(const Prog &program);
 
 void print_lexer_result(const vector<Token> &tokens);

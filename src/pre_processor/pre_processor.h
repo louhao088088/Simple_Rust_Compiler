@@ -10,12 +10,12 @@ using std::vector;
 
 // Read Program, delete the empty line and delete comments in the program.
 
-struct Program {
+struct Prog {
     string content;
     vector<pair<int, int>> positions; // Store the positions of the comments
 };
 
-Program read_program();
+Prog read_program();
 
 // Print Program in the pre-processor.
 void print_program(const string &program);

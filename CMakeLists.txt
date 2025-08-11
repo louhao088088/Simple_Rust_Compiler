@@ -11,6 +11,8 @@ add_compile_options(-g)
 add_executable(code 
     src/pre_processor/pre_processor.cpp
     src/lexer/lexer.cpp
+    src/parser/parser.cpp
+    src/parser/ast.cpp
     main.cpp
 )
 
