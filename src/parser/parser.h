@@ -10,7 +10,7 @@
 // Operator precedence
 enum Precedence {
     NONE,
-    ASSIGNMENT,  // = = += -= *= /= %= &= |= ^= <<= >>=
+    ASSIGNMENT,  // = += -= *= /= %= &= |= ^= <<= >>=
     RANGE,       // .. ..=
     OR,          // ||
     AND,         // &&
@@ -20,7 +20,7 @@ enum Precedence {
     BITWISE_AND, // &
     SHIFT,       // << >>
     TERM,        // + -
-    FACTOR,      // * /
+    FACTOR,      // * / %
     AS,          // as
     UNARY,       // ! - *
     CALL,        // . () []
@@ -56,6 +56,7 @@ class Parser {
     const Token &advance();
     bool check(TokenType type);
     bool match(const std::vector<TokenType> &types);
+    bool is_comparison_op(TokenType type) const;
     const Token &consume(TokenType type, const std::string &error_message);
     std::runtime_error error(const Token &token, const std::string &message);
     void synchronize();
@@ -65,6 +66,8 @@ class Parser {
     // Top level
     std::unique_ptr<Item> parse_item();
     std::unique_ptr<FnDecl> parse_fn_declaration();
+    std::unique_ptr<StructDecl> parse_struct_declaration();
+    std::unique_ptr<Expr> parse_struct_initializer(std::unique_ptr<Expr> name);
 
     // Statements
     std::unique_ptr<Stmt> parse_statement();
@@ -77,6 +80,11 @@ class Parser {
 
     // Expressions (Pratt Parser)
     std::unique_ptr<Expr> parse_expression(Precedence precedence);
+    std::unique_ptr<Expr> parse_primary_expression();
+    std::unique_ptr<Expr> parse_if_expression();
+    std::unique_ptr<Expr> parse_loop_expression();
+    std::unique_ptr<Expr> parse_while_expression();
+    std::unique_ptr<Expr> parse_match_expression();
     Precedence get_precedence(TokenType type);
 
     // Type parsing

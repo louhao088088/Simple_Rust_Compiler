@@ -12,52 +12,50 @@ using std::vector;
 enum class TokenType {
 
     // symbols
-    LEFT_PAREN,    //(
-    RIGHT_PAREN,   //)
-    LEFT_BRACKET,  //[
-    RIGHT_BRACKET, //]
-    LEFT_BRACE,    //{
-    RIGHT_BRACE,   //}
-    COMMA,
-    DOT,
-    MINUS,
-    PLUS,
-    SEMICOLON,
-    SLASH,
-    STAR,
-    PERCENT,
-    AMPERSAND,
-    PIPE,
-    CARET,
-    COLON,
-    QUESTION,
-
-    BANG,
-    BANG_EQUAL,
-    EQUAL,
-    EQUAL_EQUAL,
-    GREATER,
-    GREATER_EQUAL,
-    LESS,
-    LESS_EQUAL,
-
-    ARROW,
-    FAT_ARROW,
-    COLON_COLON,
-    PLUS_EQUAL,
-    MINUS_EQUAL,
-    STAR_EQUAL,
-    SLASH_EQUAL,
-    PERCENT_EQUAL,
-    AMPERSAND_EQUAL,
-    PIPE_EQUAL,
-    CARET_EQUAL,
-    LESS_LESS,
-    GREATER_GREATER,
-    LESS_LESS_EQUAL,
-    GREATER_GREATER_EQUAL,
-    AMPERSAND_AMPERSAND,
-    PIPE_PIPE,
+    LEFT_PAREN,            //(
+    RIGHT_PAREN,           //)
+    LEFT_BRACKET,          //[
+    RIGHT_BRACKET,         //]
+    LEFT_BRACE,            //{
+    RIGHT_BRACE,           //}
+    COMMA,                 //,
+    DOT,                   //.
+    MINUS,                 //-
+    PLUS,                  //+
+    SEMICOLON,             //;
+    SLASH,                 // /
+    STAR,                  //*
+    PERCENT,               //%
+    AMPERSAND,             //&
+    PIPE,                  //|
+    CARET,                 //^
+    COLON,                 //:
+    QUESTION,              //?
+    BANG,                  //!
+    BANG_EQUAL,            //!=
+    EQUAL,                 //==
+    EQUAL_EQUAL,           //===
+    GREATER,               //>
+    GREATER_EQUAL,         //>=
+    LESS,                  //<
+    LESS_EQUAL,            //<=
+    ARROW,                 //->
+    FAT_ARROW,             //=>
+    COLON_COLON,           //::
+    PLUS_EQUAL,            //+=
+    MINUS_EQUAL,           //-=
+    STAR_EQUAL,            //*=
+    SLASH_EQUAL,           // /=
+    PERCENT_EQUAL,         //%=
+    AMPERSAND_EQUAL,       //&=
+    PIPE_EQUAL,            //|=
+    CARET_EQUAL,           //^=
+    LESS_LESS,             //<<
+    GREATER_GREATER,       //>>
+    LESS_LESS_EQUAL,       //<<=
+    GREATER_GREATER_EQUAL, //>>=
+    AMPERSAND_AMPERSAND,   //&&
+    PIPE_PIPE,             //||
 
     // Literals
     IDENTIFIER,

@@ -137,6 +137,52 @@ struct AssignmentExpr : public Expr {
     void print(std::ostream &os, int indent = 0) const override;
 };
 
+struct CompoundAssignmentExpr : public Expr {
+    std::unique_ptr<Expr> target;
+    Token op;
+    std::unique_ptr<Expr> value;
+    CompoundAssignmentExpr(std::unique_ptr<Expr> t, Token o, std::unique_ptr<Expr> v)
+        : target(std::move(t)), op(std::move(o)), value(std::move(v)) {}
+    void print(std::ostream &os, int indent = 0) const override;
+};
+
+struct FieldInitializer {
+    Token name;
+    std::unique_ptr<Expr> value;
+};
+
+struct StructInitializerExpr : public Expr {
+    std::unique_ptr<Expr> name;
+    std::vector<FieldInitializer> fields;
+    StructInitializerExpr(std::unique_ptr<Expr> n, std::vector<FieldInitializer> f)
+        : name(std::move(n)), fields(std::move(f)) {}
+    void print(std::ostream &os, int indent = 0) const override;
+};
+
+struct UnitExpr : public Expr {
+    void print(std::ostream &os, int indent = 0) const override;
+};
+
+struct GroupingExpr : public Expr {
+    std::unique_ptr<Expr> expression;
+    explicit GroupingExpr(std::unique_ptr<Expr> expr) : expression(std::move(expr)) {}
+    void print(std::ostream &os, int indent = 0) const override;
+};
+
+struct TupleExpr : public Expr {
+    std::vector<std::unique_ptr<Expr>> elements;
+    explicit TupleExpr(std::vector<std::unique_ptr<Expr>> elems) : elements(std::move(elems)) {}
+    void print(std::ostream &os, int indent = 0) const override;
+};
+
+struct AsExpr : public Expr {
+    std::unique_ptr<Expr> expression;
+    std::unique_ptr<TypeNode> target_type;
+    AsExpr(std::unique_ptr<Expr> expr, std::unique_ptr<TypeNode> type)
+        : expression(std::move(expr)), target_type(std::move(type)) {}
+    void print(std::ostream &os, int indent = 0) const override;
+};
+
 // Statements
 
 struct BlockStmt : public Stmt {
@@ -147,7 +193,9 @@ struct BlockStmt : public Stmt {
 
 struct ExprStmt : public Stmt {
     std::unique_ptr<Expr> expression;
-    explicit ExprStmt(std::unique_ptr<Expr> expr) : expression(std::move(expr)) {}
+    bool has_semicolon;
+    ExprStmt(std::unique_ptr<Expr> expr, bool semi)
+        : expression(std::move(expr)), has_semicolon(semi) {}
     void print(std::ostream &os, int indent = 0) const override;
 };
 
@@ -179,6 +227,12 @@ struct BreakStmt : public Stmt {
 
 struct ContinueStmt : public Stmt {
     ContinueStmt() = default;
+    void print(std::ostream &os, int indent = 0) const override;
+};
+
+struct ItemStmt : public Stmt {
+    std::unique_ptr<Item> item;
+    explicit ItemStmt(std::unique_ptr<Item> i) : item(std::move(i)) {}
     void print(std::ostream &os, int indent = 0) const override;
 };
 
@@ -222,6 +276,29 @@ struct FnDecl : public Item {
            std::optional<std::unique_ptr<TypeNode>> return_type, std::unique_ptr<BlockStmt> body)
         : name(std::move(name)), params(std::move(params)), param_types(std::move(param_types)),
           return_type(std::move(return_type)), body(std::move(body)) {}
+    void print(std::ostream &os, int indent = 0) const override;
+};
+struct Field {
+    Token name;
+    std::unique_ptr<TypeNode> type;
+};
+enum class StructKind { Normal, Tuple, Unit };
+
+struct StructDecl : public Item {
+    Token name;
+    StructKind kind;
+    std::vector<Field> fields;
+    std::vector<std::unique_ptr<TypeNode>> tuple_fields;
+
+    StructDecl(Token n, std::vector<Field> f) // Normal
+        : name(std::move(n)), kind(StructKind::Normal), fields(std::move(f)) {}
+
+    StructDecl(Token n, std::vector<std::unique_ptr<TypeNode>> tf) // Tuple
+        : name(std::move(n)), kind(StructKind::Tuple), tuple_fields(std::move(tf)) {}
+
+    explicit StructDecl(Token n) // Unit
+        : name(std::move(n)), kind(StructKind::Unit) {}
+
     void print(std::ostream &os, int indent = 0) const override;
 };
 

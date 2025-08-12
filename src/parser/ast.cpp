@@ -6,6 +6,7 @@
 // Helper function for printing indentation
 static void print_indent(std::ostream &os, int indent) { os << std::string(indent * 2, ' '); }
 
+// expr
 void LiteralExpr::print(std::ostream &os, int indent) const {
     print_indent(os, indent);
     os << "LiteralExpr(" << literal.lexeme << ")\n";
@@ -58,108 +59,6 @@ void IfExpr::print(std::ostream &os, int indent) const {
     }
 }
 
-void BlockStmt::print(std::ostream &os, int indent) const {
-    print_indent(os, indent);
-    os << "BlockStmt\n";
-    for (const auto &stmt : statements) {
-        stmt->print(os, indent + 1);
-    }
-    if (final_expr) {
-        print_indent(os, indent + 1);
-        os << "Final Expression:\n";
-        (*final_expr)->print(os, indent + 2);
-    }
-}
-
-void ExprStmt::print(std::ostream &os, int indent) const {
-    print_indent(os, indent);
-    os << "ExprStmt\n";
-    expression->print(os, indent + 1);
-}
-
-void LetStmt::print(std::ostream &os, int indent) const {
-    print_indent(os, indent);
-    os << "LetStmt(name=" << name.lexeme << ", mut=" << (is_mutable ? "true" : "false") << ")\n";
-    if (type_annotation) {
-        print_indent(os, indent + 1);
-        os << "Type Annotation:\n";
-        (*type_annotation)->print(os, indent + 2);
-    }
-    if (initializer) {
-        print_indent(os, indent + 1);
-        os << "Initializer:\n";
-        (*initializer)->print(os, indent + 2);
-    }
-}
-
-void ReturnStmt::print(std::ostream &os, int indent) const {
-    print_indent(os, indent);
-    os << "ReturnStmt\n";
-    if (value) {
-        (*value)->print(os, indent + 1);
-    }
-}
-
-void FnDecl::print(std::ostream &os, int indent) const {
-    print_indent(os, indent);
-    os << "FnDecl(name=" << name.lexeme << ")\n";
-    print_indent(os, indent + 1);
-    os << "Params: ";
-    for (const auto &p : params) {
-        os << p.lexeme << " ";
-    }
-
-    os << "\n";
-    os << "Param Types:\n";
-    for (const auto &type : param_types) {
-        type->print(os, indent + 1);
-    }
-    os << "Return Type:\n";
-    if (return_type) {
-        (*return_type)->print(os, indent + 2);
-    }
-    print_indent(os, indent + 1);
-    os << "Body:\n";
-    body->print(os, indent + 2);
-}
-
-void Program::print(std::ostream &os, int indent) const {
-    print_indent(os, indent);
-    os << "Program\n";
-    for (const auto &item : items) {
-        item->print(os, indent + 1);
-    }
-}
-
-void TypeNameNode::print(std::ostream &os, int indent) const {
-    print_indent(os, indent);
-    os << "TypeNameNode(" << name.lexeme << ")\n";
-}
-
-void ArrayTypeNode::print(std::ostream &os, int indent) const {
-    print_indent(os, indent);
-    os << "ArrayTypeNode\n";
-    print_indent(os, indent + 1);
-    os << "Element Type:\n";
-    element_type->print(os, indent + 2);
-    print_indent(os, indent + 1);
-    os << "Size:\n";
-    size->print(os, indent + 2);
-}
-
-void UnitTypeNode::print(std::ostream &os, int indent) const {
-    print_indent(os, indent);
-    os << "UnitTypeNode\n";
-}
-
-void TupleTypeNode::print(std::ostream &os, int indent) const {
-    print_indent(os, indent);
-    os << "TupleTypeNode\n";
-    for (const auto &elem : elements) {
-        elem->print(os, indent + 1);
-    }
-}
-
 void IndexExpr::print(std::ostream &os, int indent) const {
     print_indent(os, indent);
     os << "IndexExpr\n";
@@ -203,6 +102,18 @@ void ArrayInitializerExpr::print(std::ostream &os, int indent) const {
 void AssignmentExpr::print(std::ostream &os, int indent) const {
     print_indent(os, indent);
     os << "AssignmentExpr\n";
+
+    print_indent(os, indent + 1);
+    os << "Target:\n";
+    target->print(os, indent + 2);
+    print_indent(os, indent + 1);
+    os << "Value:\n";
+    value->print(os, indent + 2);
+}
+
+void CompoundAssignmentExpr::print(std::ostream &os, int indent) const {
+    print_indent(os, indent);
+    os << "CompoundAssignmentExpr(" << op.lexeme << ")\n";
     print_indent(os, indent + 1);
     os << "Target:\n";
     target->print(os, indent + 2);
@@ -230,6 +141,98 @@ void WhileExpr::print(std::ostream &os, int indent) const {
     body->print(os, indent + 2);
 }
 
+void StructInitializerExpr::print(std::ostream &os, int indent) const {
+    print_indent(os, indent);
+    os << "StructInitializerExpr\n";
+    print_indent(os, indent + 1);
+    os << "Name:\n";
+    name->print(os, indent + 2);
+    print_indent(os, indent + 1);
+    os << "Fields:\n";
+    for (const auto &field : fields) {
+        print_indent(os, indent + 2);
+        os << field.name.lexeme << ":\n";
+        field.value->print(os, indent + 3);
+    }
+}
+
+void UnitExpr::print(std::ostream &os, int indent) const {
+    print_indent(os, indent);
+    os << "UnitExpr\n";
+}
+
+void GroupingExpr::print(std::ostream &os, int indent) const {
+    print_indent(os, indent);
+    os << "GroupingExpr\n";
+    print_indent(os, indent + 1);
+    os << "Expression:\n";
+    expression->print(os, indent + 2);
+}
+
+void TupleExpr::print(std::ostream &os, int indent) const {
+    print_indent(os, indent);
+    os << "TupleExpr\n";
+    print_indent(os, indent + 1);
+    os << "Elements:\n";
+    for (const auto &elem : elements) {
+        elem->print(os, indent + 2);
+    }
+}
+
+void AsExpr::print(std::ostream &os, int indent) const {
+    print_indent(os, indent);
+    os << "AsExpr\n";
+    print_indent(os, indent + 1);
+    os << "Expression:\n";
+    expression->print(os, indent + 2);
+    print_indent(os, indent + 1);
+    os << "Target Type:\n";
+    target_type->print(os, indent + 2);
+}
+
+// stmt
+void BlockStmt::print(std::ostream &os, int indent) const {
+    print_indent(os, indent);
+    os << "BlockStmt\n";
+    for (const auto &stmt : statements) {
+        stmt->print(os, indent + 1);
+    }
+    if (final_expr) {
+        print_indent(os, indent + 1);
+        os << "Final Expression:\n";
+        (*final_expr)->print(os, indent + 2);
+    }
+}
+
+void ExprStmt::print(std::ostream &os, int indent) const {
+    print_indent(os, indent);
+    os << "ExprStmt\n";
+    expression->print(os, indent + 1);
+}
+
+void LetStmt::print(std::ostream &os, int indent) const {
+    print_indent(os, indent);
+    os << "LetStmt(name=" << name.lexeme << ", mut=" << (is_mutable ? "true" : "false") << ")\n";
+    if (type_annotation) {
+        print_indent(os, indent + 1);
+        os << "Type Annotation:\n";
+        (*type_annotation)->print(os, indent + 2);
+    }
+    if (initializer) {
+        print_indent(os, indent + 1);
+        os << "Initializer:\n";
+        (*initializer)->print(os, indent + 2);
+    }
+}
+
+void ReturnStmt::print(std::ostream &os, int indent) const {
+    print_indent(os, indent);
+    os << "ReturnStmt\n";
+    if (value) {
+        (*value)->print(os, indent + 1);
+    }
+}
+
 void BreakStmt::print(std::ostream &os, int indent) const {
     print_indent(os, indent);
     os << "BreakStmt\n";
@@ -243,4 +246,97 @@ void BreakStmt::print(std::ostream &os, int indent) const {
 void ContinueStmt::print(std::ostream &os, int indent) const {
     print_indent(os, indent);
     os << "ContinueStmt\n";
+}
+
+void ItemStmt::print(std::ostream &os, int indent) const { item->print(os, indent); }
+
+void FnDecl::print(std::ostream &os, int indent) const {
+    print_indent(os, indent);
+    os << "FnDecl(name=" << name.lexeme << ")\n";
+    print_indent(os, indent + 1);
+    os << "Params: ";
+    for (const auto &p : params) {
+        os << p.lexeme << " ";
+    }
+
+    os << "\n";
+    print_indent(os, indent + 1);
+    os << "Param Types:\n";
+    for (const auto &type : param_types) {
+        type->print(os, indent + 1);
+    }
+    print_indent(os, indent + 1);
+    os << "Return Type:\n";
+    if (return_type) {
+        (*return_type)->print(os, indent + 2);
+    }
+    print_indent(os, indent + 1);
+    os << "Body:\n";
+    body->print(os, indent + 2);
+}
+
+void StructDecl::print(std::ostream &os, int indent) const {
+    print_indent(os, indent);
+    os << "StructDecl(name=" << name.lexeme << ")\n";
+    print_indent(os, indent + 1);
+    os << "Kind: ";
+    switch (kind) {
+    case StructKind::Normal:
+        os << "Normal\n";
+        break;
+    case StructKind::Tuple:
+        os << "Tuple\n";
+        break;
+    case StructKind::Unit:
+        os << "Unit\n";
+        break;
+    }
+    print_indent(os, indent + 1);
+    os << "Fields:\n";
+    for (const auto &field : fields) {
+        print_indent(os, indent + 2);
+        os << "Field(name=" << field.name.lexeme << ")\n";
+        print_indent(os, indent + 3);
+        os << "Type:\n";
+        field.type->print(os, indent + 4);
+    }
+}
+
+// Root
+void Program::print(std::ostream &os, int indent) const {
+    print_indent(os, indent);
+    os << "Program\n";
+    for (const auto &item : items) {
+        item->print(os, indent + 1);
+    }
+}
+
+// Type
+void TypeNameNode::print(std::ostream &os, int indent) const {
+    print_indent(os, indent);
+    os << "TypeNameNode(" << name.lexeme << ")\n";
+}
+
+void ArrayTypeNode::print(std::ostream &os, int indent) const {
+    print_indent(os, indent);
+    os << "ArrayTypeNode\n";
+    print_indent(os, indent + 1);
+    os << "Element Type:\n";
+    element_type->print(os, indent + 2);
+    print_indent(os, indent + 1);
+    os << "Size:\n";
+    size->print(os, indent + 2);
+}
+
+void UnitTypeNode::print(std::ostream &os, int indent) const {
+    print_indent(os, indent);
+    os << "UnitTypeNode\n";
+}
+
+void TupleTypeNode::print(std::ostream &os, int indent) const {
+    print_indent(os, indent);
+    os << "TupleTypeNode\n";
+    for (const auto &elem : elements) {
+        elem->print(os, indent + 1);
+    }
 }

@@ -11,7 +11,7 @@ void Token::print() const {
               << " at line " << line << ", column " << column << std::endl;
 }
 
-std::string tokenTypeToString(TokenType type) {
+string tokenTypeToString(TokenType type) {
     switch (type) {
     // symbols
     case TokenType::LEFT_PAREN:
