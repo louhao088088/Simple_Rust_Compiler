@@ -27,6 +27,7 @@ struct Expr : public Node {};
 struct Stmt : public Node {};
 struct Item : public Node {};
 struct TypeNode : public Node {};
+struct Pattern : public Node {};
 
 // Expressions
 
@@ -182,6 +183,22 @@ struct AsExpr : public Expr {
         : expression(std::move(expr)), target_type(std::move(type)) {}
     void print(std::ostream &os, int indent = 0) const override;
 };
+struct MatchArm;
+struct MatchExpr : public Expr {
+    std::unique_ptr<Expr> scrutinee; // The expression being matched on
+    std::vector<std::unique_ptr<MatchArm>> arms;
+
+    MatchExpr(std::unique_ptr<Expr> scrut, std::vector<std::unique_ptr<MatchArm>> arms_vec)
+        : scrutinee(std::move(scrut)), arms(std::move(arms_vec)) {}
+
+    void print(std::ostream &os, int indent = 0) const override;
+};
+
+struct UnderscoreExpr : public Expr {
+    Token underscore_token;
+    explicit UnderscoreExpr(Token token) : underscore_token(std::move(token)) {}
+    void print(std::ostream &os, int indent = 0) const override;
+};
 
 // Statements
 
@@ -200,14 +217,17 @@ struct ExprStmt : public Stmt {
 };
 
 struct LetStmt : public Stmt {
-    Token name;
-    bool is_mutable;
+
+    std::unique_ptr<Pattern> pattern;
+
     std::optional<std::unique_ptr<TypeNode>> type_annotation;
     std::optional<std::unique_ptr<Expr>> initializer;
-    LetStmt(Token name, bool is_mut, std::optional<std::unique_ptr<TypeNode>> type_ann,
+
+    LetStmt(std::unique_ptr<Pattern> pat, std::optional<std::unique_ptr<TypeNode>> type_ann,
             std::optional<std::unique_ptr<Expr>> init)
-        : name(std::move(name)), is_mutable(is_mut), type_annotation(std::move(type_ann)),
+        : pattern(std::move(pat)), type_annotation(std::move(type_ann)),
           initializer(std::move(init)) {}
+
     void print(std::ostream &os, int indent = 0) const override;
 };
 
@@ -298,6 +318,105 @@ struct StructDecl : public Item {
 
     explicit StructDecl(Token n) // Unit
         : name(std::move(n)), kind(StructKind::Unit) {}
+
+    void print(std::ostream &os, int indent = 0) const override;
+};
+
+struct ConstDecl : public Item {
+    Token name;
+    std::unique_ptr<TypeNode> type;
+    std::unique_ptr<Expr> value;
+
+    ConstDecl(Token n, std::unique_ptr<TypeNode> t, std::unique_ptr<Expr> v)
+        : name(std::move(n)), type(std::move(t)), value(std::move(v)) {}
+
+    void print(std::ostream &os, int indent = 0) const override;
+};
+
+enum class EnumVariantKind { Plain, Tuple, Struct };
+
+struct EnumVariant : public Node {
+    Token name;
+    EnumVariantKind kind;
+
+    std::optional<std::unique_ptr<Expr>> discriminant;
+
+    std::vector<std::unique_ptr<TypeNode>> tuple_types;
+
+    std::vector<Field> fields;
+
+    EnumVariant(Token n, std::optional<std::unique_ptr<Expr>> disc = std::nullopt)
+        : name(std::move(n)), kind(EnumVariantKind::Plain), discriminant(std::move(disc)) {}
+
+    EnumVariant(Token n, std::vector<std::unique_ptr<TypeNode>> types)
+        : name(std::move(n)), kind(EnumVariantKind::Tuple), tuple_types(std::move(types)) {}
+
+    EnumVariant(Token n, std::vector<Field> f)
+        : name(std::move(n)), kind(EnumVariantKind::Struct), fields(std::move(f)) {}
+
+    void print(std::ostream &os, int indent = 0) const override;
+};
+
+struct EnumDecl : public Item {
+    Token name;
+    std::vector<std::unique_ptr<EnumVariant>> variants;
+
+    EnumDecl(Token n, std::vector<std::unique_ptr<EnumVariant>> v)
+        : name(std::move(n)), variants(std::move(v)) {}
+
+    void print(std::ostream &os, int indent = 0) const override;
+};
+
+// pattern node
+struct WildcardPattern : public Pattern {
+    void print(std::ostream &os, int indent = 0) const override;
+};
+
+struct LiteralPattern : public Pattern {
+    Token literal;
+    explicit LiteralPattern(Token lit) : literal(std::move(lit)) {}
+    void print(std::ostream &os, int indent = 0) const override;
+};
+
+struct IdentifierPattern : public Pattern {
+    Token name;
+    bool is_mutable;
+    IdentifierPattern(Token n, bool is_mut) : name(std::move(n)), is_mutable(is_mut) {}
+    void print(std::ostream &os, int indent = 0) const override;
+};
+struct TuplePattern : public Pattern {
+    std::vector<std::unique_ptr<Pattern>> elements;
+
+    explicit TuplePattern(std::vector<std::unique_ptr<Pattern>> elems)
+        : elements(std::move(elems)) {}
+
+    void print(std::ostream &os, int indent = 0) const override;
+};
+struct MatchArm : public Node {
+    std::unique_ptr<Pattern> pattern;
+    std::optional<std::unique_ptr<Expr>> guard;
+    std::unique_ptr<Expr> body;
+
+    MatchArm(std::unique_ptr<Pattern> pat, std::optional<std::unique_ptr<Expr>> grd,
+             std::unique_ptr<Expr> bdy)
+        : pattern(std::move(pat)), guard(std::move(grd)), body(std::move(bdy)) {}
+
+    void print(std::ostream &os, int indent = 0) const override;
+};
+
+struct StructPatternField {
+    Token field_name;
+    std::optional<std::unique_ptr<Pattern>> pattern;
+};
+
+struct StructPattern : public Pattern {
+    std::unique_ptr<Expr> path;
+
+    std::vector<StructPatternField> fields;
+    bool has_rest;
+
+    StructPattern(std::unique_ptr<Expr> p, std::vector<StructPatternField> f, bool rest)
+        : path(std::move(p)), fields(std::move(f)), has_rest(rest) {}
 
     void print(std::ostream &os, int indent = 0) const override;
 };

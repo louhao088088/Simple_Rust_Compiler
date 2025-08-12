@@ -189,6 +189,39 @@ void AsExpr::print(std::ostream &os, int indent) const {
     os << "Target Type:\n";
     target_type->print(os, indent + 2);
 }
+void MatchArm::print(std::ostream &os, int indent) const {
+    print_indent(os, indent);
+    os << "MatchArm\n";
+    print_indent(os, indent + 1);
+    os << "Pattern:\n";
+    pattern->print(os, indent + 2);
+    print_indent(os, indent + 1);
+    os << "Guard:\n";
+    if (guard) {
+        (*guard)->print(os, indent + 2);
+    }
+    print_indent(os, indent + 1);
+    os << "Body:\n";
+    body->print(os, indent + 2);
+}
+
+void MatchExpr::print(std::ostream &os, int indent) const {
+    print_indent(os, indent);
+    os << "MatchExpr\n";
+    print_indent(os, indent + 1);
+    os << "Subject:\n";
+    scrutinee->print(os, indent + 2);
+    print_indent(os, indent + 1);
+    os << "Arms:\n";
+    for (const auto &arm : arms) {
+        arm->print(os, indent + 2);
+    }
+}
+
+void UnderscoreExpr::print(std::ostream &os, int indent) const {
+    print_indent(os, indent);
+    os << "UnderscoreExpr(_)\n";
+}
 
 // stmt
 void BlockStmt::print(std::ostream &os, int indent) const {
@@ -212,7 +245,10 @@ void ExprStmt::print(std::ostream &os, int indent) const {
 
 void LetStmt::print(std::ostream &os, int indent) const {
     print_indent(os, indent);
-    os << "LetStmt(name=" << name.lexeme << ", mut=" << (is_mutable ? "true" : "false") << ")\n";
+    os << "LetStmt\n";
+    print_indent(os, indent + 1);
+    os << "Pattern:\n";
+    pattern->print(os, indent + 2);
     if (type_annotation) {
         print_indent(os, indent + 1);
         os << "Type Annotation:\n";
@@ -302,6 +338,62 @@ void StructDecl::print(std::ostream &os, int indent) const {
     }
 }
 
+void ConstDecl::print(std::ostream &os, int indent) const {
+    print_indent(os, indent);
+    os << "ConstDecl(name=" << name.lexeme << ")\n";
+    print_indent(os, indent + 1);
+    os << "Type:\n";
+    type->print(os, indent + 2);
+    print_indent(os, indent + 1);
+    os << "Value:\n";
+    value->print(os, indent + 2);
+}
+
+void EnumVariant::print(std::ostream &os, int indent) const {
+    print_indent(os, indent);
+    os << "EnumVariant(name=" << name.lexeme;
+    switch (kind) {
+    case EnumVariantKind::Plain:
+        os << ", kind=Plain)\n";
+        if (discriminant) {
+            print_indent(os, indent + 1);
+            os << "Discriminant:\n";
+            (*discriminant)->print(os, indent + 2);
+        }
+        break;
+    case EnumVariantKind::Tuple:
+        os << ", kind=Tuple)\n";
+        print_indent(os, indent + 1);
+        os << "Types:\n";
+        for (const auto &type : tuple_types) {
+            type->print(os, indent + 2);
+        }
+        break;
+    case EnumVariantKind::Struct:
+        os << ", kind=Struct)\n";
+        print_indent(os, indent + 1);
+        os << "Fields:\n";
+        for (const auto &field : fields) {
+            print_indent(os, indent + 2);
+            os << "Field(name=" << field.name.lexeme << ")\n";
+            print_indent(os, indent + 3);
+            os << "Type:\n";
+            field.type->print(os, indent + 4);
+        }
+        break;
+    }
+}
+
+void EnumDecl::print(std::ostream &os, int indent) const {
+    print_indent(os, indent);
+    os << "EnumDecl(name=" << name.lexeme << ")\n";
+    print_indent(os, indent + 1);
+    os << "Variants:\n";
+    for (const auto &variant : variants) {
+        variant->print(os, indent + 2);
+    }
+}
+
 // Root
 void Program::print(std::ostream &os, int indent) const {
     print_indent(os, indent);
@@ -338,5 +430,60 @@ void TupleTypeNode::print(std::ostream &os, int indent) const {
     os << "TupleTypeNode\n";
     for (const auto &elem : elements) {
         elem->print(os, indent + 1);
+    }
+}
+
+// pattern
+
+void IdentifierPattern::print(std::ostream &os, int indent) const {
+    print_indent(os, indent);
+    os << "IdentifierPattern(name=" << name.lexeme << ")\n";
+    print_indent(os, indent);
+    os << "mutability:" << (is_mutable ? "mutable" : "immutable") << "\n";
+}
+
+void WildcardPattern::print(std::ostream &os, int indent) const {
+    print_indent(os, indent);
+    os << "WildcardPattern\n";
+}
+
+void LiteralPattern::print(std::ostream &os, int indent) const {
+    print_indent(os, indent);
+    os << "LiteralPattern(value=" << literal.lexeme << ")\n";
+}
+
+void TuplePattern::print(std::ostream &os, int indent) const {
+    print_indent(os, indent);
+    os << "TuplePattern\n";
+    print_indent(os, indent + 1);
+    os << "Elements:\n";
+    for (const auto &element : elements) {
+        element->print(os, indent + 2);
+    }
+}
+void print_struct_pattern_field(const StructPatternField &field, std::ostream &os, int indent) {
+    print_indent(os, indent);
+    os << "StructPatternField(name=" << field.field_name.lexeme << ")\n";
+    if (field.pattern) {
+        print_indent(os, indent + 1);
+        os << "Pattern:\n";
+        (*field.pattern)->print(os, indent + 2);
+    } else {
+        print_indent(os, indent + 1);
+        os << "Pattern: (shorthand)\n";
+    }
+}
+void StructPattern::print(std::ostream &os, int indent) const {
+    print_indent(os, indent);
+    os << "StructPatternNode(has_rest=" << (has_rest ? "true" : "false") << ")\n";
+
+    print_indent(os, indent + 1);
+    os << "Path:\n";
+    path->print(os, indent + 2);
+
+    print_indent(os, indent + 1);
+    os << "Fields:\n";
+    for (const auto &field : fields) {
+        print_struct_pattern_field(field, os, indent + 2);
     }
 }

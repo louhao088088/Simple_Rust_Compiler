@@ -467,8 +467,8 @@ vector<Token> lexer_program(const Prog &program) {
                     new_token.lexeme = "==";
                 } else if (next_ch == '>') {
                     i++;
-                    new_token.type = TokenType::ARROW;
-                    new_token.lexeme = "->";
+                    new_token.type = TokenType::FAT_ARROW;
+                    new_token.lexeme = "=>";
                 } else {
                     new_token.type = TokenType::EQUAL;
                     new_token.lexeme = "=";

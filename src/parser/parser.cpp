@@ -11,8 +11,13 @@ Parser::Parser(const std::vector<Token> &tokens) : tokens_(tokens) {
     // Register Pratt parser rules
 
     // Register prefix parsing functions
-    register_prefix(TokenType::IDENTIFIER,
-                    [this] { return std::make_unique<VariableExpr>(previous()); });
+    register_prefix(TokenType::IDENTIFIER, [this] -> std::unique_ptr<Expr> {
+        if (previous().lexeme == "_") {
+            return std::make_unique<UnderscoreExpr>(previous());
+        } else {
+            return std::make_unique<VariableExpr>(previous());
+        }
+    });
     register_prefix(TokenType::NUMBER,
                     [this] { return std::make_unique<LiteralExpr>(previous()); });
     register_prefix(TokenType::STRING,
@@ -31,12 +36,10 @@ Parser::Parser(const std::vector<Token> &tokens) : tokens_(tokens) {
         return std::make_unique<UnaryExpr>(op, std::move(right));
     });
 
-    register_prefix(TokenType::IF, [this] {
-        puts("why there If");
-        return parse_if_expression();
-    });
+    register_prefix(TokenType::IF, [this] { return parse_if_expression(); });
     register_prefix(TokenType::WHILE, [this] { return parse_while_expression(); });
     register_prefix(TokenType::LOOP, [this] { return parse_loop_expression(); });
+    register_prefix(TokenType::MATCH, [this] { return parse_match_expression(); });
 
     register_prefix(TokenType::LEFT_PAREN, [this] -> std::unique_ptr<Expr> {
         if (check(TokenType::RIGHT_PAREN)) {
@@ -322,15 +325,79 @@ std::unique_ptr<Program> Parser::parse() {
     return program;
 }
 
+// pattern
+
+std::unique_ptr<Pattern> Parser::parse_pattern() {
+    if (match({TokenType::LEFT_PAREN})) {
+        std::vector<std::unique_ptr<Pattern>> elements;
+        if (!check(TokenType::RIGHT_PAREN)) {
+            do {
+                elements.push_back(parse_pattern());
+            } while (match({TokenType::COMMA}));
+        }
+        consume(TokenType::RIGHT_PAREN, "Expect ')' to close tuple pattern.");
+        return std::make_unique<TuplePattern>(std::move(elements));
+    }
+
+    bool is_mutable = match({TokenType::MUT});
+
+    if (match({TokenType::IDENTIFIER})) {
+        if (previous().lexeme == "_") {
+            return std::make_unique<WildcardPattern>();
+        }
+        return std::make_unique<IdentifierPattern>(previous(), is_mutable);
+    }
+
+    if (match({TokenType::NUMBER, TokenType::STRING, TokenType::TRUE, TokenType::FALSE})) {
+        return std::make_unique<LiteralPattern>(previous());
+    }
+
+    throw error(peek(), "Expected a pattern.");
+}
+
+std::unique_ptr<Pattern> Parser::parse_struct_pattern_body(std::unique_ptr<Expr> path) {
+    consume(TokenType::LEFT_BRACE, "Expect '{' to start struct pattern.");
+
+    std::vector<StructPatternField> fields;
+    bool has_rest = false;
+
+    while (!check(TokenType::RIGHT_BRACE) && !is_at_end()) {
+
+        if (match({TokenType::DOT, TokenType::DOT})) {
+            has_rest = true;
+            break;
+        }
+        Token field_name = consume(TokenType::IDENTIFIER, "Expect field name in struct pattern.");
+        std::optional<std::unique_ptr<Pattern>> pattern;
+
+        if (match({TokenType::COLON})) {
+            pattern = parse_pattern();
+        } else {
+            pattern = std::nullopt;
+        }
+        fields.push_back({field_name, std::move(pattern)});
+        if (!check(TokenType::RIGHT_BRACE)) {
+            consume(TokenType::COMMA, "Expect ',' after field in struct pattern.");
+        }
+    }
+    consume(TokenType::RIGHT_BRACE, "Expect '}' to close struct pattern.");
+
+    return std::make_unique<StructPattern>(std::move(path), std::move(fields), has_rest);
+}
+
 // Recursive descent implementation
 std::unique_ptr<Item> Parser::parse_item() {
 
     if (peek().type == TokenType::FN) {
         return parse_fn_declaration();
     } else if (peek().type == TokenType::STRUCT) {
-
         return parse_struct_declaration();
+    } else if (peek().type == TokenType::CONST) {
+        return parse_const_declaration();
+    } else if (peek().type == TokenType::ENUM) {
+        return parse_enum_declaration();
     }
+
     throw error(peek(), "Expect a top-level item like 'fn'.");
 }
 
@@ -418,11 +485,78 @@ std::unique_ptr<Expr> Parser::parse_struct_initializer(std::unique_ptr<Expr> nam
 
     return std::make_unique<StructInitializerExpr>(std::move(name), std::move(fields));
 }
+std::unique_ptr<ConstDecl> Parser::parse_const_declaration() {
+    consume(TokenType::CONST, "Expect 'const' keyword.");
+    Token name = consume(TokenType::IDENTIFIER, "Expect constant name.");
+    consume(TokenType::COLON, "Expect ':' after constant name.");
+    auto type = parse_type();
+    if (!type) {
+        throw error(peek(), "Expect a type for the constant.");
+    }
+    consume(TokenType::EQUAL, "Expect '=' after constant type.");
+    auto value = parse_expression(Precedence::NONE);
+    consume(TokenType::SEMICOLON, "Expect ';' after constant value.");
+    return std::make_unique<ConstDecl>(name, std::move(type), std::move(value));
+}
+std::unique_ptr<EnumDecl> Parser::parse_enum_declaration() {
+    consume(TokenType::ENUM, "Expect 'enum' keyword.");
+    Token name = consume(TokenType::IDENTIFIER, "Expect enum name.");
+    consume(TokenType::LEFT_BRACE, "Expect '{' before enum body.");
 
+    std::vector<std::unique_ptr<EnumVariant>> variants;
+    while (!check(TokenType::RIGHT_BRACE) && !is_at_end()) {
+        variants.push_back(parse_enum_variant());
+
+        if (!check(TokenType::RIGHT_BRACE)) {
+            consume(TokenType::COMMA, "Expect ',' after enum variant.");
+        }
+    }
+    consume(TokenType::RIGHT_BRACE, "Expect '}' after enum body.");
+    return std::make_unique<EnumDecl>(name, std::move(variants));
+}
+
+std::unique_ptr<EnumVariant> Parser::parse_enum_variant() {
+    Token name = consume(TokenType::IDENTIFIER, "Expect variant name.");
+    if (peek().type == TokenType::LEFT_BRACE) {
+        advance();
+
+        std::vector<Field> fields;
+        if (!check(TokenType::RIGHT_BRACE)) {
+            do {
+                Token field_name = consume(TokenType::IDENTIFIER, "Expect field name.");
+                consume(TokenType::COLON, "Expect ':' after field name.");
+                auto field_type = parse_type();
+                fields.push_back({field_name, std::move(field_type)});
+            } while (match({TokenType::COMMA}));
+        }
+
+        consume(TokenType::RIGHT_BRACE, "Expect '}' after struct variant fields.");
+        return std::make_unique<EnumVariant>(name, std::move(fields));
+    } else if (peek().type == TokenType::LEFT_PAREN) {
+        advance();
+
+        std::vector<std::unique_ptr<TypeNode>> tuple_types;
+        if (!check(TokenType::RIGHT_PAREN)) {
+            do {
+                tuple_types.push_back(parse_type());
+            } while (match({TokenType::COMMA}));
+        }
+
+        consume(TokenType::RIGHT_PAREN, "Expect ')' after tuple variant types.");
+        return std::make_unique<EnumVariant>(name, std::move(tuple_types));
+    } else {
+        std::optional<std::unique_ptr<Expr>> discriminant;
+        if (match({TokenType::EQUAL})) {
+            discriminant = parse_expression(Precedence::NONE);
+        }
+        return std::make_unique<EnumVariant>(name, std::move(discriminant));
+    }
+}
+
+// statement
 std::unique_ptr<BlockStmt> Parser::parse_block_statement() {
     consume(TokenType::LEFT_BRACE, "Expect '{' to start a block.");
     auto block = std::make_unique<BlockStmt>();
-    puts("hello block");
     while (!check(TokenType::RIGHT_BRACE) && !is_at_end()) {
         block->statements.push_back(parse_statement());
     }
@@ -448,26 +582,38 @@ std::unique_ptr<Stmt> Parser::parse_statement() {
     if (peek().type == TokenType::STRUCT) {
         return std::make_unique<ItemStmt>(parse_struct_declaration());
     }
+    if (peek().type == TokenType::CONST) {
+        return std::make_unique<ItemStmt>(parse_const_declaration());
+    }
+    if (peek().type == TokenType::ENUM) {
+        return std::make_unique<ItemStmt>(parse_enum_declaration());
+    }
+    if (peek().type == TokenType::BREAK) {
+        return parse_break_statement();
+    }
+    if (peek().type == TokenType::CONTINUE) {
+        return parse_continue_statement();
+    }
 
     return parse_expression_statement();
 }
 
 std::unique_ptr<LetStmt> Parser::parse_let_statement() {
     consume(TokenType::LET, "Expect 'let'.");
-    bool is_mutable = match({TokenType::MUT});
-    Token name = consume(TokenType::IDENTIFIER, "Expect variable name.");
+
+    auto pattern = parse_pattern();
 
     std::optional<std::unique_ptr<TypeNode>> type_annotation;
     if (match({TokenType::COLON})) {
         type_annotation = parse_type();
     }
-
     std::optional<std::unique_ptr<Expr>> initializer;
     if (match({TokenType::EQUAL})) {
-        initializer = parse_expression(Precedence::NONE);
+        initializer = parse_expression(Precedence::NONE, true);
     }
+
     consume(TokenType::SEMICOLON, "Expect ';' after let statement.");
-    return std::make_unique<LetStmt>(name, is_mutable, std::move(type_annotation),
+    return std::make_unique<LetStmt>(std::move(pattern), std::move(type_annotation),
                                      std::move(initializer));
 }
 
@@ -507,7 +653,6 @@ std::unique_ptr<ExprStmt> Parser::parse_expression_statement() {
     return std::make_unique<ExprStmt>(std::move(expr), true);
 }
 
-// Core of Pratt parser
 Precedence Parser::get_precedence(TokenType type) {
     if (precedences_.count(type)) {
         return precedences_[type];
@@ -515,7 +660,7 @@ Precedence Parser::get_precedence(TokenType type) {
     return Precedence::NONE;
 }
 
-std::unique_ptr<Expr> Parser::parse_expression(Precedence precedence) {
+std::unique_ptr<Expr> Parser::parse_expression(Precedence precedence, bool allow_struct_literal) {
     advance();
     TokenType prefix_type = previous().type;
     if (prefix_parsers_.find(prefix_type) == prefix_parsers_.end()) {
@@ -525,11 +670,11 @@ std::unique_ptr<Expr> Parser::parse_expression(Precedence precedence) {
     auto left = prefix_parsers_[prefix_type]();
 
     if (peek().type == TokenType::LEFT_BRACE) {
-        bool is_valid_struct_path = dynamic_cast<VariableExpr *>(left.get()) != nullptr;
+        bool is_valid_struct_path = dynamic_cast<VariableExpr *>(left.get()) != nullptr ||
+                                    dynamic_cast<FieldAccessExpr *>(left.get()) != nullptr;
 
-        if (is_valid_struct_path) {
+        if (is_valid_struct_path && allow_struct_literal) {
             if (Precedence::CALL > precedence) {
-                
                 left = parse_struct_initializer(std::move(left));
             }
         }
@@ -547,11 +692,9 @@ std::unique_ptr<Expr> Parser::parse_expression(Precedence precedence) {
     return left;
 }
 
-std::unique_ptr<Expr> Parser::parse_if_expression() {
-    auto condition = parse_expression(Precedence::NONE);
-    puts("I am in IF");
+std::unique_ptr<IfExpr> Parser::parse_if_expression() {
+    auto condition = parse_expression(Precedence::NONE, 0);
     auto then_branch = parse_block_statement();
-    puts("I am out if");
     std::optional<std::unique_ptr<Stmt>> else_branch;
     if (match({TokenType::ELSE})) {
         if (peek().type == TokenType::IF) {
@@ -564,15 +707,46 @@ std::unique_ptr<Expr> Parser::parse_if_expression() {
                                     std::move(else_branch));
 }
 
-std::unique_ptr<Expr> Parser::parse_loop_expression() {
+std::unique_ptr<LoopExpr> Parser::parse_loop_expression() {
     auto body = parse_block_statement();
     return std::make_unique<LoopExpr>(std::move(body));
 }
 
-std::unique_ptr<Expr> Parser::parse_while_expression() {
-    auto condition = parse_expression(Precedence::NONE);
+std::unique_ptr<WhileExpr> Parser::parse_while_expression() {
+    auto condition = parse_expression(Precedence::NONE, 0);
     auto body = parse_block_statement();
     return std::make_unique<WhileExpr>(std::move(condition), std::move(body));
+}
+
+std::unique_ptr<MatchArm> Parser::parse_match_arm() {
+    auto pattern = parse_pattern();
+    std::optional<std::unique_ptr<Expr>> guard;
+    if (match({TokenType::IF})) {
+        guard = parse_expression(Precedence::NONE);
+    }
+
+    consume(TokenType::FAT_ARROW, "Expect '=>' after match arm pattern.");
+    auto body = parse_expression(Precedence::NONE);
+    if (!check(TokenType::RIGHT_BRACE)) {
+        consume(TokenType::COMMA, "Expect ',' after match arm body.");
+    }
+    return std::make_unique<MatchArm>(std::move(pattern), std::move(guard), std::move(body));
+}
+
+std::unique_ptr<MatchExpr> Parser::parse_match_expression() {
+    puts("hello");
+    auto scrutinee = parse_expression(Precedence::NONE, 0);
+
+    consume(TokenType::LEFT_BRACE, "Expect '{' after match scrutinee.");
+
+    std::vector<std::unique_ptr<MatchArm>> arms;
+    while (!check(TokenType::RIGHT_BRACE) && !is_at_end()) {
+        arms.push_back(parse_match_arm());
+    }
+
+    consume(TokenType::RIGHT_BRACE, "Expect '}' to close match expression.");
+
+    return std::make_unique<MatchExpr>(std::move(scrutinee), std::move(arms));
 }
 
 // tools

@@ -67,7 +67,14 @@ class Parser {
     std::unique_ptr<Item> parse_item();
     std::unique_ptr<FnDecl> parse_fn_declaration();
     std::unique_ptr<StructDecl> parse_struct_declaration();
+    std::unique_ptr<ConstDecl> parse_const_declaration();
     std::unique_ptr<Expr> parse_struct_initializer(std::unique_ptr<Expr> name);
+    std::unique_ptr<EnumDecl> parse_enum_declaration();
+    std::unique_ptr<EnumVariant> parse_enum_variant();
+
+    // Patterns
+    std::unique_ptr<Pattern> parse_pattern();
+    std::unique_ptr<Pattern> parse_struct_pattern_body(std::unique_ptr<Expr> path);
 
     // Statements
     std::unique_ptr<Stmt> parse_statement();
@@ -79,12 +86,13 @@ class Parser {
     std::unique_ptr<ContinueStmt> parse_continue_statement();
 
     // Expressions (Pratt Parser)
-    std::unique_ptr<Expr> parse_expression(Precedence precedence);
+    std::unique_ptr<Expr> parse_expression(Precedence precedence, bool allow_struct_literal = false);
     std::unique_ptr<Expr> parse_primary_expression();
-    std::unique_ptr<Expr> parse_if_expression();
-    std::unique_ptr<Expr> parse_loop_expression();
-    std::unique_ptr<Expr> parse_while_expression();
-    std::unique_ptr<Expr> parse_match_expression();
+    std::unique_ptr<IfExpr> parse_if_expression();
+    std::unique_ptr<LoopExpr> parse_loop_expression();
+    std::unique_ptr<WhileExpr> parse_while_expression();
+    std::unique_ptr<MatchArm> parse_match_arm();
+    std::unique_ptr<MatchExpr> parse_match_expression();
     Precedence get_precedence(TokenType type);
 
     // Type parsing
