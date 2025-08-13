@@ -35,6 +35,16 @@ Parser::Parser(const std::vector<Token> &tokens) : tokens_(tokens) {
         auto right = parse_expression(Precedence::UNARY);
         return std::make_unique<UnaryExpr>(op, std::move(right));
     });
+    register_prefix(TokenType::AMPERSAND, [this]() -> std::unique_ptr<Expr> {
+        bool is_mutable = match({TokenType::MUT});
+        auto expr = parse_expression(Precedence::UNARY);
+        return std::make_unique<ReferenceExpr>(is_mutable, std::move(expr));
+    });
+    register_prefix(TokenType::STAR, [this] {
+        Token op = previous();
+        auto right = parse_expression(Precedence::UNARY);
+        return std::make_unique<UnaryExpr>(op, std::move(right));
+    });
 
     register_prefix(TokenType::IF, [this] { return parse_if_expression(); });
     register_prefix(TokenType::WHILE, [this] { return parse_while_expression(); });
@@ -270,6 +280,11 @@ Parser::Parser(const std::vector<Token> &tokens) : tokens_(tokens) {
         auto right = parse_expression(Precedence::ASSIGNMENT);
         return std::make_unique<CompoundAssignmentExpr>(std::move(left), op, std::move(right));
     });
+    register_infix(TokenType::COLON_COLON, Precedence::PATH, [this](auto left) {
+        Token op = previous();
+        Token right = consume(TokenType::IDENTIFIER, "Expect identifier after '::'.");
+        return std::make_unique<PathExpr>(std::move(left), op, right);
+    });
 }
 
 // Implementation of registration functions
@@ -278,14 +293,24 @@ void Parser::register_infix(TokenType type, Precedence prec, InfixParseFn fn) {
     infix_parsers_[type] = fn;
     precedences_[type] = prec;
 }
-std::unique_ptr<TypeNode> Parser::parse_type() { return parse_primary_type(); }
 
-std::unique_ptr<TypeNode> Parser::parse_primary_type() {
-    if (match({TokenType::IDENTIFIER})) {
-        return std::make_unique<TypeNameNode>(previous());
-    }
+std::unique_ptr<TypeNode> Parser::parse_type() {
+
     if (match({TokenType::BANG})) {
         return std::make_unique<TypeNameNode>(previous());
+    }
+    if (match({TokenType::STAR})) {
+        bool is_mutable = match({TokenType::MUT});
+        if (!is_mutable) {
+            consume(TokenType::CONST, "Expect 'const' or 'mut' after '*' in raw pointer type.");
+        }
+        auto pointee_type = parse_type();
+        return std::make_unique<RawPointerTypeNode>(is_mutable, std::move(pointee_type));
+    }
+    if (match({TokenType::AMPERSAND})) {
+        bool is_mutable = match({TokenType::MUT});
+        auto referenced_type = parse_type();
+        return std::make_unique<ReferenceTypeNode>(is_mutable, std::move(referenced_type));
     }
     if (match({TokenType::LEFT_BRACKET})) {
         auto element_type = parse_type();
@@ -301,12 +326,14 @@ std::unique_ptr<TypeNode> Parser::parse_primary_type() {
         } else if (check(TokenType::IDENTIFIER)) {
             std::vector<std::unique_ptr<TypeNode>> elements;
             do {
-                elements.push_back(parse_primary_type());
+                elements.push_back(parse_type());
             } while (match({TokenType::COMMA}));
             consume(TokenType::RIGHT_PAREN, "Expect ')' to close tuple type.");
             return std::make_unique<TupleTypeNode>(std::move(elements));
         }
     }
+    auto path = parse_expression(Precedence::CALL);
+    return std::make_unique<PathTypeNode>(std::move(path));
 
     throw error(peek(), "Expected a type.");
 }
@@ -345,7 +372,12 @@ std::unique_ptr<Pattern> Parser::parse_pattern() {
         if (previous().lexeme == "_") {
             return std::make_unique<WildcardPattern>();
         }
-        return std::make_unique<IdentifierPattern>(previous(), is_mutable);
+        // auto path_expr = parse_expression(Precedence::CALL);
+        if (peek().type == TokenType::LEFT_BRACE) {
+            return parse_struct_pattern_body(std::make_unique<VariableExpr>(previous()));
+        } else {
+            return std::make_unique<IdentifierPattern>(previous(), is_mutable);
+        }
     }
 
     if (match({TokenType::NUMBER, TokenType::STRING, TokenType::TRUE, TokenType::FALSE})) {
@@ -396,6 +428,8 @@ std::unique_ptr<Item> Parser::parse_item() {
         return parse_const_declaration();
     } else if (peek().type == TokenType::ENUM) {
         return parse_enum_declaration();
+    } else if (peek().type == TokenType::MOD) {
+        return parse_mod_declaration();
     }
 
     throw error(peek(), "Expect a top-level item like 'fn'.");
@@ -553,6 +587,25 @@ std::unique_ptr<EnumVariant> Parser::parse_enum_variant() {
     }
 }
 
+std::unique_ptr<ModDecl> Parser::parse_mod_declaration() {
+    consume(TokenType::MOD, "Expect 'mod' keyword.");
+    Token name = consume(TokenType::IDENTIFIER, "Expect module name.");
+
+    if (match({TokenType::LEFT_BRACE})) {
+        std::vector<std::unique_ptr<Item>> items;
+        while (!check(TokenType::RIGHT_BRACE) && !is_at_end()) {
+            items.push_back(parse_item());
+        }
+        consume(TokenType::RIGHT_BRACE, "Expect '}' to close module body.");
+        return std::make_unique<ModDecl>(name, std::move(items));
+    } else if (match({TokenType::SEMICOLON})) {
+        std::vector<std::unique_ptr<Item>> items;
+        return std::make_unique<ModDecl>(name, std::move(items));
+    } else {
+        throw error(peek(), "Expect '{' or ';' after module name.");
+    }
+}
+
 // statement
 std::unique_ptr<BlockStmt> Parser::parse_block_statement() {
     consume(TokenType::LEFT_BRACE, "Expect '{' to start a block.");
@@ -587,6 +640,9 @@ std::unique_ptr<Stmt> Parser::parse_statement() {
     }
     if (peek().type == TokenType::ENUM) {
         return std::make_unique<ItemStmt>(parse_enum_declaration());
+    }
+    if (peek().type == TokenType::MOD) {
+        return std::make_unique<ItemStmt>(parse_mod_declaration());
     }
     if (peek().type == TokenType::BREAK) {
         return parse_break_statement();

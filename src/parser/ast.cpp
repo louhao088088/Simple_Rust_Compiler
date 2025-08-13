@@ -223,6 +223,30 @@ void UnderscoreExpr::print(std::ostream &os, int indent) const {
     os << "UnderscoreExpr(_)\n";
 }
 
+void PathExpr::print(std::ostream &os, int indent) const {
+    print_indent(os, indent);
+    os << "PathExpr\n";
+    print_indent(os, indent + 1);
+    os << "Left:\n";
+    left->print(os, indent + 2);
+    print_indent(os, indent + 1);
+    os << "Operator: ";
+    os << op.lexeme << "\n";
+    print_indent(os, indent + 1);
+    os << "Right: ";
+    os << right.lexeme << "\n";
+}
+
+void ReferenceExpr::print(std::ostream &os, int indent) const {
+    print_indent(os, indent);
+    os << "ReferenceExpr\n";
+    print_indent(os, indent + 1);
+    os << "Is Mutable: " << (is_mutable ? "true" : "false") << "\n";
+    print_indent(os, indent + 1);
+    os << "Expression:\n";
+    expression->print(os, indent + 2);
+}
+
 // stmt
 void BlockStmt::print(std::ostream &os, int indent) const {
     print_indent(os, indent);
@@ -394,6 +418,19 @@ void EnumDecl::print(std::ostream &os, int indent) const {
     }
 }
 
+void ModDecl::print(std::ostream &os, int indent) const {
+    print_indent(os, indent);
+    os << "ModDecl(name=" << name.lexeme << ")\n";
+
+    if (!items.empty()) {
+        print_indent(os, indent + 1);
+        os << "Items:\n";
+        for (const auto &item : items) {
+            item->print(os, indent + 2);
+        }
+    }
+}
+
 // Root
 void Program::print(std::ostream &os, int indent) const {
     print_indent(os, indent);
@@ -431,6 +468,32 @@ void TupleTypeNode::print(std::ostream &os, int indent) const {
     for (const auto &elem : elements) {
         elem->print(os, indent + 1);
     }
+}
+
+void PathTypeNode::print(std::ostream &os, int indent) const {
+    print_indent(os, indent);
+    os << "PathTypeNode\n";
+    print_indent(os, indent + 1);
+    os << "Path:\n";
+    path->print(os, indent + 2);
+}
+
+void RawPointerTypeNode::print(std::ostream &os, int indent) const {
+    print_indent(os, indent);
+    os << "RawPointerTypeNode\n";
+    print_indent(os, indent + 1);
+    os << "Pointee Type:\n";
+    pointee_type->print(os, indent + 2);
+}
+
+void ReferenceTypeNode::print(std::ostream &os, int indent) const {
+    print_indent(os, indent);
+    os << "ReferenceTypeNode\n";
+    print_indent(os, indent + 1);
+    os << "Is Mutable: " << (is_mutable ? "true" : "false") << "\n";
+    print_indent(os, indent + 1);
+    os << "Referenced Type:\n";
+    referenced_type->print(os, indent + 2);
 }
 
 // pattern

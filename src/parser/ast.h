@@ -200,6 +200,27 @@ struct UnderscoreExpr : public Expr {
     void print(std::ostream &os, int indent = 0) const override;
 };
 
+struct PathExpr : public Expr {
+    std::unique_ptr<Expr> left;
+    Token op;
+    Token right;
+
+    PathExpr(std::unique_ptr<Expr> l, Token o, Token r)
+        : left(std::move(l)), op(std::move(o)), right(std::move(r)) {}
+
+    void print(std::ostream &os, int indent = 0) const override;
+};
+
+struct ReferenceExpr : public Expr {
+    bool is_mutable;
+    std::unique_ptr<Expr> expression;
+
+    ReferenceExpr(bool is_mut, std::unique_ptr<Expr> expr)
+        : is_mutable(is_mut), expression(std::move(expr)) {}
+
+    void print(std::ostream &os, int indent = 0) const override;
+};
+
 // Statements
 
 struct BlockStmt : public Stmt {
@@ -279,6 +300,28 @@ struct TupleTypeNode : public TypeNode {
     std::vector<std::unique_ptr<TypeNode>> elements;
     explicit TupleTypeNode(std::vector<std::unique_ptr<TypeNode>> elems)
         : elements(std::move(elems)) {}
+    void print(std::ostream &os, int indent = 0) const override;
+};
+
+struct PathTypeNode : public TypeNode {
+    std::unique_ptr<Expr> path;
+    explicit PathTypeNode(std::unique_ptr<Expr> p) : path(std::move(p)) {}
+    void print(std::ostream &os, int indent = 0) const override;
+};
+
+struct RawPointerTypeNode : public TypeNode {
+    bool is_mutable;
+    std::unique_ptr<TypeNode> pointee_type;
+    RawPointerTypeNode(bool is_mut, std::unique_ptr<TypeNode> pointee)
+        : is_mutable(is_mut), pointee_type(std::move(pointee)) {}
+    void print(std::ostream &os, int indent = 0) const override;
+};
+
+struct ReferenceTypeNode : public TypeNode {
+    bool is_mutable;
+    std::unique_ptr<TypeNode> referenced_type;
+    ReferenceTypeNode(bool is_mut, std::unique_ptr<TypeNode> ref_type)
+        : is_mutable(is_mut), referenced_type(std::move(ref_type)) {}
     void print(std::ostream &os, int indent = 0) const override;
 };
 
@@ -363,6 +406,17 @@ struct EnumDecl : public Item {
 
     EnumDecl(Token n, std::vector<std::unique_ptr<EnumVariant>> v)
         : name(std::move(n)), variants(std::move(v)) {}
+
+    void print(std::ostream &os, int indent = 0) const override;
+};
+
+struct ModDecl : public Item {
+    Token name;
+
+    std::vector<std::unique_ptr<Item>> items;
+
+    ModDecl(Token n, std::vector<std::unique_ptr<Item>> i)
+        : name(std::move(n)), items(std::move(i)) {}
 
     void print(std::ostream &os, int indent = 0) const override;
 };

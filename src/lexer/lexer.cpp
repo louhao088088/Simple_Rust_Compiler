@@ -102,6 +102,8 @@ string tokenTypeToString(TokenType type) {
         return "AMPERSAND_AMPERSAND";
     case TokenType::PIPE_PIPE:
         return "PIPE_PIPE";
+    case TokenType::DOT_DOT:
+        return "DOT_DOT";
 
     // Literals
     case TokenType::IDENTIFIER:
@@ -312,6 +314,7 @@ static std::unordered_map<std::string, TokenType> symbols = {
     {">>", TokenType::GREATER_GREATER},
     {"&&", TokenType::AMPERSAND_AMPERSAND},
     {"||", TokenType::PIPE_PIPE},
+    {"..", TokenType::DOT_DOT},
     {"(", TokenType::LEFT_PAREN},
     {")", TokenType::RIGHT_PAREN},
     {"{", TokenType::LEFT_BRACE},
@@ -444,12 +447,18 @@ vector<Token> lexer_program(const Prog &program) {
                 new_token.type = TokenType::QUESTION;
                 new_token.lexeme = '?';
                 break;
-            case '.':
-                new_token.type = TokenType::DOT;
-                new_token.lexeme = '.';
-                break;
 
             // Symbols with potential multi-character tokens
+            case '.':
+                if (next_ch == '.') {
+                    i++;
+                    new_token.type = TokenType::DOT_DOT;
+                    new_token.lexeme = "..";
+                } else {
+                    new_token.type = TokenType::DOT;
+                    new_token.lexeme = '.';
+                }
+                break;
             case '!':
                 if (next_ch == '=') {
                     i++;
