@@ -221,6 +221,17 @@ struct ReferenceExpr : public Expr {
     void print(std::ostream &os, int indent = 0) const override;
 };
 
+struct RangeExpr : public Expr {
+    std::optional<std::unique_ptr<Expr>> start;
+    std::optional<std::unique_ptr<Expr>> end;
+    bool is_inclusive;
+    RangeExpr(std::optional<std::unique_ptr<Expr>> s, std::optional<std::unique_ptr<Expr>> e,
+              bool inclusive)
+        : start(std::move(s)), end(std::move(e)), is_inclusive(inclusive) {}
+
+    void print(std::ostream &os, int indent = 0) const override;
+};
+
 // Statements
 
 struct BlockStmt : public Stmt {
@@ -305,7 +316,11 @@ struct TupleTypeNode : public TypeNode {
 
 struct PathTypeNode : public TypeNode {
     std::unique_ptr<Expr> path;
-    explicit PathTypeNode(std::unique_ptr<Expr> p) : path(std::move(p)) {}
+    std::optional<std::vector<std::unique_ptr<TypeNode>>> generic_args;
+    PathTypeNode(std::unique_ptr<Expr> p,
+                 std::optional<std::vector<std::unique_ptr<TypeNode>>> args = std::nullopt)
+        : path(std::move(p)), generic_args(std::move(args)) {}
+
     void print(std::ostream &os, int indent = 0) const override;
 };
 
@@ -325,20 +340,31 @@ struct ReferenceTypeNode : public TypeNode {
     void print(std::ostream &os, int indent = 0) const override;
 };
 
-// Top-level Items
+struct SliceTypeNode : public TypeNode {
+    std::unique_ptr<TypeNode> element_type;
+    SliceTypeNode(std::unique_ptr<TypeNode> elem_type) : element_type(std::move(elem_type)) {}
+    void print(std::ostream &os, int indent = 0) const override;
+};
 
+struct SelfTypeNode : public TypeNode {
+    void print(std::ostream &os, int indent = 0) const override;
+};
+// Top-level Items
+struct FnParam {
+    std::unique_ptr<Pattern> pattern;
+    std::unique_ptr<TypeNode> type;
+};
 struct FnDecl : public Item {
     Token name;
-    std::vector<Token> params;
-    std::vector<std::unique_ptr<TypeNode>> param_types;
+    std::vector<FnParam> params;
     std::optional<std::unique_ptr<TypeNode>> return_type;
-    std::unique_ptr<BlockStmt> body;
+    std::optional<std::unique_ptr<BlockStmt>> body;
 
-    FnDecl(Token name, std::vector<Token> params,
-           std::vector<std::unique_ptr<TypeNode>> param_types,
-           std::optional<std::unique_ptr<TypeNode>> return_type, std::unique_ptr<BlockStmt> body)
-        : name(std::move(name)), params(std::move(params)), param_types(std::move(param_types)),
-          return_type(std::move(return_type)), body(std::move(body)) {}
+    FnDecl(Token name, std::vector<FnParam> params,
+           std::optional<std::unique_ptr<TypeNode>> return_type,
+           std::optional<std::unique_ptr<BlockStmt>> body)
+        : name(std::move(name)), params(std::move(params)), return_type(std::move(return_type)),
+          body(std::move(body)) {}
     void print(std::ostream &os, int indent = 0) const override;
 };
 struct Field {
@@ -421,6 +447,28 @@ struct ModDecl : public Item {
     void print(std::ostream &os, int indent = 0) const override;
 };
 
+struct TraitDecl : public Item {
+    Token name;
+    std::vector<std::unique_ptr<Item>> associated_items;
+    TraitDecl(Token n, std::vector<std::unique_ptr<Item>> items)
+        : name(std::move(n)), associated_items(std::move(items)) {}
+
+    void print(std::ostream &os, int indent = 0) const override;
+};
+
+struct ImplBlock : public Item {
+    std::optional<std::unique_ptr<TypeNode>> trait_name;
+    std::unique_ptr<TypeNode> target_type;
+    std::vector<std::unique_ptr<Item>> implemented_items;
+
+    ImplBlock(std::optional<std::unique_ptr<TypeNode>> trait, std::unique_ptr<TypeNode> target,
+              std::vector<std::unique_ptr<Item>> items)
+        : trait_name(std::move(trait)), target_type(std::move(target)),
+          implemented_items(std::move(items)) {}
+
+    void print(std::ostream &os, int indent = 0) const override;
+};
+
 // pattern node
 struct WildcardPattern : public Pattern {
     void print(std::ostream &os, int indent = 0) const override;
@@ -471,6 +519,18 @@ struct StructPattern : public Pattern {
 
     StructPattern(std::unique_ptr<Expr> p, std::vector<StructPatternField> f, bool rest)
         : path(std::move(p)), fields(std::move(f)), has_rest(rest) {}
+
+    void print(std::ostream &os, int indent = 0) const override;
+};
+
+struct RestPattern : public Pattern {
+    void print(std::ostream &os, int indent = 0) const override;
+};
+
+struct SlicePattern : public Pattern {
+    std::vector<std::unique_ptr<Pattern>> elements;
+    explicit SlicePattern(std::vector<std::unique_ptr<Pattern>> elems)
+        : elements(std::move(elems)) {}
 
     void print(std::ostream &os, int indent = 0) const override;
 };

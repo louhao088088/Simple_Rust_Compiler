@@ -241,10 +241,32 @@ void ReferenceExpr::print(std::ostream &os, int indent) const {
     print_indent(os, indent);
     os << "ReferenceExpr\n";
     print_indent(os, indent + 1);
-    os << "Is Mutable: " << (is_mutable ? "true" : "false") << "\n";
+    os << "Mutiability: " << (is_mutable ? "true" : "false") << "\n";
     print_indent(os, indent + 1);
     os << "Expression:\n";
     expression->print(os, indent + 2);
+}
+
+void RangeExpr::print(std::ostream &os, int indent) const {
+    print_indent(os, indent);
+    os << "RangeExpr\n";
+    print_indent(os, indent + 1);
+    os << "Start:\n";
+    if (start) {
+        (*start)->print(os, indent + 2);
+    }
+    print_indent(os, indent + 1);
+    os << "End:\n";
+    if (end) {
+        (*end)->print(os, indent + 2);
+    }
+    print_indent(os, indent + 1);
+    os << "Is Inclusive: " << (is_inclusive ? "true" : "false") << "\n";
+}
+
+void SelfTypeNode::print(std::ostream &os, int indent) const {
+    print_indent(os, indent);
+    os << "SelfTypeNode\n";
 }
 
 // stmt
@@ -314,16 +336,15 @@ void FnDecl::print(std::ostream &os, int indent) const {
     print_indent(os, indent);
     os << "FnDecl(name=" << name.lexeme << ")\n";
     print_indent(os, indent + 1);
-    os << "Params: ";
-    for (const auto &p : params) {
-        os << p.lexeme << " ";
-    }
-
-    os << "\n";
-    print_indent(os, indent + 1);
-    os << "Param Types:\n";
-    for (const auto &type : param_types) {
-        type->print(os, indent + 1);
+    os << "Params: \n";
+    for (const auto &param : params) {
+        param.pattern->print(os, indent + 2);
+        if (param.type) {
+            param.type->print(os, indent + 2);
+        } else {
+            os << "Any";
+        }
+        os << "\n";
     }
     print_indent(os, indent + 1);
     os << "Return Type:\n";
@@ -331,8 +352,11 @@ void FnDecl::print(std::ostream &os, int indent) const {
         (*return_type)->print(os, indent + 2);
     }
     print_indent(os, indent + 1);
+
     os << "Body:\n";
-    body->print(os, indent + 2);
+    if (body) {
+        (*body)->print(os, indent + 2);
+    }
 }
 
 void StructDecl::print(std::ostream &os, int indent) const {
@@ -431,6 +455,34 @@ void ModDecl::print(std::ostream &os, int indent) const {
     }
 }
 
+void TraitDecl::print(std::ostream &os, int indent) const {
+    print_indent(os, indent);
+    os << "TraitDecl(name=" << name.lexeme << ")\n";
+    print_indent(os, indent + 1);
+    os << "Associated Items:\n";
+    for (const auto &item : associated_items) {
+        item->print(os, indent + 2);
+    }
+}
+
+void ImplBlock::print(std::ostream &os, int indent) const {
+    print_indent(os, indent);
+    os << "ImplBlock\n";
+    if (trait_name) {
+        print_indent(os, indent + 1);
+        os << "Trait Name:\n";
+        (*trait_name)->print(os, indent + 2);
+    }
+    print_indent(os, indent + 1);
+    os << "Target Type:\n";
+    target_type->print(os, indent + 2);
+    print_indent(os, indent + 1);
+    os << "Implemented Items:\n";
+    for (const auto &item : implemented_items) {
+        item->print(os, indent + 2);
+    }
+}
+
 // Root
 void Program::print(std::ostream &os, int indent) const {
     print_indent(os, indent);
@@ -476,6 +528,13 @@ void PathTypeNode::print(std::ostream &os, int indent) const {
     print_indent(os, indent + 1);
     os << "Path:\n";
     path->print(os, indent + 2);
+    if (generic_args) {
+        print_indent(os, indent + 1);
+        os << "Generic Arguments:\n";
+        for (const auto &arg : *generic_args) {
+            arg->print(os, indent + 2);
+        }
+    }
 }
 
 void RawPointerTypeNode::print(std::ostream &os, int indent) const {
@@ -490,13 +549,19 @@ void ReferenceTypeNode::print(std::ostream &os, int indent) const {
     print_indent(os, indent);
     os << "ReferenceTypeNode\n";
     print_indent(os, indent + 1);
-    os << "Is Mutable: " << (is_mutable ? "true" : "false") << "\n";
+    os << "Mutability: " << (is_mutable ? "true" : "false") << "\n";
     print_indent(os, indent + 1);
     os << "Referenced Type:\n";
     referenced_type->print(os, indent + 2);
 }
 
-// pattern
+void SliceTypeNode::print(std::ostream &os, int indent) const {
+    print_indent(os, indent);
+    os << "SliceTypeNode\n";
+    print_indent(os, indent + 1);
+    os << "Element Type:\n";
+    element_type->print(os, indent + 2);
+}
 
 void IdentifierPattern::print(std::ostream &os, int indent) const {
     print_indent(os, indent);
@@ -548,5 +613,20 @@ void StructPattern::print(std::ostream &os, int indent) const {
     os << "Fields:\n";
     for (const auto &field : fields) {
         print_struct_pattern_field(field, os, indent + 2);
+    }
+}
+
+void RestPattern::print(std::ostream &os, int indent) const {
+    print_indent(os, indent);
+    os << "RestPattern(..)\n";
+}
+
+void SlicePattern::print(std::ostream &os, int indent) const {
+    print_indent(os, indent);
+    os << "SlicePattern\n";
+    print_indent(os, indent + 1);
+    os << "Elements:\n";
+    for (const auto &element : elements) {
+        element->print(os, indent + 2);
     }
 }

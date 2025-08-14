@@ -57,6 +57,7 @@ enum class TokenType {
     AMPERSAND_AMPERSAND,   //&&
     PIPE_PIPE,             //||
     DOT_DOT,               //..
+    DOT_DOT_EQUAL,         // ..=
 
     // Literals
     IDENTIFIER,

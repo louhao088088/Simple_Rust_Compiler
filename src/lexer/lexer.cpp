@@ -104,6 +104,8 @@ string tokenTypeToString(TokenType type) {
         return "PIPE_PIPE";
     case TokenType::DOT_DOT:
         return "DOT_DOT";
+    case TokenType::DOT_DOT_EQUAL:
+        return "DOT_DOT_EQUAL";
 
     // Literals
     case TokenType::IDENTIFIER:
@@ -315,6 +317,7 @@ static std::unordered_map<std::string, TokenType> symbols = {
     {"&&", TokenType::AMPERSAND_AMPERSAND},
     {"||", TokenType::PIPE_PIPE},
     {"..", TokenType::DOT_DOT},
+    {"..=", TokenType::DOT_DOT_EQUAL},
     {"(", TokenType::LEFT_PAREN},
     {")", TokenType::RIGHT_PAREN},
     {"{", TokenType::LEFT_BRACE},
@@ -451,9 +454,15 @@ vector<Token> lexer_program(const Prog &program) {
             // Symbols with potential multi-character tokens
             case '.':
                 if (next_ch == '.') {
-                    i++;
                     new_token.type = TokenType::DOT_DOT;
                     new_token.lexeme = "..";
+                    if (i + 2 < program.content.size() && program.content[i + 2] == '=') {
+                        i++;
+                        new_token.type = TokenType::DOT_DOT_EQUAL;
+                        new_token.lexeme = "..=";
+                    }
+                    i++;
+
                 } else {
                     new_token.type = TokenType::DOT;
                     new_token.lexeme = '.';
@@ -489,7 +498,7 @@ vector<Token> lexer_program(const Prog &program) {
                     new_token.type = TokenType::LESS_EQUAL;
                     new_token.lexeme = "<=";
                 } else if (next_ch == '<') {
-                    i++;
+
                     new_token.type = TokenType::LESS_LESS;
                     new_token.lexeme = "<<";
                     if (i + 2 < program.content.size() && program.content[i + 2] == '=') {
@@ -497,6 +506,7 @@ vector<Token> lexer_program(const Prog &program) {
                         new_token.type = TokenType::LESS_LESS_EQUAL;
                         new_token.lexeme = "<<=";
                     }
+                    i++;
 
                 } else {
                     new_token.type = TokenType::LESS;
@@ -509,7 +519,6 @@ vector<Token> lexer_program(const Prog &program) {
                     new_token.type = TokenType::GREATER_EQUAL;
                     new_token.lexeme = ">=";
                 } else if (next_ch == '>') {
-                    i++;
                     new_token.type = TokenType::GREATER_GREATER;
                     new_token.lexeme = ">>";
                     if (i + 2 < program.content.size() && program.content[i + 2] == '=') {
@@ -517,6 +526,7 @@ vector<Token> lexer_program(const Prog &program) {
                         new_token.type = TokenType::GREATER_GREATER_EQUAL;
                         new_token.lexeme = ">>=";
                     }
+                    i++;
                 } else {
                     new_token.type = TokenType::GREATER;
                     new_token.lexeme = ">";

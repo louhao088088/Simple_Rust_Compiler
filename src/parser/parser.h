@@ -52,6 +52,7 @@ class Parser {
     // Utility functions
     bool is_at_end();
     const Token &peek();
+    const Token &peekNext();
     const Token &previous();
     const Token &advance();
     bool check(TokenType type);
@@ -72,6 +73,8 @@ class Parser {
     std::unique_ptr<EnumDecl> parse_enum_declaration();
     std::unique_ptr<EnumVariant> parse_enum_variant();
     std::unique_ptr<ModDecl> parse_mod_declaration();
+    std::unique_ptr<TraitDecl> parse_trait_declaration();
+    std::unique_ptr<ImplBlock> parse_impl_block();
 
     // Patterns
     std::unique_ptr<Pattern> parse_pattern();

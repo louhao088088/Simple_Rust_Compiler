@@ -45,6 +45,18 @@ Parser::Parser(const std::vector<Token> &tokens) : tokens_(tokens) {
         auto right = parse_expression(Precedence::UNARY);
         return std::make_unique<UnaryExpr>(op, std::move(right));
     });
+    auto range_prefix_parser = [this]() -> std::unique_ptr<Expr> {
+        bool is_inclusive = previous().type == TokenType::DOT_DOT_EQUAL;
+        std::optional<std::unique_ptr<Expr>> end;
+        if (!check(TokenType::RIGHT_BRACKET) && !check(TokenType::RIGHT_BRACE) &&
+            !check(TokenType::SEMICOLON) && !check(TokenType::COMMA)) {
+            end = parse_expression(Precedence::RANGE);
+        }
+
+        return std::make_unique<RangeExpr>(std::nullopt, std::move(end), is_inclusive);
+    };
+    register_prefix(TokenType::DOT_DOT, range_prefix_parser);
+    register_prefix(TokenType::DOT_DOT_EQUAL, range_prefix_parser);
 
     register_prefix(TokenType::IF, [this] { return parse_if_expression(); });
     register_prefix(TokenType::WHILE, [this] { return parse_while_expression(); });
@@ -100,6 +112,10 @@ Parser::Parser(const std::vector<Token> &tokens) : tokens_(tokens) {
             return std::make_unique<ArrayLiteralExpr>(std::move(elements));
         }
     });
+
+    register_prefix(TokenType::SELF_TYPE,
+                    [this] { return std::make_unique<VariableExpr>(previous()); });
+    register_prefix(TokenType::SELF, [this] { return std::make_unique<VariableExpr>(previous()); });
 
     register_infix(TokenType::AS, Precedence::AS, [this](auto left) -> std::unique_ptr<Expr> {
         auto target_type = parse_type();
@@ -285,57 +301,18 @@ Parser::Parser(const std::vector<Token> &tokens) : tokens_(tokens) {
         Token right = consume(TokenType::IDENTIFIER, "Expect identifier after '::'.");
         return std::make_unique<PathExpr>(std::move(left), op, right);
     });
-}
-
-// Implementation of registration functions
-void Parser::register_prefix(TokenType type, PrefixParseFn fn) { prefix_parsers_[type] = fn; }
-void Parser::register_infix(TokenType type, Precedence prec, InfixParseFn fn) {
-    infix_parsers_[type] = fn;
-    precedences_[type] = prec;
-}
-
-std::unique_ptr<TypeNode> Parser::parse_type() {
-
-    if (match({TokenType::BANG})) {
-        return std::make_unique<TypeNameNode>(previous());
-    }
-    if (match({TokenType::STAR})) {
-        bool is_mutable = match({TokenType::MUT});
-        if (!is_mutable) {
-            consume(TokenType::CONST, "Expect 'const' or 'mut' after '*' in raw pointer type.");
+    auto range_infix_parser = [this](auto left) -> std::unique_ptr<Expr> {
+        bool is_inclusive = previous().type == TokenType::DOT_DOT_EQUAL;
+        std::optional<std::unique_ptr<Expr>> end;
+        if (!check(TokenType::RIGHT_BRACKET) && !check(TokenType::RIGHT_BRACE) &&
+            !check(TokenType::SEMICOLON) && !check(TokenType::COMMA)) {
+            end = parse_expression(Precedence::RANGE);
         }
-        auto pointee_type = parse_type();
-        return std::make_unique<RawPointerTypeNode>(is_mutable, std::move(pointee_type));
-    }
-    if (match({TokenType::AMPERSAND})) {
-        bool is_mutable = match({TokenType::MUT});
-        auto referenced_type = parse_type();
-        return std::make_unique<ReferenceTypeNode>(is_mutable, std::move(referenced_type));
-    }
-    if (match({TokenType::LEFT_BRACKET})) {
-        auto element_type = parse_type();
-        consume(TokenType::SEMICOLON, "Expect ';' in array type definition.");
-        auto size_expr = parse_expression(Precedence::NONE);
-        consume(TokenType::RIGHT_BRACKET, "Expect ']' to close array type.");
-        return std::make_unique<ArrayTypeNode>(std::move(element_type), std::move(size_expr));
-    }
 
-    if (match({TokenType::LEFT_PAREN})) {
-        if (match({TokenType::RIGHT_PAREN})) {
-            return std::make_unique<UnitTypeNode>();
-        } else if (check(TokenType::IDENTIFIER)) {
-            std::vector<std::unique_ptr<TypeNode>> elements;
-            do {
-                elements.push_back(parse_type());
-            } while (match({TokenType::COMMA}));
-            consume(TokenType::RIGHT_PAREN, "Expect ')' to close tuple type.");
-            return std::make_unique<TupleTypeNode>(std::move(elements));
-        }
-    }
-    auto path = parse_expression(Precedence::CALL);
-    return std::make_unique<PathTypeNode>(std::move(path));
-
-    throw error(peek(), "Expected a type.");
+        return std::make_unique<RangeExpr>(std::move(left), std::move(end), is_inclusive);
+    };
+    register_infix(TokenType::DOT_DOT, Precedence::RANGE, range_infix_parser);
+    register_infix(TokenType::DOT_DOT_EQUAL, Precedence::RANGE, range_infix_parser);
 }
 
 // Main parsing loop
@@ -352,6 +329,69 @@ std::unique_ptr<Program> Parser::parse() {
     return program;
 }
 
+std::unique_ptr<TypeNode> Parser::parse_type() {
+
+    if (match({TokenType::BANG})) {
+        return std::make_unique<TypeNameNode>(previous());
+    }
+    if (match({TokenType::SELF_TYPE})) {
+        return std::make_unique<SelfTypeNode>();
+    }
+
+    if (match({TokenType::STAR})) {
+        bool is_mutable = match({TokenType::MUT});
+        if (!is_mutable) {
+            consume(TokenType::CONST, "Expect 'const' or 'mut' after '*' in raw pointer type.");
+        }
+        auto pointee_type = parse_type();
+        return std::make_unique<RawPointerTypeNode>(is_mutable, std::move(pointee_type));
+    }
+    if (match({TokenType::AMPERSAND})) {
+        bool is_mutable = match({TokenType::MUT});
+        auto referenced_type = parse_type();
+        return std::make_unique<ReferenceTypeNode>(is_mutable, std::move(referenced_type));
+    }
+    if (match({TokenType::LEFT_BRACKET})) {
+        auto element_type = parse_type();
+        if (match({TokenType::SEMICOLON})) {
+            auto size = parse_expression(Precedence::NONE);
+            consume(TokenType::RIGHT_BRACKET, "Expect ']' to close array type.");
+            return std::make_unique<ArrayTypeNode>(std::move(element_type), std::move(size));
+        } else {
+            consume(TokenType::RIGHT_BRACKET, "Expect ']' to close slice type.");
+            return std::make_unique<SliceTypeNode>(std::move(element_type));
+        }
+    }
+
+    if (match({TokenType::LEFT_PAREN})) {
+        if (match({TokenType::RIGHT_PAREN})) {
+            return std::make_unique<UnitTypeNode>();
+        } else if (check(TokenType::IDENTIFIER)) {
+            std::vector<std::unique_ptr<TypeNode>> elements;
+            do {
+                elements.push_back(parse_type());
+            } while (match({TokenType::COMMA}));
+            consume(TokenType::RIGHT_PAREN, "Expect ')' to close tuple type.");
+            return std::make_unique<TupleTypeNode>(std::move(elements));
+        }
+    }
+    auto path = parse_expression(Precedence::CALL);
+    if (match({TokenType::LESS})) {
+        std::vector<std::unique_ptr<TypeNode>> args;
+        if (!check(TokenType::GREATER)) {
+            do {
+                args.push_back(parse_type());
+            } while (match({TokenType::COMMA}));
+        }
+        consume(TokenType::GREATER, "Expect '>' to close generic argument list.");
+        return std::make_unique<PathTypeNode>(std::move(path), std::move(args));
+    } else {
+        return std::make_unique<PathTypeNode>(std::move(path));
+    }
+
+    throw error(peek(), "Expected a type.");
+}
+
 // pattern
 
 std::unique_ptr<Pattern> Parser::parse_pattern() {
@@ -366,13 +406,29 @@ std::unique_ptr<Pattern> Parser::parse_pattern() {
         return std::make_unique<TuplePattern>(std::move(elements));
     }
 
+    if (match({TokenType::LEFT_BRACKET})) {
+        std::vector<std::unique_ptr<Pattern>> elements;
+        if (!check(TokenType::RIGHT_BRACKET)) {
+            do {
+                if (peek().type == TokenType::DOT_DOT) {
+                    advance();
+                    elements.push_back(std::make_unique<RestPattern>());
+                    match({TokenType::COMMA});
+                    break;
+                }
+                elements.push_back(parse_pattern());
+            } while (match({TokenType::COMMA}));
+        }
+        consume(TokenType::RIGHT_BRACKET, "Expect ']' to close slice pattern.");
+        return std::make_unique<SlicePattern>(std::move(elements));
+    }
+
     bool is_mutable = match({TokenType::MUT});
 
     if (match({TokenType::IDENTIFIER})) {
         if (previous().lexeme == "_") {
             return std::make_unique<WildcardPattern>();
         }
-        // auto path_expr = parse_expression(Precedence::CALL);
         if (peek().type == TokenType::LEFT_BRACE) {
             return parse_struct_pattern_body(std::make_unique<VariableExpr>(previous()));
         } else {
@@ -430,6 +486,10 @@ std::unique_ptr<Item> Parser::parse_item() {
         return parse_enum_declaration();
     } else if (peek().type == TokenType::MOD) {
         return parse_mod_declaration();
+    } else if (peek().type == TokenType::TRAIT) {
+        return parse_trait_declaration();
+    } else if (peek().type == TokenType::IMPL) {
+        return parse_impl_block();
     }
 
     throw error(peek(), "Expect a top-level item like 'fn'.");
@@ -440,14 +500,38 @@ std::unique_ptr<FnDecl> Parser::parse_fn_declaration() {
     Token name = consume(TokenType::IDENTIFIER, "Expect function name.");
     consume(TokenType::LEFT_PAREN, "Expect '(' after function name.");
 
-    std::vector<Token> params;
-    std::vector<std::unique_ptr<TypeNode>> param_types;
+    std::vector<FnParam> params;
     std::optional<std::unique_ptr<TypeNode>> return_type;
+
     if (!check(TokenType::RIGHT_PAREN)) {
         do {
-            params.push_back(consume(TokenType::IDENTIFIER, "Expect parameter name."));
-            consume(TokenType::COLON, "Expect ': ' after parameter name.");
-            param_types.push_back(parse_type());
+            std::unique_ptr<Pattern> pattern;
+            std::unique_ptr<TypeNode> type;
+
+            if (peek().type == TokenType::AMPERSAND && peekNext().type == TokenType::SELF) {
+                advance();
+                bool is_mutable = match({TokenType::MUT});
+                Token self_token = consume(TokenType::SELF, "Expect 'self' after '&' in receiver.");
+
+                pattern = std::make_unique<IdentifierPattern>(self_token, false);
+                auto self_type_token = Token{TokenType::SELF_TYPE, "Self", 0, 0};
+                auto self_type_node =
+                    std::make_unique<PathTypeNode>(std::make_unique<VariableExpr>(self_type_token));
+                type = std::make_unique<ReferenceTypeNode>(is_mutable, std::move(self_type_node));
+            } else if (peek().type == TokenType::SELF && peekNext().type != TokenType::COLON) {
+                Token self_token = consume(TokenType::SELF, "Expect 'self' parameter.");
+                pattern = std::make_unique<IdentifierPattern>(self_token, false);
+                auto self_type_token = Token{TokenType::SELF_TYPE, "Self", 0, 0};
+                type =
+                    std::make_unique<PathTypeNode>(std::make_unique<VariableExpr>(self_type_token));
+            } else {
+                pattern = parse_pattern();
+                consume(TokenType::COLON, "Expect ':' after parameter pattern.");
+                type = parse_type();
+            }
+
+            params.push_back({std::move(pattern), std::move(type)});
+
         } while (match({TokenType::COMMA}));
     }
 
@@ -456,9 +540,15 @@ std::unique_ptr<FnDecl> Parser::parse_fn_declaration() {
         advance();
         return_type = parse_type();
     }
-    auto body = parse_block_statement();
-    return std::make_unique<FnDecl>(name, std::move(params), std::move(param_types),
-                                    std::move(return_type), std::move(body));
+    std::optional<std::unique_ptr<BlockStmt>> body;
+    if (peek().type == TokenType::LEFT_BRACE) {
+        body = parse_block_statement();
+    } else if (match({TokenType::SEMICOLON})) {
+    } else {
+        throw error(peek(), "Expect function body `{` or semicolon `;` after function signature.");
+    }
+    return std::make_unique<FnDecl>(name, std::move(params), std::move(return_type),
+                                    std::move(body));
 }
 
 std::unique_ptr<StructDecl> Parser::parse_struct_declaration() {
@@ -606,27 +696,53 @@ std::unique_ptr<ModDecl> Parser::parse_mod_declaration() {
     }
 }
 
-// statement
-std::unique_ptr<BlockStmt> Parser::parse_block_statement() {
-    consume(TokenType::LEFT_BRACE, "Expect '{' to start a block.");
-    auto block = std::make_unique<BlockStmt>();
+std::unique_ptr<TraitDecl> Parser::parse_trait_declaration() {
+    consume(TokenType::TRAIT, "Expect 'trait' keyword.");
+    Token name = consume(TokenType::IDENTIFIER, "Expect trait name.");
+    consume(TokenType::LEFT_BRACE, "Expect '{' before trait body.");
+    std::vector<std::unique_ptr<Item>> items;
     while (!check(TokenType::RIGHT_BRACE) && !is_at_end()) {
-        block->statements.push_back(parse_statement());
-    }
-
-    consume(TokenType::RIGHT_BRACE, "Expect '}' to end a block.");
-    if (!block->statements.empty()) {
-        if (auto *last_stmt = dynamic_cast<ExprStmt *>(block->statements.back().get())) {
-            if (!last_stmt->has_semicolon) {
-                block->final_expr = std::move(last_stmt->expression);
-                block->statements.pop_back();
-            }
+        if (peek().type == TokenType::FN) {
+            items.push_back(parse_fn_declaration());
+        } else {
+            throw error(peek(), "Expect associated function, type, or const in trait body.");
         }
     }
 
-    return block;
+    consume(TokenType::RIGHT_BRACE, "Expect '}' after trait body.");
+    return std::make_unique<TraitDecl>(name, std::move(items));
 }
 
+std::unique_ptr<ImplBlock> Parser::parse_impl_block() {
+    consume(TokenType::IMPL, "Expect 'impl' keyword.");
+
+    std::optional<std::unique_ptr<TypeNode>> trait_name;
+    std::unique_ptr<TypeNode> target_type;
+    auto first_type = parse_type();
+    if (match({TokenType::FOR})) {
+        trait_name = std::move(first_type);
+        target_type = parse_type();
+    } else {
+        target_type = std::move(first_type);
+    }
+
+    consume(TokenType::LEFT_BRACE, "Expect '{' before impl body.");
+
+    std::vector<std::unique_ptr<Item>> items;
+    while (!check(TokenType::RIGHT_BRACE) && !is_at_end()) {
+        if (peek().type == TokenType::FN) {
+            items.push_back(parse_fn_declaration());
+        } else {
+            throw error(peek(), "Expect associated function, type, or const in impl body.");
+        }
+    }
+
+    consume(TokenType::RIGHT_BRACE, "Expect '}' after impl body.");
+    return std::make_unique<ImplBlock>(std::move(trait_name), std::move(target_type),
+                                       std::move(items));
+}
+
+// statement
 std::unique_ptr<Stmt> Parser::parse_statement() {
     if (peek().type == TokenType::LET)
         return parse_let_statement();
@@ -644,6 +760,12 @@ std::unique_ptr<Stmt> Parser::parse_statement() {
     if (peek().type == TokenType::MOD) {
         return std::make_unique<ItemStmt>(parse_mod_declaration());
     }
+    if (peek().type == TokenType::TRAIT) {
+        return std::make_unique<ItemStmt>(parse_trait_declaration());
+    }
+    if (peek().type == TokenType::IMPL) {
+        return std::make_unique<ItemStmt>(parse_impl_block());
+    }
     if (peek().type == TokenType::BREAK) {
         return parse_break_statement();
     }
@@ -652,6 +774,25 @@ std::unique_ptr<Stmt> Parser::parse_statement() {
     }
 
     return parse_expression_statement();
+}
+
+std::unique_ptr<BlockStmt> Parser::parse_block_statement() {
+    consume(TokenType::LEFT_BRACE, "Expect '{' to start a block.");
+    auto block = std::make_unique<BlockStmt>();
+    while (!check(TokenType::RIGHT_BRACE) && !is_at_end()) {
+        block->statements.push_back(parse_statement());
+    }
+
+    consume(TokenType::RIGHT_BRACE, "Expect '}' to end a block.");
+    if (!block->statements.empty()) {
+        if (auto *last_stmt = dynamic_cast<ExprStmt *>(block->statements.back().get())) {
+            if (!last_stmt->has_semicolon) {
+                block->final_expr = std::move(last_stmt->expression);
+                block->statements.pop_back();
+            }
+        }
+    }
+    return block;
 }
 
 std::unique_ptr<LetStmt> Parser::parse_let_statement() {
@@ -729,7 +870,8 @@ std::unique_ptr<Expr> Parser::parse_expression(Precedence precedence, bool allow
         bool is_valid_struct_path = dynamic_cast<VariableExpr *>(left.get()) != nullptr ||
                                     dynamic_cast<FieldAccessExpr *>(left.get()) != nullptr;
 
-        if (is_valid_struct_path && allow_struct_literal) {
+        if (is_valid_struct_path &&
+            (allow_struct_literal || previous().type == TokenType::SELF_TYPE)) {
             if (Precedence::CALL > precedence) {
                 left = parse_struct_initializer(std::move(left));
             }
@@ -810,6 +952,11 @@ bool Parser::is_at_end() {
     return current_ >= tokens_.size() || peek().type == TokenType::END_OF_FILE;
 }
 const Token &Parser::peek() { return tokens_[current_]; }
+const Token &Parser::peekNext() {
+    if (is_at_end())
+        return ((Token){TokenType::UNKNOWN, "nullptr", 0, 0});
+    return tokens_[current_ + 1];
+}
 const Token &Parser::previous() { return tokens_[current_ - 1]; }
 const Token &Parser::advance() {
     if (!is_at_end())
@@ -870,4 +1017,11 @@ void Parser::synchronize() {
         }
         advance();
     }
+}
+
+// Implementation of registration functions
+void Parser::register_prefix(TokenType type, PrefixParseFn fn) { prefix_parsers_[type] = fn; }
+void Parser::register_infix(TokenType type, Precedence prec, InfixParseFn fn) {
+    infix_parsers_[type] = fn;
+    precedences_[type] = prec;
 }
