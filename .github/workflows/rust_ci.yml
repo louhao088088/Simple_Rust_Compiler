@@ -1,0 +1,55 @@
+name: C++ CI
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+    branches: ["main"]
+
+jobs:
+  # This job does a fast release build on all major platforms
+  build_fast:
+    name: Build (Release)
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Configure CMake
+        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+
+      - name: Build with CMake
+        run: cmake --build build --config Release
+
+      # Note: This step will do nothing until you add tests to your CMakeLists.txt
+      - name: Run Unit Tests (ctest)
+        working-directory: ./build
+        run: ctest --output-on-failure
+
+  # This job does a slower, more thorough check on Linux with sanitizers
+  build_sanitized:
+    name: Build (Debug + Sanitizers)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Dependencies
+        run: sudo apt-get update && sudo apt-get install -y build-essential cmake
+
+      - name: Configure CMake with Sanitizers
+        # We enable sanitizers via a CMake option
+        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug -DENABLE_SANITIZERS=ON
+
+      - name: Build with CMake
+        run: cmake --build build --config Debug
+
+      # Here you would run tests that benefit from sanitizer checks
+      - name: Run Sanitized Tests (ctest)
+        working-directory: ./build
+        run: ctest --output-on-failure

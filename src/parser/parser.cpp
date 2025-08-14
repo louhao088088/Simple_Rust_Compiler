@@ -1,8 +1,6 @@
 // parser.cpp
 #include "parser.h"
 
-#include "ast.h"
-
 using std::string;
 using std::vector;
 

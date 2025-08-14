@@ -1,7 +1,7 @@
 // parser.h
 #pragma once
 
-#include "ast.h"
+#include "../ast/ast.h"
 
 #include <functional>
 #include <map>

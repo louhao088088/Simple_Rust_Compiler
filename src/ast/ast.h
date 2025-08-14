@@ -8,26 +8,123 @@
 #include <optional>
 #include <string>
 #include <vector>
+#include <map>
+
+// Forward declarations for semantic analysis
+class Visitor;
+class Type;
+class Symbol;
 
 // Forward declarations of all nodes
 struct Node;
 struct Expr;
 struct Stmt;
 struct Item;
+struct TypeNode;
 struct Program;
+
+// Forward declarations for all concrete node types
+struct LiteralExpr;
+struct ArrayLiteralExpr;
+struct ArrayInitializerExpr;
+struct VariableExpr;
+struct UnaryExpr;
+struct BinaryExpr;
+struct CallExpr;
+struct IfExpr;
+struct LoopExpr;
+struct WhileExpr;
+struct IndexExpr;
+struct FieldAccessExpr;
+struct AssignmentExpr;
+struct BlockStmt;
+struct ExprStmt;
+struct LetStmt;
+struct ReturnStmt;
+struct BreakStmt;
+struct ContinueStmt;
+struct TypeNameNode;
+struct ArrayTypeNode;
+struct UnitTypeNode;
+struct TupleTypeNode;
+struct FnDecl;
+
+// Forward declarations for pattern types
+struct IdentifierPattern;
+struct WildcardPattern;
+struct LiteralPattern;
+struct TuplePattern;
+struct SlicePattern;
+struct StructPattern;
+struct RestPattern;
+
+// Visitor interface for AST traversal
+class Visitor {
+public:
+    virtual ~Visitor() = default;
+    
+    // Expression visitors
+    virtual void visit(LiteralExpr* node) = 0;
+    virtual void visit(ArrayLiteralExpr* node) = 0;
+    virtual void visit(ArrayInitializerExpr* node) = 0;
+    virtual void visit(VariableExpr* node) = 0;
+    virtual void visit(UnaryExpr* node) = 0;
+    virtual void visit(BinaryExpr* node) = 0;
+    virtual void visit(CallExpr* node) = 0;
+    virtual void visit(IfExpr* node) = 0;
+    virtual void visit(LoopExpr* node) = 0;
+    virtual void visit(WhileExpr* node) = 0;
+    virtual void visit(IndexExpr* node) = 0;
+    virtual void visit(FieldAccessExpr* node) = 0;
+    virtual void visit(AssignmentExpr* node) = 0;
+    
+    // Statement visitors
+    virtual void visit(BlockStmt* node) = 0;
+    virtual void visit(ExprStmt* node) = 0;
+    virtual void visit(LetStmt* node) = 0;
+    virtual void visit(ReturnStmt* node) = 0;
+    virtual void visit(BreakStmt* node) = 0;
+    virtual void visit(ContinueStmt* node) = 0;
+    
+    // Type node visitors
+    virtual void visit(TypeNameNode* node) = 0;
+    virtual void visit(ArrayTypeNode* node) = 0;
+    virtual void visit(UnitTypeNode* node) = 0;
+    virtual void visit(TupleTypeNode* node) = 0;
+    
+    // Item visitors
+    virtual void visit(FnDecl* node) = 0;
+    virtual void visit(Program* node) = 0;
+    
+    // Pattern visitors
+    virtual void visit(IdentifierPattern* node) = 0;
+    virtual void visit(WildcardPattern* node) = 0;
+    virtual void visit(LiteralPattern* node) = 0;
+    virtual void visit(TuplePattern* node) = 0;
+    virtual void visit(SlicePattern* node) = 0;
+    virtual void visit(StructPattern* node) = 0;
+    virtual void visit(RestPattern* node) = 0;
+};
 
 // Base classes
 
 struct Node {
     virtual ~Node() = default;
     virtual void print(std::ostream &os, int indent = 0) const = 0;
+    virtual void accept(Visitor* visitor) { /* Default empty implementation for compatibility */ }
 };
 
-struct Expr : public Node {};
+struct Expr : public Node {
+    // Semantic analysis annotations
+    std::shared_ptr<Type> type;
+    std::shared_ptr<Symbol> resolved_symbol;
+};
 struct Stmt : public Node {};
 struct Item : public Node {};
 struct TypeNode : public Node {};
-struct Pattern : public Node {};
+struct Pattern : public Node {
+    void accept(Visitor* visitor) override { /* Default implementation for compatibility */ }
+};
 
 // Expressions
 
@@ -35,6 +132,7 @@ struct LiteralExpr : public Expr {
     Token literal;
     explicit LiteralExpr(Token lit) : literal(std::move(lit)) {}
     void print(std::ostream &os, int indent = 0) const override;
+    void accept(Visitor* visitor) override;
 };
 
 struct ArrayLiteralExpr : public Expr {
@@ -43,6 +141,7 @@ struct ArrayLiteralExpr : public Expr {
     ArrayLiteralExpr(std::vector<std::unique_ptr<Expr>> elems) : elements(std::move(elems)) {}
 
     void print(std::ostream &os, int indent = 0) const override;
+    void accept(Visitor* visitor) override;
 };
 
 struct ArrayInitializerExpr : public Expr {
@@ -53,12 +152,14 @@ struct ArrayInitializerExpr : public Expr {
         : value(std::move(val)), size(std::move(cnt)) {}
 
     void print(std::ostream &os, int indent = 0) const override;
+    void accept(Visitor* visitor) override;
 };
 
 struct VariableExpr : public Expr {
     Token name;
     explicit VariableExpr(Token name) : name(std::move(name)) {}
     void print(std::ostream &os, int indent = 0) const override;
+    void accept(Visitor* visitor) override;
 };
 
 struct UnaryExpr : public Expr {
@@ -66,6 +167,7 @@ struct UnaryExpr : public Expr {
     std::unique_ptr<Expr> right;
     UnaryExpr(Token op, std::unique_ptr<Expr> right) : op(std::move(op)), right(std::move(right)) {}
     void print(std::ostream &os, int indent = 0) const override;
+    void accept(Visitor* visitor) override;
 };
 
 struct BinaryExpr : public Expr {
@@ -75,6 +177,7 @@ struct BinaryExpr : public Expr {
     BinaryExpr(std::unique_ptr<Expr> left, Token op, std::unique_ptr<Expr> right)
         : left(std::move(left)), op(std::move(op)), right(std::move(right)) {}
     void print(std::ostream &os, int indent = 0) const override;
+    void accept(Visitor* visitor) override;
 };
 
 struct CallExpr : public Expr {
@@ -83,6 +186,7 @@ struct CallExpr : public Expr {
     CallExpr(std::unique_ptr<Expr> callee, std::vector<std::unique_ptr<Expr>> args)
         : callee(std::move(callee)), arguments(std::move(args)) {}
     void print(std::ostream &os, int indent = 0) const override;
+    void accept(Visitor* visitor) override;
 };
 
 struct IfExpr : public Expr {
@@ -94,12 +198,14 @@ struct IfExpr : public Expr {
         : condition(std::move(cond)), then_branch(std::move(then_b)),
           else_branch(std::move(else_b)) {}
     void print(std::ostream &os, int indent = 0) const override;
+    void accept(Visitor* visitor) override;
 };
 
 struct LoopExpr : public Expr {
     std::unique_ptr<Stmt> body;
     LoopExpr(std::unique_ptr<Stmt> body) : body(std::move(body)) {}
     void print(std::ostream &os, int indent = 0) const override;
+    void accept(Visitor* visitor) override;
 };
 
 struct WhileExpr : public Expr {
@@ -108,6 +214,7 @@ struct WhileExpr : public Expr {
     WhileExpr(std::unique_ptr<Expr> cond, std::unique_ptr<Stmt> body)
         : condition(std::move(cond)), body(std::move(body)) {}
     void print(std::ostream &os, int indent = 0) const override;
+    void accept(Visitor* visitor) override;
 };
 
 struct IndexExpr : public Expr {
@@ -118,6 +225,7 @@ struct IndexExpr : public Expr {
         : object(std::move(obj)), index(std::move(idx)) {}
 
     void print(std::ostream &os, int indent = 0) const override;
+    void accept(Visitor* visitor) override;
 };
 
 struct FieldAccessExpr : public Expr {
@@ -128,6 +236,7 @@ struct FieldAccessExpr : public Expr {
         : object(std::move(obj)), field(std::move(fld)) {}
 
     void print(std::ostream &os, int indent = 0) const override;
+    void accept(Visitor* visitor) override;
 };
 
 struct AssignmentExpr : public Expr {
@@ -136,6 +245,7 @@ struct AssignmentExpr : public Expr {
     AssignmentExpr(std::unique_ptr<Expr> t, std::unique_ptr<Expr> v)
         : target(std::move(t)), value(std::move(v)) {}
     void print(std::ostream &os, int indent = 0) const override;
+    void accept(Visitor* visitor) override;
 };
 
 struct CompoundAssignmentExpr : public Expr {
@@ -238,14 +348,16 @@ struct BlockStmt : public Stmt {
     std::vector<std::unique_ptr<Stmt>> statements;
     std::optional<std::unique_ptr<Expr>> final_expr;
     void print(std::ostream &os, int indent = 0) const override;
+    void accept(Visitor* visitor) override;
 };
 
 struct ExprStmt : public Stmt {
     std::unique_ptr<Expr> expression;
     bool has_semicolon;
-    ExprStmt(std::unique_ptr<Expr> expr, bool semi)
-        : expression(std::move(expr)), has_semicolon(semi) {}
+    explicit ExprStmt(std::unique_ptr<Expr> expr, bool has_semi = false) 
+        : expression(std::move(expr)), has_semicolon(has_semi) {}
     void print(std::ostream &os, int indent = 0) const override;
+    void accept(Visitor* visitor) override;
 };
 
 struct LetStmt : public Stmt {
@@ -261,6 +373,7 @@ struct LetStmt : public Stmt {
           initializer(std::move(init)) {}
 
     void print(std::ostream &os, int indent = 0) const override;
+    void accept(Visitor* visitor) override;
 };
 
 struct ReturnStmt : public Stmt {
@@ -269,17 +382,20 @@ struct ReturnStmt : public Stmt {
     ReturnStmt(Token keyword, std::optional<std::unique_ptr<Expr>> val)
         : keyword(std::move(keyword)), value(std::move(val)) {}
     void print(std::ostream &os, int indent = 0) const override;
+    void accept(Visitor* visitor) override;
 };
 
 struct BreakStmt : public Stmt {
     std::optional<std::unique_ptr<Expr>> value;
     BreakStmt(std::optional<std::unique_ptr<Expr>> value) : value(std::move(value)) {}
     void print(std::ostream &os, int indent = 0) const override;
+    void accept(Visitor* visitor) override;
 };
 
 struct ContinueStmt : public Stmt {
     ContinueStmt() = default;
     void print(std::ostream &os, int indent = 0) const override;
+    void accept(Visitor* visitor) override;
 };
 
 struct ItemStmt : public Stmt {
@@ -293,6 +409,7 @@ struct TypeNameNode : public TypeNode {
     Token name;
     explicit TypeNameNode(Token name) : name(std::move(name)) {}
     void print(std::ostream &os, int indent = 0) const override;
+    void accept(Visitor* visitor) override;
 };
 
 struct ArrayTypeNode : public TypeNode {
@@ -301,10 +418,12 @@ struct ArrayTypeNode : public TypeNode {
     ArrayTypeNode(std::unique_ptr<TypeNode> et, std::unique_ptr<Expr> sz)
         : element_type(std::move(et)), size(std::move(sz)) {}
     void print(std::ostream &os, int indent = 0) const override;
+    void accept(Visitor* visitor) override;
 };
 
 struct UnitTypeNode : public TypeNode {
     void print(std::ostream &os, int indent = 0) const override;
+    void accept(Visitor* visitor) override;
 };
 
 struct TupleTypeNode : public TypeNode {
@@ -312,6 +431,7 @@ struct TupleTypeNode : public TypeNode {
     explicit TupleTypeNode(std::vector<std::unique_ptr<TypeNode>> elems)
         : elements(std::move(elems)) {}
     void print(std::ostream &os, int indent = 0) const override;
+    void accept(Visitor* visitor) override;
 };
 
 struct PathTypeNode : public TypeNode {
@@ -366,6 +486,10 @@ struct FnDecl : public Item {
         : name(std::move(name)), params(std::move(params)), return_type(std::move(return_type)),
           body(std::move(body)) {}
     void print(std::ostream &os, int indent = 0) const override;
+    void accept(Visitor* visitor) override;
+    
+    // Semantic analysis annotations
+    std::shared_ptr<Symbol> resolved_symbol;
 };
 struct Field {
     Token name;
@@ -485,6 +609,7 @@ struct IdentifierPattern : public Pattern {
     bool is_mutable;
     IdentifierPattern(Token n, bool is_mut) : name(std::move(n)), is_mutable(is_mut) {}
     void print(std::ostream &os, int indent = 0) const override;
+    void accept(Visitor* visitor) override;
 };
 struct TuplePattern : public Pattern {
     std::vector<std::unique_ptr<Pattern>> elements;
@@ -540,4 +665,157 @@ struct SlicePattern : public Pattern {
 struct Program : public Node {
     std::vector<std::unique_ptr<Item>> items;
     void print(std::ostream &os, int indent = 0) const override;
+    void accept(Visitor* visitor) override;
+};
+
+// ===================== Semantic Analysis Classes =====================
+
+// Type system base class
+class Type {
+public:
+    virtual ~Type() = default;
+    virtual std::string to_string() const = 0;
+    virtual bool equals(const Type* other) const = 0;
+};
+
+// Symbol class for symbol table
+class Symbol {
+public:
+    enum Kind { VARIABLE, FUNCTION, TYPE };
+    
+    std::string name;
+    Kind kind;
+    std::shared_ptr<Type> type;
+    
+    Symbol(std::string name, Kind kind, std::shared_ptr<Type> type = nullptr)
+        : name(std::move(name)), kind(kind), type(std::move(type)) {}
+    
+    virtual ~Symbol() = default;
+};
+
+// Symbol table for scope management
+class SymbolTable {
+public:
+    void enter_scope();
+    void exit_scope();
+    void define(const std::string& name, std::shared_ptr<Symbol> symbol);
+    std::shared_ptr<Symbol> lookup(const std::string& name);
+    
+private:
+    std::vector<std::map<std::string, std::shared_ptr<Symbol>>> scopes_;
+};
+
+// Error reporter for semantic analysis
+class ErrorReporter {
+public:
+    void report_error(const std::string& message, int line = -1, int column = -1);
+    void report_warning(const std::string& message, int line = -1, int column = -1);
+    bool has_errors() const { return has_errors_; }
+    
+private:
+    bool has_errors_ = false;
+};
+
+// Name resolution visitor
+class NameResolutionVisitor : public Visitor {
+public:
+    NameResolutionVisitor(ErrorReporter& error_reporter);
+    
+    // Expression visitors
+    void visit(LiteralExpr* node) override;
+    void visit(ArrayLiteralExpr* node) override;
+    void visit(ArrayInitializerExpr* node) override;
+    void visit(VariableExpr* node) override;
+    void visit(UnaryExpr* node) override;
+    void visit(BinaryExpr* node) override;
+    void visit(CallExpr* node) override;
+    void visit(IfExpr* node) override;
+    void visit(LoopExpr* node) override;
+    void visit(WhileExpr* node) override;
+    void visit(IndexExpr* node) override;
+    void visit(FieldAccessExpr* node) override;
+    void visit(AssignmentExpr* node) override;
+    
+    // Statement visitors
+    void visit(BlockStmt* node) override;
+    void visit(ExprStmt* node) override;
+    void visit(LetStmt* node) override;
+    void visit(ReturnStmt* node) override;
+    void visit(BreakStmt* node) override;
+    void visit(ContinueStmt* node) override;
+    
+    // Type node visitors
+    void visit(TypeNameNode* node) override;
+    void visit(ArrayTypeNode* node) override;
+    void visit(UnitTypeNode* node) override;
+    void visit(TupleTypeNode* node) override;
+    
+    // Item visitors
+    void visit(FnDecl* node) override;
+    void visit(Program* node) override;
+    
+    // Pattern visitors
+    void visit(IdentifierPattern* node) override;
+    void visit(WildcardPattern* node) override;
+    void visit(LiteralPattern* node) override;
+    void visit(TuplePattern* node) override;
+    void visit(SlicePattern* node) override;
+    void visit(StructPattern* node) override;
+    void visit(RestPattern* node) override;
+    
+private:
+    SymbolTable symbol_table_;
+    ErrorReporter& error_reporter_;
+};
+
+// Type check visitor
+class TypeCheckVisitor : public Visitor {
+public:
+    TypeCheckVisitor(ErrorReporter& error_reporter);
+    
+    // Expression visitors
+    void visit(LiteralExpr* node) override;
+    void visit(ArrayLiteralExpr* node) override;
+    void visit(ArrayInitializerExpr* node) override;
+    void visit(VariableExpr* node) override;
+    void visit(UnaryExpr* node) override;
+    void visit(BinaryExpr* node) override;
+    void visit(CallExpr* node) override;
+    void visit(IfExpr* node) override;
+    void visit(LoopExpr* node) override;
+    void visit(WhileExpr* node) override;
+    void visit(IndexExpr* node) override;
+    void visit(FieldAccessExpr* node) override;
+    void visit(AssignmentExpr* node) override;
+    
+    // Statement visitors
+    void visit(BlockStmt* node) override;
+    void visit(ExprStmt* node) override;
+    void visit(LetStmt* node) override;
+    void visit(ReturnStmt* node) override;
+    void visit(BreakStmt* node) override;
+    void visit(ContinueStmt* node) override;
+    
+    // Type node visitors
+    void visit(TypeNameNode* node) override;
+    void visit(ArrayTypeNode* node) override;
+    void visit(UnitTypeNode* node) override;
+    void visit(TupleTypeNode* node) override;
+    
+    // Item visitors
+    void visit(FnDecl* node) override;
+    void visit(Program* node) override;
+    
+    // Pattern visitors
+    void visit(IdentifierPattern* node) override;
+    void visit(WildcardPattern* node) override;
+    void visit(LiteralPattern* node) override;
+    void visit(TuplePattern* node) override;
+    void visit(SlicePattern* node) override;
+    void visit(StructPattern* node) override;
+    void visit(RestPattern* node) override;
+    
+private:
+    ErrorReporter& error_reporter_;
+    std::shared_ptr<Type> current_return_type_;
 };
