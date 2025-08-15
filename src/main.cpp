@@ -20,7 +20,7 @@ int main() {
     try {
         Parser parser(tokens);
 
-        std::unique_ptr<Program> ast = parser.parse();
+        std::shared_ptr<Program> ast = parser.parse();
         if (ast) {
             ast->print(std::cout);
             std::cout << "\n";

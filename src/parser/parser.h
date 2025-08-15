@@ -30,7 +30,7 @@ enum Precedence {
 class Parser {
   public:
     explicit Parser(const std::vector<Token> &tokens);
-    std::unique_ptr<Program> parse();
+    std::shared_ptr<Program> parse();
 
   private:
     // State
@@ -38,8 +38,8 @@ class Parser {
     size_t current_ = 0;
 
     // Pratt parser required types
-    using PrefixParseFn = std::function<std::unique_ptr<Expr>()>;
-    using InfixParseFn = std::function<std::unique_ptr<Expr>(std::unique_ptr<Expr>)>;
+    using PrefixParseFn = std::function<std::shared_ptr<Expr>()>;
+    using InfixParseFn = std::function<std::shared_ptr<Expr>(std::shared_ptr<Expr>)>;
 
     std::map<TokenType, PrefixParseFn> prefix_parsers_;
     std::map<TokenType, InfixParseFn> infix_parsers_;
@@ -65,40 +65,40 @@ class Parser {
     // Grammar parsing functions
 
     // Top level
-    std::unique_ptr<Item> parse_item();
-    std::unique_ptr<FnDecl> parse_fn_declaration();
-    std::unique_ptr<StructDecl> parse_struct_declaration();
-    std::unique_ptr<ConstDecl> parse_const_declaration();
-    std::unique_ptr<Expr> parse_struct_initializer(std::unique_ptr<Expr> name);
-    std::unique_ptr<EnumDecl> parse_enum_declaration();
-    std::unique_ptr<EnumVariant> parse_enum_variant();
-    std::unique_ptr<ModDecl> parse_mod_declaration();
-    std::unique_ptr<TraitDecl> parse_trait_declaration();
-    std::unique_ptr<ImplBlock> parse_impl_block();
+    std::shared_ptr<Item> parse_item();
+    std::shared_ptr<FnDecl> parse_fn_declaration();
+    std::shared_ptr<StructDecl> parse_struct_declaration();
+    std::shared_ptr<ConstDecl> parse_const_declaration();
+    std::shared_ptr<Expr> parse_struct_initializer(std::shared_ptr<Expr> name);
+    std::shared_ptr<EnumDecl> parse_enum_declaration();
+    std::shared_ptr<EnumVariant> parse_enum_variant();
+    std::shared_ptr<ModDecl> parse_mod_declaration();
+    std::shared_ptr<TraitDecl> parse_trait_declaration();
+    std::shared_ptr<ImplBlock> parse_impl_block();
 
     // Patterns
-    std::unique_ptr<Pattern> parse_pattern();
-    std::unique_ptr<Pattern> parse_struct_pattern_body(std::unique_ptr<Expr> path);
+    std::shared_ptr<Pattern> parse_pattern();
+    std::shared_ptr<Pattern> parse_struct_pattern_body(std::shared_ptr<Expr> path);
 
     // Statements
-    std::unique_ptr<Stmt> parse_statement();
-    std::unique_ptr<LetStmt> parse_let_statement();
-    std::unique_ptr<ReturnStmt> parse_return_statement();
-    std::unique_ptr<BlockStmt> parse_block_statement();
-    std::unique_ptr<ExprStmt> parse_expression_statement();
-    std::unique_ptr<BreakStmt> parse_break_statement();
-    std::unique_ptr<ContinueStmt> parse_continue_statement();
+    std::shared_ptr<Stmt> parse_statement();
+    std::shared_ptr<LetStmt> parse_let_statement();
+    std::shared_ptr<ReturnStmt> parse_return_statement();
+    std::shared_ptr<BlockStmt> parse_block_statement();
+    std::shared_ptr<ExprStmt> parse_expression_statement();
+    std::shared_ptr<BreakStmt> parse_break_statement();
+    std::shared_ptr<ContinueStmt> parse_continue_statement();
 
     // Expressions (Pratt Parser)
-    std::unique_ptr<Expr> parse_expression(Precedence precedence,
+    std::shared_ptr<Expr> parse_expression(Precedence precedence,
                                            bool allow_struct_literal = false);
-    std::unique_ptr<IfExpr> parse_if_expression();
-    std::unique_ptr<LoopExpr> parse_loop_expression();
-    std::unique_ptr<WhileExpr> parse_while_expression();
-    std::unique_ptr<MatchArm> parse_match_arm();
-    std::unique_ptr<MatchExpr> parse_match_expression();
+    std::shared_ptr<IfExpr> parse_if_expression();
+    std::shared_ptr<LoopExpr> parse_loop_expression();
+    std::shared_ptr<WhileExpr> parse_while_expression();
+    std::shared_ptr<MatchArm> parse_match_arm();
+    std::shared_ptr<MatchExpr> parse_match_expression();
     Precedence get_precedence(TokenType type);
 
     // Type parsing
-    std::unique_ptr<TypeNode> parse_type();
+    std::shared_ptr<TypeNode> parse_type();
 };

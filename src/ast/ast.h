@@ -111,7 +111,7 @@ public:
 struct Node {
     virtual ~Node() = default;
     virtual void print(std::ostream &os, int indent = 0) const = 0;
-    virtual void accept(Visitor* visitor) { /* Default empty implementation for compatibility */ }
+    virtual void accept(Visitor* visitor) {}
 };
 
 struct Expr : public Node {
@@ -123,7 +123,7 @@ struct Stmt : public Node {};
 struct Item : public Node {};
 struct TypeNode : public Node {};
 struct Pattern : public Node {
-    void accept(Visitor* visitor) override { /* Default implementation for compatibility */ }
+    void accept(Visitor* visitor) override {}
 };
 
 // Expressions
@@ -136,19 +136,19 @@ struct LiteralExpr : public Expr {
 };
 
 struct ArrayLiteralExpr : public Expr {
-    std::vector<std::unique_ptr<Expr>> elements;
+    std::vector<std::shared_ptr<Expr>> elements;
 
-    ArrayLiteralExpr(std::vector<std::unique_ptr<Expr>> elems) : elements(std::move(elems)) {}
+    ArrayLiteralExpr(std::vector<std::shared_ptr<Expr>> elems) : elements(std::move(elems)) {}
 
     void print(std::ostream &os, int indent = 0) const override;
     void accept(Visitor* visitor) override;
 };
 
 struct ArrayInitializerExpr : public Expr {
-    std::unique_ptr<Expr> value;
-    std::unique_ptr<Expr> size;
+    std::shared_ptr<Expr> value;
+    std::shared_ptr<Expr> size;
 
-    ArrayInitializerExpr(std::unique_ptr<Expr> val, std::unique_ptr<Expr> cnt)
+    ArrayInitializerExpr(std::shared_ptr<Expr> val, std::shared_ptr<Expr> cnt)
         : value(std::move(val)), size(std::move(cnt)) {}
 
     void print(std::ostream &os, int indent = 0) const override;
@@ -164,37 +164,37 @@ struct VariableExpr : public Expr {
 
 struct UnaryExpr : public Expr {
     Token op;
-    std::unique_ptr<Expr> right;
-    UnaryExpr(Token op, std::unique_ptr<Expr> right) : op(std::move(op)), right(std::move(right)) {}
+    std::shared_ptr<Expr> right;
+    UnaryExpr(Token op, std::shared_ptr<Expr> right) : op(std::move(op)), right(std::move(right)) {}
     void print(std::ostream &os, int indent = 0) const override;
     void accept(Visitor* visitor) override;
 };
 
 struct BinaryExpr : public Expr {
-    std::unique_ptr<Expr> left;
+    std::shared_ptr<Expr> left;
     Token op;
-    std::unique_ptr<Expr> right;
-    BinaryExpr(std::unique_ptr<Expr> left, Token op, std::unique_ptr<Expr> right)
+    std::shared_ptr<Expr> right;
+    BinaryExpr(std::shared_ptr<Expr> left, Token op, std::shared_ptr<Expr> right)
         : left(std::move(left)), op(std::move(op)), right(std::move(right)) {}
     void print(std::ostream &os, int indent = 0) const override;
     void accept(Visitor* visitor) override;
 };
 
 struct CallExpr : public Expr {
-    std::unique_ptr<Expr> callee;
-    std::vector<std::unique_ptr<Expr>> arguments;
-    CallExpr(std::unique_ptr<Expr> callee, std::vector<std::unique_ptr<Expr>> args)
+    std::shared_ptr<Expr> callee;
+    std::vector<std::shared_ptr<Expr>> arguments;
+    CallExpr(std::shared_ptr<Expr> callee, std::vector<std::shared_ptr<Expr>> args)
         : callee(std::move(callee)), arguments(std::move(args)) {}
     void print(std::ostream &os, int indent = 0) const override;
     void accept(Visitor* visitor) override;
 };
 
 struct IfExpr : public Expr {
-    std::unique_ptr<Expr> condition;
-    std::unique_ptr<Stmt> then_branch;
-    std::optional<std::unique_ptr<Stmt>> else_branch;
-    IfExpr(std::unique_ptr<Expr> cond, std::unique_ptr<Stmt> then_b,
-           std::optional<std::unique_ptr<Stmt>> else_b)
+    std::shared_ptr<Expr> condition;
+    std::shared_ptr<Stmt> then_branch;
+    std::optional<std::shared_ptr<Stmt>> else_branch;
+    IfExpr(std::shared_ptr<Expr> cond, std::shared_ptr<Stmt> then_b,
+           std::optional<std::shared_ptr<Stmt>> else_b)
         : condition(std::move(cond)), then_branch(std::move(then_b)),
           else_branch(std::move(else_b)) {}
     void print(std::ostream &os, int indent = 0) const override;
@@ -202,26 +202,26 @@ struct IfExpr : public Expr {
 };
 
 struct LoopExpr : public Expr {
-    std::unique_ptr<Stmt> body;
-    LoopExpr(std::unique_ptr<Stmt> body) : body(std::move(body)) {}
+    std::shared_ptr<Stmt> body;
+    LoopExpr(std::shared_ptr<Stmt> body) : body(std::move(body)) {}
     void print(std::ostream &os, int indent = 0) const override;
     void accept(Visitor* visitor) override;
 };
 
 struct WhileExpr : public Expr {
-    std::unique_ptr<Expr> condition;
-    std::unique_ptr<Stmt> body;
-    WhileExpr(std::unique_ptr<Expr> cond, std::unique_ptr<Stmt> body)
+    std::shared_ptr<Expr> condition;
+    std::shared_ptr<Stmt> body;
+    WhileExpr(std::shared_ptr<Expr> cond, std::shared_ptr<Stmt> body)
         : condition(std::move(cond)), body(std::move(body)) {}
     void print(std::ostream &os, int indent = 0) const override;
     void accept(Visitor* visitor) override;
 };
 
 struct IndexExpr : public Expr {
-    std::unique_ptr<Expr> object;
-    std::unique_ptr<Expr> index;
+    std::shared_ptr<Expr> object;
+    std::shared_ptr<Expr> index;
 
-    IndexExpr(std::unique_ptr<Expr> obj, std::unique_ptr<Expr> idx)
+    IndexExpr(std::shared_ptr<Expr> obj, std::shared_ptr<Expr> idx)
         : object(std::move(obj)), index(std::move(idx)) {}
 
     void print(std::ostream &os, int indent = 0) const override;
@@ -229,10 +229,10 @@ struct IndexExpr : public Expr {
 };
 
 struct FieldAccessExpr : public Expr {
-    std::unique_ptr<Expr> object;
+    std::shared_ptr<Expr> object;
     Token field;
 
-    FieldAccessExpr(std::unique_ptr<Expr> obj, Token fld)
+    FieldAccessExpr(std::shared_ptr<Expr> obj, Token fld)
         : object(std::move(obj)), field(std::move(fld)) {}
 
     void print(std::ostream &os, int indent = 0) const override;
@@ -240,32 +240,32 @@ struct FieldAccessExpr : public Expr {
 };
 
 struct AssignmentExpr : public Expr {
-    std::unique_ptr<Expr> target;
-    std::unique_ptr<Expr> value;
-    AssignmentExpr(std::unique_ptr<Expr> t, std::unique_ptr<Expr> v)
+    std::shared_ptr<Expr> target;
+    std::shared_ptr<Expr> value;
+    AssignmentExpr(std::shared_ptr<Expr> t, std::shared_ptr<Expr> v)
         : target(std::move(t)), value(std::move(v)) {}
     void print(std::ostream &os, int indent = 0) const override;
     void accept(Visitor* visitor) override;
 };
 
 struct CompoundAssignmentExpr : public Expr {
-    std::unique_ptr<Expr> target;
+    std::shared_ptr<Expr> target;
     Token op;
-    std::unique_ptr<Expr> value;
-    CompoundAssignmentExpr(std::unique_ptr<Expr> t, Token o, std::unique_ptr<Expr> v)
+    std::shared_ptr<Expr> value;
+    CompoundAssignmentExpr(std::shared_ptr<Expr> t, Token o, std::shared_ptr<Expr> v)
         : target(std::move(t)), op(std::move(o)), value(std::move(v)) {}
     void print(std::ostream &os, int indent = 0) const override;
 };
 
 struct FieldInitializer {
     Token name;
-    std::unique_ptr<Expr> value;
+    std::shared_ptr<Expr> value;
 };
 
 struct StructInitializerExpr : public Expr {
-    std::unique_ptr<Expr> name;
+    std::shared_ptr<Expr> name;
     std::vector<FieldInitializer> fields;
-    StructInitializerExpr(std::unique_ptr<Expr> n, std::vector<FieldInitializer> f)
+    StructInitializerExpr(std::shared_ptr<Expr> n, std::vector<FieldInitializer> f)
         : name(std::move(n)), fields(std::move(f)) {}
     void print(std::ostream &os, int indent = 0) const override;
 };
@@ -275,30 +275,30 @@ struct UnitExpr : public Expr {
 };
 
 struct GroupingExpr : public Expr {
-    std::unique_ptr<Expr> expression;
-    explicit GroupingExpr(std::unique_ptr<Expr> expr) : expression(std::move(expr)) {}
+    std::shared_ptr<Expr> expression;
+    explicit GroupingExpr(std::shared_ptr<Expr> expr) : expression(std::move(expr)) {}
     void print(std::ostream &os, int indent = 0) const override;
 };
 
 struct TupleExpr : public Expr {
-    std::vector<std::unique_ptr<Expr>> elements;
-    explicit TupleExpr(std::vector<std::unique_ptr<Expr>> elems) : elements(std::move(elems)) {}
+    std::vector<std::shared_ptr<Expr>> elements;
+    explicit TupleExpr(std::vector<std::shared_ptr<Expr>> elems) : elements(std::move(elems)) {}
     void print(std::ostream &os, int indent = 0) const override;
 };
 
 struct AsExpr : public Expr {
-    std::unique_ptr<Expr> expression;
-    std::unique_ptr<TypeNode> target_type;
-    AsExpr(std::unique_ptr<Expr> expr, std::unique_ptr<TypeNode> type)
+    std::shared_ptr<Expr> expression;
+    std::shared_ptr<TypeNode> target_type;
+    AsExpr(std::shared_ptr<Expr> expr, std::shared_ptr<TypeNode> type)
         : expression(std::move(expr)), target_type(std::move(type)) {}
     void print(std::ostream &os, int indent = 0) const override;
 };
 struct MatchArm;
 struct MatchExpr : public Expr {
-    std::unique_ptr<Expr> scrutinee; // The expression being matched on
-    std::vector<std::unique_ptr<MatchArm>> arms;
+    std::shared_ptr<Expr> scrutinee; // The expression being matched on
+    std::vector<std::shared_ptr<MatchArm>> arms;
 
-    MatchExpr(std::unique_ptr<Expr> scrut, std::vector<std::unique_ptr<MatchArm>> arms_vec)
+    MatchExpr(std::shared_ptr<Expr> scrut, std::vector<std::shared_ptr<MatchArm>> arms_vec)
         : scrutinee(std::move(scrut)), arms(std::move(arms_vec)) {}
 
     void print(std::ostream &os, int indent = 0) const override;
@@ -311,11 +311,11 @@ struct UnderscoreExpr : public Expr {
 };
 
 struct PathExpr : public Expr {
-    std::unique_ptr<Expr> left;
+    std::shared_ptr<Expr> left;
     Token op;
     Token right;
 
-    PathExpr(std::unique_ptr<Expr> l, Token o, Token r)
+    PathExpr(std::shared_ptr<Expr> l, Token o, Token r)
         : left(std::move(l)), op(std::move(o)), right(std::move(r)) {}
 
     void print(std::ostream &os, int indent = 0) const override;
@@ -323,19 +323,19 @@ struct PathExpr : public Expr {
 
 struct ReferenceExpr : public Expr {
     bool is_mutable;
-    std::unique_ptr<Expr> expression;
+    std::shared_ptr<Expr> expression;
 
-    ReferenceExpr(bool is_mut, std::unique_ptr<Expr> expr)
+    ReferenceExpr(bool is_mut, std::shared_ptr<Expr> expr)
         : is_mutable(is_mut), expression(std::move(expr)) {}
 
     void print(std::ostream &os, int indent = 0) const override;
 };
 
 struct RangeExpr : public Expr {
-    std::optional<std::unique_ptr<Expr>> start;
-    std::optional<std::unique_ptr<Expr>> end;
+    std::optional<std::shared_ptr<Expr>> start;
+    std::optional<std::shared_ptr<Expr>> end;
     bool is_inclusive;
-    RangeExpr(std::optional<std::unique_ptr<Expr>> s, std::optional<std::unique_ptr<Expr>> e,
+    RangeExpr(std::optional<std::shared_ptr<Expr>> s, std::optional<std::shared_ptr<Expr>> e,
               bool inclusive)
         : start(std::move(s)), end(std::move(e)), is_inclusive(inclusive) {}
 
@@ -345,16 +345,16 @@ struct RangeExpr : public Expr {
 // Statements
 
 struct BlockStmt : public Stmt {
-    std::vector<std::unique_ptr<Stmt>> statements;
-    std::optional<std::unique_ptr<Expr>> final_expr;
+    std::vector<std::shared_ptr<Stmt>> statements;
+    std::optional<std::shared_ptr<Expr>> final_expr;
     void print(std::ostream &os, int indent = 0) const override;
     void accept(Visitor* visitor) override;
 };
 
 struct ExprStmt : public Stmt {
-    std::unique_ptr<Expr> expression;
+    std::shared_ptr<Expr> expression;
     bool has_semicolon;
-    explicit ExprStmt(std::unique_ptr<Expr> expr, bool has_semi = false) 
+    explicit ExprStmt(std::shared_ptr<Expr> expr, bool has_semi = false) 
         : expression(std::move(expr)), has_semicolon(has_semi) {}
     void print(std::ostream &os, int indent = 0) const override;
     void accept(Visitor* visitor) override;
@@ -362,13 +362,13 @@ struct ExprStmt : public Stmt {
 
 struct LetStmt : public Stmt {
 
-    std::unique_ptr<Pattern> pattern;
+    std::shared_ptr<Pattern> pattern;
 
-    std::optional<std::unique_ptr<TypeNode>> type_annotation;
-    std::optional<std::unique_ptr<Expr>> initializer;
+    std::optional<std::shared_ptr<TypeNode>> type_annotation;
+    std::optional<std::shared_ptr<Expr>> initializer;
 
-    LetStmt(std::unique_ptr<Pattern> pat, std::optional<std::unique_ptr<TypeNode>> type_ann,
-            std::optional<std::unique_ptr<Expr>> init)
+    LetStmt(std::shared_ptr<Pattern> pat, std::optional<std::shared_ptr<TypeNode>> type_ann,
+            std::optional<std::shared_ptr<Expr>> init)
         : pattern(std::move(pat)), type_annotation(std::move(type_ann)),
           initializer(std::move(init)) {}
 
@@ -378,16 +378,16 @@ struct LetStmt : public Stmt {
 
 struct ReturnStmt : public Stmt {
     Token keyword;
-    std::optional<std::unique_ptr<Expr>> value;
-    ReturnStmt(Token keyword, std::optional<std::unique_ptr<Expr>> val)
+    std::optional<std::shared_ptr<Expr>> value;
+    ReturnStmt(Token keyword, std::optional<std::shared_ptr<Expr>> val)
         : keyword(std::move(keyword)), value(std::move(val)) {}
     void print(std::ostream &os, int indent = 0) const override;
     void accept(Visitor* visitor) override;
 };
 
 struct BreakStmt : public Stmt {
-    std::optional<std::unique_ptr<Expr>> value;
-    BreakStmt(std::optional<std::unique_ptr<Expr>> value) : value(std::move(value)) {}
+    std::optional<std::shared_ptr<Expr>> value;
+    BreakStmt(std::optional<std::shared_ptr<Expr>> value) : value(std::move(value)) {}
     void print(std::ostream &os, int indent = 0) const override;
     void accept(Visitor* visitor) override;
 };
@@ -399,8 +399,8 @@ struct ContinueStmt : public Stmt {
 };
 
 struct ItemStmt : public Stmt {
-    std::unique_ptr<Item> item;
-    explicit ItemStmt(std::unique_ptr<Item> i) : item(std::move(i)) {}
+    std::shared_ptr<Item> item;
+    explicit ItemStmt(std::shared_ptr<Item> i) : item(std::move(i)) {}
     void print(std::ostream &os, int indent = 0) const override;
 };
 
@@ -413,9 +413,9 @@ struct TypeNameNode : public TypeNode {
 };
 
 struct ArrayTypeNode : public TypeNode {
-    std::unique_ptr<TypeNode> element_type;
-    std::unique_ptr<Expr> size;
-    ArrayTypeNode(std::unique_ptr<TypeNode> et, std::unique_ptr<Expr> sz)
+    std::shared_ptr<TypeNode> element_type;
+    std::shared_ptr<Expr> size;
+    ArrayTypeNode(std::shared_ptr<TypeNode> et, std::shared_ptr<Expr> sz)
         : element_type(std::move(et)), size(std::move(sz)) {}
     void print(std::ostream &os, int indent = 0) const override;
     void accept(Visitor* visitor) override;
@@ -427,18 +427,18 @@ struct UnitTypeNode : public TypeNode {
 };
 
 struct TupleTypeNode : public TypeNode {
-    std::vector<std::unique_ptr<TypeNode>> elements;
-    explicit TupleTypeNode(std::vector<std::unique_ptr<TypeNode>> elems)
+    std::vector<std::shared_ptr<TypeNode>> elements;
+    explicit TupleTypeNode(std::vector<std::shared_ptr<TypeNode>> elems)
         : elements(std::move(elems)) {}
     void print(std::ostream &os, int indent = 0) const override;
     void accept(Visitor* visitor) override;
 };
 
 struct PathTypeNode : public TypeNode {
-    std::unique_ptr<Expr> path;
-    std::optional<std::vector<std::unique_ptr<TypeNode>>> generic_args;
-    PathTypeNode(std::unique_ptr<Expr> p,
-                 std::optional<std::vector<std::unique_ptr<TypeNode>>> args = std::nullopt)
+    std::shared_ptr<Expr> path;
+    std::optional<std::vector<std::shared_ptr<TypeNode>>> generic_args;
+    PathTypeNode(std::shared_ptr<Expr> p,
+                 std::optional<std::vector<std::shared_ptr<TypeNode>>> args = std::nullopt)
         : path(std::move(p)), generic_args(std::move(args)) {}
 
     void print(std::ostream &os, int indent = 0) const override;
@@ -446,23 +446,23 @@ struct PathTypeNode : public TypeNode {
 
 struct RawPointerTypeNode : public TypeNode {
     bool is_mutable;
-    std::unique_ptr<TypeNode> pointee_type;
-    RawPointerTypeNode(bool is_mut, std::unique_ptr<TypeNode> pointee)
+    std::shared_ptr<TypeNode> pointee_type;
+    RawPointerTypeNode(bool is_mut, std::shared_ptr<TypeNode> pointee)
         : is_mutable(is_mut), pointee_type(std::move(pointee)) {}
     void print(std::ostream &os, int indent = 0) const override;
 };
 
 struct ReferenceTypeNode : public TypeNode {
     bool is_mutable;
-    std::unique_ptr<TypeNode> referenced_type;
-    ReferenceTypeNode(bool is_mut, std::unique_ptr<TypeNode> ref_type)
+    std::shared_ptr<TypeNode> referenced_type;
+    ReferenceTypeNode(bool is_mut, std::shared_ptr<TypeNode> ref_type)
         : is_mutable(is_mut), referenced_type(std::move(ref_type)) {}
     void print(std::ostream &os, int indent = 0) const override;
 };
 
 struct SliceTypeNode : public TypeNode {
-    std::unique_ptr<TypeNode> element_type;
-    SliceTypeNode(std::unique_ptr<TypeNode> elem_type) : element_type(std::move(elem_type)) {}
+    std::shared_ptr<TypeNode> element_type;
+    SliceTypeNode(std::shared_ptr<TypeNode> elem_type) : element_type(std::move(elem_type)) {}
     void print(std::ostream &os, int indent = 0) const override;
 };
 
@@ -471,18 +471,18 @@ struct SelfTypeNode : public TypeNode {
 };
 // Top-level Items
 struct FnParam {
-    std::unique_ptr<Pattern> pattern;
-    std::unique_ptr<TypeNode> type;
+    std::shared_ptr<Pattern> pattern;
+    std::shared_ptr<TypeNode> type;
 };
 struct FnDecl : public Item {
     Token name;
     std::vector<FnParam> params;
-    std::optional<std::unique_ptr<TypeNode>> return_type;
-    std::optional<std::unique_ptr<BlockStmt>> body;
+    std::optional<std::shared_ptr<TypeNode>> return_type;
+    std::optional<std::shared_ptr<BlockStmt>> body;
 
     FnDecl(Token name, std::vector<FnParam> params,
-           std::optional<std::unique_ptr<TypeNode>> return_type,
-           std::optional<std::unique_ptr<BlockStmt>> body)
+           std::optional<std::shared_ptr<TypeNode>> return_type,
+           std::optional<std::shared_ptr<BlockStmt>> body)
         : name(std::move(name)), params(std::move(params)), return_type(std::move(return_type)),
           body(std::move(body)) {}
     void print(std::ostream &os, int indent = 0) const override;
@@ -493,7 +493,7 @@ struct FnDecl : public Item {
 };
 struct Field {
     Token name;
-    std::unique_ptr<TypeNode> type;
+    std::shared_ptr<TypeNode> type;
 };
 enum class StructKind { Normal, Tuple, Unit };
 
@@ -501,12 +501,12 @@ struct StructDecl : public Item {
     Token name;
     StructKind kind;
     std::vector<Field> fields;
-    std::vector<std::unique_ptr<TypeNode>> tuple_fields;
+    std::vector<std::shared_ptr<TypeNode>> tuple_fields;
 
     StructDecl(Token n, std::vector<Field> f) // Normal
         : name(std::move(n)), kind(StructKind::Normal), fields(std::move(f)) {}
 
-    StructDecl(Token n, std::vector<std::unique_ptr<TypeNode>> tf) // Tuple
+    StructDecl(Token n, std::vector<std::shared_ptr<TypeNode>> tf) // Tuple
         : name(std::move(n)), kind(StructKind::Tuple), tuple_fields(std::move(tf)) {}
 
     explicit StructDecl(Token n) // Unit
@@ -517,10 +517,10 @@ struct StructDecl : public Item {
 
 struct ConstDecl : public Item {
     Token name;
-    std::unique_ptr<TypeNode> type;
-    std::unique_ptr<Expr> value;
+    std::shared_ptr<TypeNode> type;
+    std::shared_ptr<Expr> value;
 
-    ConstDecl(Token n, std::unique_ptr<TypeNode> t, std::unique_ptr<Expr> v)
+    ConstDecl(Token n, std::shared_ptr<TypeNode> t, std::shared_ptr<Expr> v)
         : name(std::move(n)), type(std::move(t)), value(std::move(v)) {}
 
     void print(std::ostream &os, int indent = 0) const override;
@@ -532,16 +532,16 @@ struct EnumVariant : public Node {
     Token name;
     EnumVariantKind kind;
 
-    std::optional<std::unique_ptr<Expr>> discriminant;
+    std::optional<std::shared_ptr<Expr>> discriminant;
 
-    std::vector<std::unique_ptr<TypeNode>> tuple_types;
+    std::vector<std::shared_ptr<TypeNode>> tuple_types;
 
     std::vector<Field> fields;
 
-    EnumVariant(Token n, std::optional<std::unique_ptr<Expr>> disc = std::nullopt)
+    EnumVariant(Token n, std::optional<std::shared_ptr<Expr>> disc = std::nullopt)
         : name(std::move(n)), kind(EnumVariantKind::Plain), discriminant(std::move(disc)) {}
 
-    EnumVariant(Token n, std::vector<std::unique_ptr<TypeNode>> types)
+    EnumVariant(Token n, std::vector<std::shared_ptr<TypeNode>> types)
         : name(std::move(n)), kind(EnumVariantKind::Tuple), tuple_types(std::move(types)) {}
 
     EnumVariant(Token n, std::vector<Field> f)
@@ -552,9 +552,9 @@ struct EnumVariant : public Node {
 
 struct EnumDecl : public Item {
     Token name;
-    std::vector<std::unique_ptr<EnumVariant>> variants;
+    std::vector<std::shared_ptr<EnumVariant>> variants;
 
-    EnumDecl(Token n, std::vector<std::unique_ptr<EnumVariant>> v)
+    EnumDecl(Token n, std::vector<std::shared_ptr<EnumVariant>> v)
         : name(std::move(n)), variants(std::move(v)) {}
 
     void print(std::ostream &os, int indent = 0) const override;
@@ -563,9 +563,9 @@ struct EnumDecl : public Item {
 struct ModDecl : public Item {
     Token name;
 
-    std::vector<std::unique_ptr<Item>> items;
+    std::vector<std::shared_ptr<Item>> items;
 
-    ModDecl(Token n, std::vector<std::unique_ptr<Item>> i)
+    ModDecl(Token n, std::vector<std::shared_ptr<Item>> i)
         : name(std::move(n)), items(std::move(i)) {}
 
     void print(std::ostream &os, int indent = 0) const override;
@@ -573,20 +573,20 @@ struct ModDecl : public Item {
 
 struct TraitDecl : public Item {
     Token name;
-    std::vector<std::unique_ptr<Item>> associated_items;
-    TraitDecl(Token n, std::vector<std::unique_ptr<Item>> items)
+    std::vector<std::shared_ptr<Item>> associated_items;
+    TraitDecl(Token n, std::vector<std::shared_ptr<Item>> items)
         : name(std::move(n)), associated_items(std::move(items)) {}
 
     void print(std::ostream &os, int indent = 0) const override;
 };
 
 struct ImplBlock : public Item {
-    std::optional<std::unique_ptr<TypeNode>> trait_name;
-    std::unique_ptr<TypeNode> target_type;
-    std::vector<std::unique_ptr<Item>> implemented_items;
+    std::optional<std::shared_ptr<TypeNode>> trait_name;
+    std::shared_ptr<TypeNode> target_type;
+    std::vector<std::shared_ptr<Item>> implemented_items;
 
-    ImplBlock(std::optional<std::unique_ptr<TypeNode>> trait, std::unique_ptr<TypeNode> target,
-              std::vector<std::unique_ptr<Item>> items)
+    ImplBlock(std::optional<std::shared_ptr<TypeNode>> trait, std::shared_ptr<TypeNode> target,
+              std::vector<std::shared_ptr<Item>> items)
         : trait_name(std::move(trait)), target_type(std::move(target)),
           implemented_items(std::move(items)) {}
 
@@ -612,20 +612,20 @@ struct IdentifierPattern : public Pattern {
     void accept(Visitor* visitor) override;
 };
 struct TuplePattern : public Pattern {
-    std::vector<std::unique_ptr<Pattern>> elements;
+    std::vector<std::shared_ptr<Pattern>> elements;
 
-    explicit TuplePattern(std::vector<std::unique_ptr<Pattern>> elems)
+    explicit TuplePattern(std::vector<std::shared_ptr<Pattern>> elems)
         : elements(std::move(elems)) {}
 
     void print(std::ostream &os, int indent = 0) const override;
 };
 struct MatchArm : public Node {
-    std::unique_ptr<Pattern> pattern;
-    std::optional<std::unique_ptr<Expr>> guard;
-    std::unique_ptr<Expr> body;
+    std::shared_ptr<Pattern> pattern;
+    std::optional<std::shared_ptr<Expr>> guard;
+    std::shared_ptr<Expr> body;
 
-    MatchArm(std::unique_ptr<Pattern> pat, std::optional<std::unique_ptr<Expr>> grd,
-             std::unique_ptr<Expr> bdy)
+    MatchArm(std::shared_ptr<Pattern> pat, std::optional<std::shared_ptr<Expr>> grd,
+             std::shared_ptr<Expr> bdy)
         : pattern(std::move(pat)), guard(std::move(grd)), body(std::move(bdy)) {}
 
     void print(std::ostream &os, int indent = 0) const override;
@@ -633,16 +633,16 @@ struct MatchArm : public Node {
 
 struct StructPatternField {
     Token field_name;
-    std::optional<std::unique_ptr<Pattern>> pattern;
+    std::optional<std::shared_ptr<Pattern>> pattern;
 };
 
 struct StructPattern : public Pattern {
-    std::unique_ptr<Expr> path;
+    std::shared_ptr<Expr> path;
 
     std::vector<StructPatternField> fields;
     bool has_rest;
 
-    StructPattern(std::unique_ptr<Expr> p, std::vector<StructPatternField> f, bool rest)
+    StructPattern(std::shared_ptr<Expr> p, std::vector<StructPatternField> f, bool rest)
         : path(std::move(p)), fields(std::move(f)), has_rest(rest) {}
 
     void print(std::ostream &os, int indent = 0) const override;
@@ -653,8 +653,8 @@ struct RestPattern : public Pattern {
 };
 
 struct SlicePattern : public Pattern {
-    std::vector<std::unique_ptr<Pattern>> elements;
-    explicit SlicePattern(std::vector<std::unique_ptr<Pattern>> elems)
+    std::vector<std::shared_ptr<Pattern>> elements;
+    explicit SlicePattern(std::vector<std::shared_ptr<Pattern>> elems)
         : elements(std::move(elems)) {}
 
     void print(std::ostream &os, int indent = 0) const override;
@@ -663,7 +663,7 @@ struct SlicePattern : public Pattern {
 // Root node
 
 struct Program : public Node {
-    std::vector<std::unique_ptr<Item>> items;
+    std::vector<std::shared_ptr<Item>> items;
     void print(std::ostream &os, int indent = 0) const override;
     void accept(Visitor* visitor) override;
 };
