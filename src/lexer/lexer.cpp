@@ -116,12 +116,12 @@ string tokenTypeToString(TokenType type) {
         return "CHAR";
     case TokenType::NUMBER:
         return "NUMBER";
-    case TokenType::BYTE:
-        return "BYTE";
     case TokenType::CSTRING:
         return "CSTRING";
-    case TokenType::BSTRING:
-        return "BSTRING";
+    case TokenType::RSTRING:
+        return "RSTRING";
+    case TokenType::RCSTRING:
+        return "RCSTRING";
 
     // Keywords
     case TokenType::AS:
@@ -344,9 +344,27 @@ static std::unordered_map<std::string, TokenType> symbols = {
 
 };
 
+bool check_inRstring(string &token) {
+    if (!token.size()) {
+        return 0;
+    }
+    if (token.size() == 1 && token[0] == 'r') {
+        return 1;
+    }
+    if (token.size() == 1)
+        return 0;
+    if (!(token[0] == 'r' && token[1] == '#') && !(token[0] == 'c' && token[1] == 'r'))
+        return 0;
+    for (int i = 2; i < token.size(); i++) {
+        if (token[i] != '#')
+            return 0;
+    }
+    return 1;
+}
 vector<Token> lexer_program(const Prog &program) {
     bool in_string = 0;
     bool in_string2 = 0;
+    int in_rstring = 0;
     bool trans = 0;
     size_t i = 0;
     string token = "";
@@ -359,7 +377,34 @@ vector<Token> lexer_program(const Prog &program) {
 
         string tmp = "";
         tmp += ch;
-        if (in_string) {
+        if (in_rstring > 0) {
+            token += ch;
+            if (ch == '"' && in_rstring == 1) {
+                in_rstring = 0;
+
+            } else if (ch == '#') {
+                for (int i = token.size() - 1; i >= 0; --i) {
+                    if (token[i] == '"' && token.size() - i == in_rstring) {
+                        in_rstring = 0;
+                        break;
+                    } else if (token[i] != '#') {
+                        break;
+                    }
+                }
+            }
+            if (!in_rstring) {
+                new_token.lexeme = token;
+                new_token.line = program.positions[i].first;
+                new_token.column = program.positions[i].second;
+                if (token[0] == 'c')
+                    new_token.type = TokenType::RCSTRING;
+                else
+                    new_token.type = TokenType::RSTRING;
+                result.push_back(new_token);
+                token = "";
+            }
+            i++;
+        } else if (in_string) {
             token += ch;
             if (trans) {
                 trans = 0;
@@ -368,9 +413,8 @@ vector<Token> lexer_program(const Prog &program) {
 
             } else if (ch == '"') {
                 in_string = 0;
-                if (token[0] == 'b')
-                    new_token.type = TokenType::BSTRING;
-                else if (token[0] == 'c')
+
+                if (token[0] == 'c')
                     new_token.type = TokenType::CSTRING;
                 else
                     new_token.type = TokenType::STRING;
@@ -390,10 +434,7 @@ vector<Token> lexer_program(const Prog &program) {
 
             } else if (ch == '\'') {
                 in_string2 = 0;
-                if (token[0] == 'b')
-                    new_token.type = TokenType::BYTE;
-                else
-                    new_token.type = TokenType::CHAR;
+                new_token.type = TokenType::CHAR;
                 new_token.lexeme = token;
                 new_token.line = program.positions[i].first;
                 new_token.column = program.positions[i].second;
@@ -402,12 +443,18 @@ vector<Token> lexer_program(const Prog &program) {
                 token = "";
             }
             i++;
-        } else if (ch == '"' && (token.size() == 0 ||
-                                 (token.size() == 1 && (token[0] == 'b' || token[0] == 'c')))) {
+        } else if (ch == '"' && check_inRstring(token)) {
+            token += ch;
+            if (token[0] == 'c')
+                in_rstring = token.size() - 2;
+            else
+                in_rstring = token.size() - 1;
+            i++;
+        } else if (ch == '"' && (token.size() == 0 || (token.size() == 1 && token[0] == 'c'))) {
             token += ch;
             in_string = 1;
             i++;
-        } else if (ch == '\'' && (token.size() == 0 || (token.size() == 1 && token[0] == 'b'))) {
+        } else if (ch == '\'' && (token.size() == 0)) {
             token += ch;
             in_string2 = 1;
             i++;
@@ -641,7 +688,7 @@ vector<Token> lexer_program(const Prog &program) {
             result.push_back(new_token);
 
         } else if (!(ch >= '0' && ch <= '9') && !(ch >= 'A' && ch <= 'Z') &&
-                   !(ch >= 'a' && ch <= 'z') && ch != '_' && token.length() > 0) {
+                   !(ch >= 'a' && ch <= 'z') && ch != '_' && ch != '#' && token.length() > 0) {
             if (token[0] >= '0' && token[0] <= '9') {
                 new_token.type = TokenType::NUMBER;
             } else {
@@ -658,7 +705,7 @@ vector<Token> lexer_program(const Prog &program) {
 
             token = "";
         } else if ((ch >= '0' && ch <= '9') || (ch >= 'A' && ch <= 'Z') ||
-                   (ch >= 'a' && ch <= 'z') || ch == '_') {
+                   (ch >= 'a' && ch <= 'z') || ch == '_' || ch == '#') {
             token += ch, i++;
         } else
             i++;

@@ -20,6 +20,15 @@ Parser::Parser(const std::vector<Token> &tokens) : tokens_(tokens) {
                     [this] { return std::make_shared<LiteralExpr>(previous()); });
     register_prefix(TokenType::STRING,
                     [this] { return std::make_shared<LiteralExpr>(previous()); });
+    register_prefix(TokenType::RSTRING,
+                    [this] { return std::make_shared<LiteralExpr>(previous()); });
+    register_prefix(TokenType::CSTRING,
+                    [this] { return std::make_shared<LiteralExpr>(previous()); });
+    register_prefix(TokenType::RCSTRING,
+                    [this] { return std::make_shared<LiteralExpr>(previous()); });
+    register_prefix(TokenType::CHAR,
+                    [this] { return std::make_shared<LiteralExpr>(previous()); });
+                    
     register_prefix(TokenType::TRUE, [this] { return std::make_shared<LiteralExpr>(previous()); });
     register_prefix(TokenType::FALSE, [this] { return std::make_shared<LiteralExpr>(previous()); });
 

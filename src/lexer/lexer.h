@@ -63,8 +63,8 @@ enum class TokenType {
     IDENTIFIER,
     STRING,
     CSTRING,
-    BSTRING,
-    BYTE,
+    RSTRING,
+    RCSTRING,
     CHAR,
     NUMBER,
 
