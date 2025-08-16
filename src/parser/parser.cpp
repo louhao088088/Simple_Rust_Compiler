@@ -5,7 +5,8 @@ using std::string;
 using std::vector;
 
 // Constructor: set up all parsing rules
-Parser::Parser(const std::vector<Token> &tokens) : tokens_(tokens) {
+Parser::Parser(const std::vector<Token> &tokens, ErrorReporter &error_reporter)
+    : tokens_(tokens), error_reporter_(error_reporter) {
     // Register Pratt parser rules
 
     // Register prefix parsing functions
@@ -26,9 +27,8 @@ Parser::Parser(const std::vector<Token> &tokens) : tokens_(tokens) {
                     [this] { return std::make_shared<LiteralExpr>(previous()); });
     register_prefix(TokenType::RCSTRING,
                     [this] { return std::make_shared<LiteralExpr>(previous()); });
-    register_prefix(TokenType::CHAR,
-                    [this] { return std::make_shared<LiteralExpr>(previous()); });
-                    
+    register_prefix(TokenType::CHAR, [this] { return std::make_shared<LiteralExpr>(previous()); });
+
     register_prefix(TokenType::TRUE, [this] { return std::make_shared<LiteralExpr>(previous()); });
     register_prefix(TokenType::FALSE, [this] { return std::make_shared<LiteralExpr>(previous()); });
 
@@ -127,7 +127,8 @@ Parser::Parser(const std::vector<Token> &tokens) : tokens_(tokens) {
     register_infix(TokenType::AS, Precedence::AS, [this](auto left) -> std::shared_ptr<Expr> {
         auto target_type = parse_type();
         if (!target_type) {
-            throw error(peek(), "Expect a type after 'as' keyword.");
+            report_error(peek(), "Expect a type after 'as' keyword.");
+            return nullptr;
         }
         return std::make_shared<AsExpr>(std::move(left), std::move(target_type));
     });
@@ -326,12 +327,11 @@ Parser::Parser(const std::vector<Token> &tokens) : tokens_(tokens) {
 std::shared_ptr<Program> Parser::parse() {
     auto program = std::make_shared<Program>();
     while (!is_at_end()) {
-        try {
-            program->items.push_back(parse_item());
-        } catch (const std::runtime_error &e) {
-            std::cerr << e.what() << std::endl;
-            synchronize();
+        auto item = parse_item();
+        if (item) {
+            program->items.push_back(item);
         }
+        // Continue parsing even if there are errors
     }
     return program;
 }
@@ -396,7 +396,8 @@ std::shared_ptr<TypeNode> Parser::parse_type() {
         return std::make_shared<PathTypeNode>(std::move(path));
     }
 
-    throw error(peek(), "Expected a type.");
+    report_error(peek(), "Expected a type.");
+    return nullptr;
 }
 
 // pattern
@@ -447,7 +448,8 @@ std::shared_ptr<Pattern> Parser::parse_pattern() {
         return std::make_shared<LiteralPattern>(previous());
     }
 
-    throw error(peek(), "Expected a pattern.");
+    report_error(peek(), "Expected a pattern.");
+    return nullptr;
 }
 
 std::shared_ptr<Pattern> Parser::parse_struct_pattern_body(std::shared_ptr<Expr> path) {
@@ -499,7 +501,8 @@ std::shared_ptr<Item> Parser::parse_item() {
         return parse_impl_block();
     }
 
-    throw error(peek(), "Expect a top-level item like 'fn'.");
+    report_error(peek(), "Expect a top-level item like 'fn'.");
+    return nullptr;
 }
 
 std::shared_ptr<FnDecl> Parser::parse_fn_declaration() {
@@ -552,7 +555,8 @@ std::shared_ptr<FnDecl> Parser::parse_fn_declaration() {
         body = parse_block_statement();
     } else if (match({TokenType::SEMICOLON})) {
     } else {
-        throw error(peek(), "Expect function body `{` or semicolon `;` after function signature.");
+        report_error(peek(), "Expect function body `{` or semicolon `;` after function signature.");
+        return nullptr;
     }
     return std::make_shared<FnDecl>(name, std::move(params), std::move(return_type),
                                     std::move(body));
@@ -600,7 +604,8 @@ std::shared_ptr<Expr> Parser::parse_struct_initializer(std::shared_ptr<Expr> nam
     while (!check(TokenType::RIGHT_BRACE) && !is_at_end()) {
         Token field_name = advance();
         if (field_name.type != TokenType::IDENTIFIER && field_name.type != TokenType::NUMBER) {
-            throw error(field_name, "Expect field name or index in struct initializer.");
+            report_error(field_name, "Expect field name or index in struct initializer.");
+            return nullptr;
         }
 
         consume(TokenType::COLON, "Expect ':' after field name.");
@@ -622,7 +627,8 @@ std::shared_ptr<ConstDecl> Parser::parse_const_declaration() {
     consume(TokenType::COLON, "Expect ':' after constant name.");
     auto type = parse_type();
     if (!type) {
-        throw error(peek(), "Expect a type for the constant.");
+        report_error(peek(), "Expect a type for the constant.");
+        return nullptr;
     }
     consume(TokenType::EQUAL, "Expect '=' after constant type.");
     auto value = parse_expression(Precedence::NONE);
@@ -699,7 +705,8 @@ std::shared_ptr<ModDecl> Parser::parse_mod_declaration() {
         std::vector<std::shared_ptr<Item>> items;
         return std::make_shared<ModDecl>(name, std::move(items));
     } else {
-        throw error(peek(), "Expect '{' or ';' after module name.");
+        report_error(peek(), "Expect '{' or ';' after module name.");
+        return nullptr;
     }
 }
 
@@ -712,7 +719,8 @@ std::shared_ptr<TraitDecl> Parser::parse_trait_declaration() {
         if (peek().type == TokenType::FN) {
             items.push_back(parse_fn_declaration());
         } else {
-            throw error(peek(), "Expect associated function, type, or const in trait body.");
+            report_error(peek(), "Expect associated function, type, or const in trait body.");
+            advance(); // Skip the invalid token to continue parsing
         }
     }
 
@@ -740,7 +748,8 @@ std::shared_ptr<ImplBlock> Parser::parse_impl_block() {
         if (peek().type == TokenType::FN) {
             items.push_back(parse_fn_declaration());
         } else {
-            throw error(peek(), "Expect associated function, type, or const in impl body.");
+            report_error(peek(), "Expect associated function, type, or const in impl body.");
+            advance(); // Skip the invalid token to continue parsing
         }
     }
 
@@ -868,7 +877,8 @@ std::shared_ptr<Expr> Parser::parse_expression(Precedence precedence, bool allow
     advance();
     TokenType prefix_type = previous().type;
     if (prefix_parsers_.find(prefix_type) == prefix_parsers_.end()) {
-        throw error(previous(), "Expect an expression.");
+        report_error(previous(), "Expect an expression.");
+        return nullptr;
     }
 
     auto left = prefix_parsers_[prefix_type]();
@@ -960,8 +970,10 @@ bool Parser::is_at_end() {
 }
 const Token &Parser::peek() { return tokens_[current_]; }
 const Token &Parser::peekNext() {
-    if (is_at_end())
-        return ((Token){TokenType::UNKNOWN, "nullptr", 0, 0});
+    if (is_at_end()) {
+        static Token unknown_token{TokenType::UNKNOWN, "nullptr", 0, 0};
+        return unknown_token;
+    }
     return tokens_[current_ + 1];
 }
 const Token &Parser::previous() { return tokens_[current_ - 1]; }
@@ -1000,11 +1012,11 @@ bool Parser::match(const std::vector<TokenType> &types) {
 const Token &Parser::consume(TokenType type, const std::string &error_message) {
     if (check(type))
         return advance();
-    throw error(peek(), error_message);
+    report_error(peek(), error_message);
+    return peek(); // Return current token to avoid crash
 }
-std::runtime_error Parser::error(const Token &token, const std::string &message) {
-    return std::runtime_error("[line " + std::to_string(token.line) + "] Error at '" +
-                              token.lexeme + "': " + message);
+void Parser::report_error(const Token &token, const std::string &message) {
+    error_reporter_.report_error(message, token.line, token.column);
 }
 void Parser::synchronize() {
     advance();

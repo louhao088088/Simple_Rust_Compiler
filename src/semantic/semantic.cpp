@@ -1,9 +1,11 @@
+// semantic.cpp
+
 #include "semantic.h"
 
 Number number_of_tokens(string token) {
     long long num = -1;
     if (token.length() > 2 && token[0] == '0' && token[1] == 'x') {
-        for (int i = 2; i < token.length(); i++) {
+        for (size_t i = 2; i < token.length(); i++) {
             if (token[i] == '_')
                 continue;
 
@@ -42,7 +44,7 @@ Number number_of_tokens(string token) {
                               : (token[i] >= 'A' && token[i] <= 'F' ? token[i] - 'A' + 10 : -1)));
         }
     } else if (token.length() > 2 && token[0] == '0' && token[1] == 'b') {
-        for (int i = 2; i < token.length(); i++) {
+        for (size_t i = 2; i < token.length(); i++) {
             if (token[i] == '_')
                 continue;
 
@@ -76,7 +78,7 @@ Number number_of_tokens(string token) {
         }
 
     } else if (token.length() > 1 && token[0] == '0' && token[1] == 'o') {
-        for (int i = 2; i < token.length(); i++) {
+        for (size_t i = 2; i < token.length(); i++) {
             if (token[i] == '_')
                 continue;
 
@@ -114,7 +116,7 @@ Number number_of_tokens(string token) {
             puts("Invalid number format");
             return {-1, false};
         }
-        for (int i = 0; i < token.length(); i++) {
+        for (size_t i = 0; i < token.length(); i++) {
             if (token[i] == '_')
                 continue;
 
@@ -153,4 +155,425 @@ Number number_of_tokens(string token) {
         return {-1, false};
     }
     return {num, true};
+}
+
+// SymbolTable implementation
+void SymbolTable::enter_scope() { scopes_.emplace_back(); }
+
+void SymbolTable::exit_scope() {
+    if (!scopes_.empty()) {
+        scopes_.pop_back();
+    }
+}
+
+void SymbolTable::define(const std::string &name, std::shared_ptr<Symbol> symbol) {
+    if (!scopes_.empty()) {
+        scopes_.back()[name] = symbol;
+    }
+}
+
+std::shared_ptr<Symbol> SymbolTable::lookup(const std::string &name) {
+    for (auto it = scopes_.rbegin(); it != scopes_.rend(); ++it) {
+        auto found = it->find(name);
+        if (found != it->end()) {
+            return found->second;
+        }
+    }
+    return nullptr;
+}
+
+// NameResolutionVisitor implementation
+NameResolutionVisitor::NameResolutionVisitor(ErrorReporter &error_reporter)
+    : error_reporter_(error_reporter) {
+    symbol_table_.enter_scope(); // Global scope
+}
+
+void NameResolutionVisitor::visit(LiteralExpr *node) {
+    // Literals don't need symbol resolution
+}
+
+void NameResolutionVisitor::visit(ArrayLiteralExpr *node) {
+    for (auto &element : node->elements) {
+        element->accept(this);
+    }
+}
+
+void NameResolutionVisitor::visit(ArrayInitializerExpr *node) {
+    node->value->accept(this);
+    node->size->accept(this);
+}
+
+void NameResolutionVisitor::visit(VariableExpr *node) {
+    auto symbol = symbol_table_.lookup(node->name.lexeme);
+    if (!symbol) {
+        error_reporter_.report_error("Undefined variable '" + node->name.lexeme + "'",
+                                     node->name.line, node->name.column);
+    } else {
+        node->resolved_symbol = symbol;
+    }
+}
+
+void NameResolutionVisitor::visit(UnaryExpr *node) { node->right->accept(this); }
+
+void NameResolutionVisitor::visit(BinaryExpr *node) {
+    node->left->accept(this);
+    node->right->accept(this);
+}
+
+void NameResolutionVisitor::visit(CallExpr *node) {
+    node->callee->accept(this);
+    for (auto &arg : node->arguments) {
+        arg->accept(this);
+    }
+}
+
+void NameResolutionVisitor::visit(IfExpr *node) {
+    node->condition->accept(this);
+    node->then_branch->accept(this);
+    if (node->else_branch) {
+        (*node->else_branch)->accept(this);
+    }
+}
+
+void NameResolutionVisitor::visit(LoopExpr *node) { node->body->accept(this); }
+
+void NameResolutionVisitor::visit(WhileExpr *node) {
+    node->condition->accept(this);
+    node->body->accept(this);
+}
+
+void NameResolutionVisitor::visit(IndexExpr *node) {
+    node->object->accept(this);
+    node->index->accept(this);
+}
+
+void NameResolutionVisitor::visit(FieldAccessExpr *node) { node->object->accept(this); }
+
+void NameResolutionVisitor::visit(AssignmentExpr *node) {
+    node->target->accept(this);
+    node->value->accept(this);
+}
+
+void NameResolutionVisitor::visit(CompoundAssignmentExpr *node) {
+    node->target->accept(this);
+    node->value->accept(this);
+}
+
+void NameResolutionVisitor::visit(ReferenceExpr *node) { node->expression->accept(this); }
+
+void NameResolutionVisitor::visit(UnderscoreExpr *node) {
+    // Underscore expression doesn't need name resolution
+}
+
+void NameResolutionVisitor::visit(BlockStmt *node) {
+    symbol_table_.enter_scope();
+    for (auto &stmt : node->statements) {
+        stmt->accept(this);
+    }
+    if (node->final_expr) {
+        (*node->final_expr)->accept(this);
+    }
+    symbol_table_.exit_scope();
+}
+
+void NameResolutionVisitor::visit(ExprStmt *node) { node->expression->accept(this); }
+
+void NameResolutionVisitor::visit(LetStmt *node) {
+    if (node->initializer) {
+        (*node->initializer)->accept(this);
+    }
+
+    // Handle pattern binding
+    if (node->pattern) {
+        node->pattern->accept(this);
+    }
+}
+
+void NameResolutionVisitor::visit(ReturnStmt *node) {
+    if (node->value) {
+        (*node->value)->accept(this);
+    }
+}
+
+void NameResolutionVisitor::visit(BreakStmt *node) {
+    if (node->value) {
+        (*node->value)->accept(this);
+    }
+}
+
+void NameResolutionVisitor::visit(ContinueStmt *node) {
+    // No symbols to resolve
+}
+
+void NameResolutionVisitor::visit(TypeNameNode *node) {
+    // Type resolution would be handled here
+}
+
+void NameResolutionVisitor::visit(ArrayTypeNode *node) {
+    node->element_type->accept(this);
+    node->size->accept(this);
+}
+
+void NameResolutionVisitor::visit(UnitTypeNode *node) {
+    // Unit type has no symbols
+}
+
+void NameResolutionVisitor::visit(TupleTypeNode *node) {
+    for (auto &element : node->elements) {
+        element->accept(this);
+    }
+}
+
+void NameResolutionVisitor::visit(FnDecl *node) {
+    // Define function symbol
+    auto fn_symbol = std::make_shared<Symbol>(node->name.lexeme, Symbol::FUNCTION);
+    symbol_table_.define(node->name.lexeme, fn_symbol);
+    node->resolved_symbol = fn_symbol;
+
+    // Process function body with new scope
+    if (node->body) {
+        symbol_table_.enter_scope();
+        // TODO: Define parameter symbols
+        (*node->body)->accept(this);
+        symbol_table_.exit_scope();
+    }
+}
+
+void NameResolutionVisitor::visit(Program *node) {
+    for (auto &item : node->items) {
+        item->accept(this);
+    }
+}
+
+// Pattern visitors (simplified implementations)
+void NameResolutionVisitor::visit(IdentifierPattern *node) {
+    // Define the variable symbol
+    auto var_symbol = std::make_shared<Symbol>(node->name.lexeme, Symbol::VARIABLE);
+    symbol_table_.define(node->name.lexeme, var_symbol);
+}
+
+void NameResolutionVisitor::visit(WildcardPattern *node) {
+    // Wildcard patterns don't bind variables
+}
+
+void NameResolutionVisitor::visit(LiteralPattern *node) {
+    // Literal patterns don't bind variables
+}
+
+void NameResolutionVisitor::visit(TuplePattern *node) {
+    for (auto &element : node->elements) {
+        element->accept(this);
+    }
+}
+
+void NameResolutionVisitor::visit(SlicePattern *node) {
+    for (auto &element : node->elements) {
+        element->accept(this);
+    }
+}
+
+void NameResolutionVisitor::visit(StructPattern *node) {
+    // TODO: Handle struct pattern fields
+}
+
+void NameResolutionVisitor::visit(RestPattern *node) {
+    // Rest patterns don't bind variables themselves
+}
+
+// TypeCheckVisitor implementation
+TypeCheckVisitor::TypeCheckVisitor(ErrorReporter &error_reporter)
+    : error_reporter_(error_reporter) {}
+
+void TypeCheckVisitor::visit(LiteralExpr *node) {
+    // TODO: Infer type from literal token
+}
+
+void TypeCheckVisitor::visit(ArrayLiteralExpr *node) {
+    // TODO: Type check array elements and infer array type
+    for (auto &element : node->elements) {
+        element->accept(this);
+    }
+}
+
+void TypeCheckVisitor::visit(ArrayInitializerExpr *node) {
+    node->value->accept(this);
+    node->size->accept(this);
+    // TODO: Type check and infer array type
+}
+
+void TypeCheckVisitor::visit(VariableExpr *node) {
+    if (node->resolved_symbol && node->resolved_symbol->type) {
+        node->type = node->resolved_symbol->type;
+    }
+}
+
+void TypeCheckVisitor::visit(UnaryExpr *node) {
+    node->right->accept(this);
+    // TODO: Type check unary operations
+}
+
+void TypeCheckVisitor::visit(BinaryExpr *node) {
+    node->left->accept(this);
+    node->right->accept(this);
+    // TODO: Type check binary operations
+}
+
+void TypeCheckVisitor::visit(CallExpr *node) {
+    node->callee->accept(this);
+    for (auto &arg : node->arguments) {
+        arg->accept(this);
+    }
+    // TODO: Type check function call
+}
+
+void TypeCheckVisitor::visit(IfExpr *node) {
+    node->condition->accept(this);
+    node->then_branch->accept(this);
+    if (node->else_branch) {
+        (*node->else_branch)->accept(this);
+    }
+    // TODO: Type check if expression
+}
+
+void TypeCheckVisitor::visit(LoopExpr *node) {
+    node->body->accept(this);
+    // TODO: Loop expressions return ()
+}
+
+void TypeCheckVisitor::visit(WhileExpr *node) {
+    node->condition->accept(this);
+    node->body->accept(this);
+    // TODO: While expressions return ()
+}
+
+void TypeCheckVisitor::visit(IndexExpr *node) {
+    node->object->accept(this);
+    node->index->accept(this);
+    // TODO: Type check array/index access
+}
+
+void TypeCheckVisitor::visit(FieldAccessExpr *node) {
+    node->object->accept(this);
+    // TODO: Type check field access
+}
+
+void TypeCheckVisitor::visit(AssignmentExpr *node) {
+    node->target->accept(this);
+    node->value->accept(this);
+    // TODO: Type check assignment compatibility
+}
+
+void TypeCheckVisitor::visit(CompoundAssignmentExpr *node) {
+    node->target->accept(this);
+    node->value->accept(this);
+    // TODO: Type check compound assignment compatibility
+}
+
+void TypeCheckVisitor::visit(ReferenceExpr *node) {
+    node->expression->accept(this);
+    // TODO: Handle reference type checking
+}
+
+void TypeCheckVisitor::visit(UnderscoreExpr *node) {
+    // Underscore expression has unknown type for now
+}
+
+void TypeCheckVisitor::visit(BlockStmt *node) {
+    for (auto &stmt : node->statements) {
+        stmt->accept(this);
+    }
+    if (node->final_expr) {
+        (*node->final_expr)->accept(this);
+    }
+}
+
+void TypeCheckVisitor::visit(ExprStmt *node) { node->expression->accept(this); }
+
+void TypeCheckVisitor::visit(LetStmt *node) {
+    if (node->initializer) {
+        (*node->initializer)->accept(this);
+    }
+    // TODO: Type check let statement
+}
+
+void TypeCheckVisitor::visit(ReturnStmt *node) {
+    if (node->value) {
+        (*node->value)->accept(this);
+        // TODO: Check return type compatibility
+    }
+}
+
+void TypeCheckVisitor::visit(BreakStmt *node) {
+    if (node->value) {
+        (*node->value)->accept(this);
+    }
+}
+
+void TypeCheckVisitor::visit(ContinueStmt *node) {
+    // Continue statements don't have types
+}
+
+void TypeCheckVisitor::visit(TypeNameNode *node) {
+    // Type nodes don't need type checking
+}
+
+void TypeCheckVisitor::visit(ArrayTypeNode *node) {
+    node->element_type->accept(this);
+    node->size->accept(this);
+}
+
+void TypeCheckVisitor::visit(UnitTypeNode *node) {
+    // Unit type is always valid
+}
+
+void TypeCheckVisitor::visit(TupleTypeNode *node) {
+    for (auto &element : node->elements) {
+        element->accept(this);
+    }
+}
+
+void TypeCheckVisitor::visit(FnDecl *node) {
+    if (node->body) {
+        // TODO: Set current return type for return statements
+        (*node->body)->accept(this);
+    }
+}
+
+void TypeCheckVisitor::visit(Program *node) {
+    for (auto &item : node->items) {
+        item->accept(this);
+    }
+}
+
+// Pattern visitors for TypeCheckVisitor (simplified implementations)
+void TypeCheckVisitor::visit(IdentifierPattern *node) {
+    // Pattern type checking would go here
+}
+
+void TypeCheckVisitor::visit(WildcardPattern *node) {
+    // No type checking needed for wildcard
+}
+
+void TypeCheckVisitor::visit(LiteralPattern *node) {
+    // Type check literal pattern
+}
+
+void TypeCheckVisitor::visit(TuplePattern *node) {
+    for (auto &element : node->elements) {
+        element->accept(this);
+    }
+}
+
+void TypeCheckVisitor::visit(SlicePattern *node) {
+    for (auto &element : node->elements) {
+        element->accept(this);
+    }
+}
+
+void TypeCheckVisitor::visit(StructPattern *node) {
+    // TODO: Handle struct pattern type checking
+}
+
+void TypeCheckVisitor::visit(RestPattern *node) {
+    // No specific type checking for rest patterns
 }

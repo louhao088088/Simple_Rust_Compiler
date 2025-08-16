@@ -13,7 +13,9 @@ add_executable(code
     src/pre_processor/pre_processor.cpp
     src/lexer/lexer.cpp
     src/ast/ast.cpp
-    src/parser/parser.cpp    
+    src/parser/parser.cpp
+    src/semantic/semantic.cpp
+    src/error/error.cpp
     src/main.cpp
 )
 

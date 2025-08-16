@@ -1,5 +1,6 @@
 #pragma once
 
+#include "../error/error.h"
 #include "../pre_processor/pre_processor.h"
 
 #include <any>
@@ -138,6 +139,6 @@ struct Token {
     void print() const;
 };
 
-vector<Token> lexer_program(const Prog &program);
+vector<Token> lexer_program(const Prog &program, ErrorReporter &error_reporter);
 
 void print_lexer_result(const vector<Token> &tokens);

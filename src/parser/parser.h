@@ -2,6 +2,7 @@
 #pragma once
 
 #include "../ast/ast.h"
+#include "../error/error.h"
 
 #include <functional>
 #include <map>
@@ -29,12 +30,13 @@ enum Precedence {
 
 class Parser {
   public:
-    explicit Parser(const std::vector<Token> &tokens);
+    explicit Parser(const std::vector<Token> &tokens, ErrorReporter &error_reporter);
     std::shared_ptr<Program> parse();
 
   private:
     // State
     const std::vector<Token> &tokens_;
+    ErrorReporter &error_reporter_;
     size_t current_ = 0;
 
     // Pratt parser required types
@@ -59,7 +61,7 @@ class Parser {
     bool match(const std::vector<TokenType> &types);
     bool is_comparison_op(TokenType type) const;
     const Token &consume(TokenType type, const std::string &error_message);
-    std::runtime_error error(const Token &token, const std::string &message);
+    void report_error(const Token &token, const std::string &message);
     void synchronize();
 
     // Grammar parsing functions

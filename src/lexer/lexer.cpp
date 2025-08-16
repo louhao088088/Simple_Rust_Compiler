@@ -355,16 +355,16 @@ bool check_inRstring(string &token) {
         return 0;
     if (!(token[0] == 'r' && token[1] == '#') && !(token[0] == 'c' && token[1] == 'r'))
         return 0;
-    for (int i = 2; i < token.size(); i++) {
+    for (size_t i = 2; i < token.size(); i++) {
         if (token[i] != '#')
             return 0;
     }
     return 1;
 }
-vector<Token> lexer_program(const Prog &program) {
+vector<Token> lexer_program(const Prog &program, ErrorReporter &error_reporter) {
     bool in_string = 0;
     bool in_string2 = 0;
-    int in_rstring = 0;
+    size_t in_rstring = 0;
     bool trans = 0;
     size_t i = 0;
     string token = "";
@@ -707,8 +707,15 @@ vector<Token> lexer_program(const Prog &program) {
         } else if ((ch >= '0' && ch <= '9') || (ch >= 'A' && ch <= 'Z') ||
                    (ch >= 'a' && ch <= 'z') || ch == '_' || ch == '#') {
             token += ch, i++;
-        } else
+        } else {
+            // Unrecognized character
+            if (ch != ' ' && ch != '\t' && ch != '\n' && ch != '\r') {
+                error_reporter.report_error("Unrecognized character '" + std::string(1, ch) + "'",
+                                            program.positions[i].first,
+                                            program.positions[i].second);
+            }
             i++;
+        }
     }
     if (token.length() > 0) {
         if (token[0] >= '0' && token[0] <= '9') {
