@@ -1,1 +1,1 @@
-It is a simple RUST compiler by C++.
+It is a simple Rust compiler by C++.

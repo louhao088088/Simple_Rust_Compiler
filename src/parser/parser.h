@@ -99,6 +99,7 @@ class Parser {
     std::shared_ptr<WhileExpr> parse_while_expression();
     std::shared_ptr<MatchArm> parse_match_arm();
     std::shared_ptr<MatchExpr> parse_match_expression();
+    std::shared_ptr<Expr> parse_path_expression();
     Precedence get_precedence(TokenType type);
 
     // Type parsing

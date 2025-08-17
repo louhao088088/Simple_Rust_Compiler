@@ -185,12 +185,10 @@ std::shared_ptr<Symbol> SymbolTable::lookup(const std::string &name) {
 // NameResolutionVisitor implementation
 NameResolutionVisitor::NameResolutionVisitor(ErrorReporter &error_reporter)
     : error_reporter_(error_reporter) {
-    symbol_table_.enter_scope(); // Global scope
+    symbol_table_.enter_scope();
 }
 
-void NameResolutionVisitor::visit(LiteralExpr *node) {
-    // Literals don't need symbol resolution
-}
+void NameResolutionVisitor::visit(LiteralExpr *node) {}
 
 void NameResolutionVisitor::visit(ArrayLiteralExpr *node) {
     for (auto &element : node->elements) {
@@ -261,9 +259,7 @@ void NameResolutionVisitor::visit(CompoundAssignmentExpr *node) {
 
 void NameResolutionVisitor::visit(ReferenceExpr *node) { node->expression->accept(this); }
 
-void NameResolutionVisitor::visit(UnderscoreExpr *node) {
-    // Underscore expression doesn't need name resolution
-}
+void NameResolutionVisitor::visit(UnderscoreExpr *node) {}
 
 void NameResolutionVisitor::visit(BlockStmt *node) {
     symbol_table_.enter_scope();
@@ -282,8 +278,6 @@ void NameResolutionVisitor::visit(LetStmt *node) {
     if (node->initializer) {
         (*node->initializer)->accept(this);
     }
-
-    // Handle pattern binding
     if (node->pattern) {
         node->pattern->accept(this);
     }
@@ -301,22 +295,16 @@ void NameResolutionVisitor::visit(BreakStmt *node) {
     }
 }
 
-void NameResolutionVisitor::visit(ContinueStmt *node) {
-    // No symbols to resolve
-}
+void NameResolutionVisitor::visit(ContinueStmt *node) {}
 
-void NameResolutionVisitor::visit(TypeNameNode *node) {
-    // Type resolution would be handled here
-}
+void NameResolutionVisitor::visit(TypeNameNode *node) {}
 
 void NameResolutionVisitor::visit(ArrayTypeNode *node) {
     node->element_type->accept(this);
     node->size->accept(this);
 }
 
-void NameResolutionVisitor::visit(UnitTypeNode *node) {
-    // Unit type has no symbols
-}
+void NameResolutionVisitor::visit(UnitTypeNode *node) {}
 
 void NameResolutionVisitor::visit(TupleTypeNode *node) {
     for (auto &element : node->elements) {
@@ -325,15 +313,15 @@ void NameResolutionVisitor::visit(TupleTypeNode *node) {
 }
 
 void NameResolutionVisitor::visit(FnDecl *node) {
-    // Define function symbol
     auto fn_symbol = std::make_shared<Symbol>(node->name.lexeme, Symbol::FUNCTION);
     symbol_table_.define(node->name.lexeme, fn_symbol);
     node->resolved_symbol = fn_symbol;
 
-    // Process function body with new scope
     if (node->body) {
         symbol_table_.enter_scope();
-        // TODO: Define parameter symbols
+        for (const auto &param : node->params) {
+            param->accept(this);
+        }
         (*node->body)->accept(this);
         symbol_table_.exit_scope();
     }
@@ -378,6 +366,117 @@ void NameResolutionVisitor::visit(StructPattern *node) {
 
 void NameResolutionVisitor::visit(RestPattern *node) {
     // Rest patterns don't bind variables themselves
+}
+
+// Missing expression visitors for NameResolutionVisitor
+void NameResolutionVisitor::visit(StructInitializerExpr *node) {
+    node->name->accept(this);
+    for (auto &field : node->fields) {
+        field->value->accept(this);
+    }
+}
+
+void NameResolutionVisitor::visit(UnitExpr *node) {
+    // Unit expressions have no sub-expressions to visit
+}
+
+void NameResolutionVisitor::visit(GroupingExpr *node) { node->expression->accept(this); }
+
+void NameResolutionVisitor::visit(TupleExpr *node) {
+    for (auto &element : node->elements) {
+        element->accept(this);
+    }
+}
+
+void NameResolutionVisitor::visit(AsExpr *node) {
+    node->expression->accept(this);
+    node->target_type->accept(this);
+}
+
+void NameResolutionVisitor::visit(MatchExpr *node) {
+    node->scrutinee->accept(this);
+    for (auto &arm : node->arms) {
+        arm->accept(this);
+    }
+}
+
+void NameResolutionVisitor::visit(PathExpr *node) {
+    // TODO: Resolve path expressions
+}
+
+void NameResolutionVisitor::visit(RangeExpr *node) {
+    if (node->start)
+        (*node->start)->accept(this);
+    if (node->end)
+        (*node->end)->accept(this);
+}
+
+// Missing statement visitors for NameResolutionVisitor
+void NameResolutionVisitor::visit(ItemStmt *node) { node->item->accept(this); }
+
+// Missing type node visitors for NameResolutionVisitor
+void NameResolutionVisitor::visit(PathTypeNode *node) { node->path->accept(this); }
+
+void NameResolutionVisitor::visit(RawPointerTypeNode *node) { node->pointee_type->accept(this); }
+
+void NameResolutionVisitor::visit(ReferenceTypeNode *node) { node->referenced_type->accept(this); }
+
+void NameResolutionVisitor::visit(SliceTypeNode *node) { node->element_type->accept(this); }
+
+void NameResolutionVisitor::visit(SelfTypeNode *node) {
+    // Self types are handled in context
+}
+
+// Missing item visitors for NameResolutionVisitor
+void NameResolutionVisitor::visit(StructDecl *node) {
+    // TODO: Handle struct declarations
+}
+
+void NameResolutionVisitor::visit(ConstDecl *node) {
+    node->value->accept(this);
+    if (node->type)
+        node->type->accept(this);
+}
+
+void NameResolutionVisitor::visit(EnumDecl *node) {
+    for (auto &variant : node->variants) {
+        variant->accept(this);
+    }
+}
+
+void NameResolutionVisitor::visit(ModDecl *node) {
+    symbol_table_.enter_scope();
+    for (auto &item : node->items) {
+        item->accept(this);
+    }
+    symbol_table_.exit_scope();
+}
+
+void NameResolutionVisitor::visit(TraitDecl *node) {
+    for (auto &item : node->associated_items) {
+        item->accept(this);
+    }
+}
+
+void NameResolutionVisitor::visit(ImplBlock *node) {
+    if (node->trait_name)
+        (*node->trait_name)->accept(this);
+    node->target_type->accept(this);
+    for (auto &item : node->implemented_items) {
+        item->accept(this);
+    }
+}
+
+// Missing other visitors for NameResolutionVisitor
+void NameResolutionVisitor::visit(EnumVariant *node) {
+    // TODO: Handle enum variant fields
+}
+
+void NameResolutionVisitor::visit(MatchArm *node) {
+    node->pattern->accept(this);
+    if (node->guard)
+        (*node->guard)->accept(this);
+    node->body->accept(this);
 }
 
 // TypeCheckVisitor implementation
@@ -576,4 +675,113 @@ void TypeCheckVisitor::visit(StructPattern *node) {
 
 void TypeCheckVisitor::visit(RestPattern *node) {
     // No specific type checking for rest patterns
+}
+
+// Missing expression visitors for TypeCheckVisitor
+void TypeCheckVisitor::visit(StructInitializerExpr *node) {
+    node->name->accept(this);
+    for (auto &field : node->fields) {
+        field->value->accept(this);
+    }
+}
+
+void TypeCheckVisitor::visit(UnitExpr *node) {
+    // Unit expressions have unit type
+}
+
+void TypeCheckVisitor::visit(GroupingExpr *node) { node->expression->accept(this); }
+
+void TypeCheckVisitor::visit(TupleExpr *node) {
+    for (auto &element : node->elements) {
+        element->accept(this);
+    }
+}
+
+void TypeCheckVisitor::visit(AsExpr *node) {
+    node->expression->accept(this);
+    node->target_type->accept(this);
+}
+
+void TypeCheckVisitor::visit(MatchExpr *node) {
+    node->scrutinee->accept(this);
+    for (auto &arm : node->arms) {
+        arm->accept(this);
+    }
+}
+
+void TypeCheckVisitor::visit(PathExpr *node) {
+    // TODO: Type check path expressions
+}
+
+void TypeCheckVisitor::visit(RangeExpr *node) {
+    if (node->start)
+        (*node->start)->accept(this);
+    if (node->end)
+        (*node->end)->accept(this);
+}
+
+// Missing statement visitors for TypeCheckVisitor
+void TypeCheckVisitor::visit(ItemStmt *node) { node->item->accept(this); }
+
+// Missing type node visitors for TypeCheckVisitor
+void TypeCheckVisitor::visit(PathTypeNode *node) { node->path->accept(this); }
+
+void TypeCheckVisitor::visit(RawPointerTypeNode *node) { node->pointee_type->accept(this); }
+
+void TypeCheckVisitor::visit(ReferenceTypeNode *node) { node->referenced_type->accept(this); }
+
+void TypeCheckVisitor::visit(SliceTypeNode *node) { node->element_type->accept(this); }
+
+void TypeCheckVisitor::visit(SelfTypeNode *node) {
+    // Self types are handled in context
+}
+
+// Missing item visitors for TypeCheckVisitor
+void TypeCheckVisitor::visit(StructDecl *node) {
+    // TODO: Handle struct type checking
+}
+
+void TypeCheckVisitor::visit(ConstDecl *node) {
+    node->value->accept(this);
+    if (node->type)
+        node->type->accept(this);
+}
+
+void TypeCheckVisitor::visit(EnumDecl *node) {
+    for (auto &variant : node->variants) {
+        variant->accept(this);
+    }
+}
+
+void TypeCheckVisitor::visit(ModDecl *node) {
+    for (auto &item : node->items) {
+        item->accept(this);
+    }
+}
+
+void TypeCheckVisitor::visit(TraitDecl *node) {
+    for (auto &item : node->associated_items) {
+        item->accept(this);
+    }
+}
+
+void TypeCheckVisitor::visit(ImplBlock *node) {
+    if (node->trait_name)
+        (*node->trait_name)->accept(this);
+    node->target_type->accept(this);
+    for (auto &item : node->implemented_items) {
+        item->accept(this);
+    }
+}
+
+// Missing other visitors for TypeCheckVisitor
+void TypeCheckVisitor::visit(EnumVariant *node) {
+    // TODO: Handle enum variant type checking
+}
+
+void TypeCheckVisitor::visit(MatchArm *node) {
+    node->pattern->accept(this);
+    if (node->guard)
+        (*node->guard)->accept(this);
+    node->body->accept(this);
 }

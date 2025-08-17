@@ -382,7 +382,7 @@ std::shared_ptr<TypeNode> Parser::parse_type() {
             return std::make_shared<TupleTypeNode>(std::move(elements));
         }
     }
-    auto path = parse_expression(Precedence::CALL);
+    auto path = parse_path_expression();
     if (match({TokenType::LESS})) {
         std::vector<std::shared_ptr<TypeNode>> args;
         if (!check(TokenType::GREATER)) {
@@ -455,7 +455,7 @@ std::shared_ptr<Pattern> Parser::parse_pattern() {
 std::shared_ptr<Pattern> Parser::parse_struct_pattern_body(std::shared_ptr<Expr> path) {
     consume(TokenType::LEFT_BRACE, "Expect '{' to start struct pattern.");
 
-    std::vector<StructPatternField> fields;
+    std::vector<std::shared_ptr<StructPatternField>> fields;
     bool has_rest = false;
 
     while (!check(TokenType::RIGHT_BRACE) && !is_at_end()) {
@@ -472,7 +472,7 @@ std::shared_ptr<Pattern> Parser::parse_struct_pattern_body(std::shared_ptr<Expr>
         } else {
             pattern = std::nullopt;
         }
-        fields.push_back({field_name, std::move(pattern)});
+        fields.push_back(std::make_shared<StructPatternField>(field_name, std::move(pattern)));
         if (!check(TokenType::RIGHT_BRACE)) {
             consume(TokenType::COMMA, "Expect ',' after field in struct pattern.");
         }
@@ -510,7 +510,7 @@ std::shared_ptr<FnDecl> Parser::parse_fn_declaration() {
     Token name = consume(TokenType::IDENTIFIER, "Expect function name.");
     consume(TokenType::LEFT_PAREN, "Expect '(' after function name.");
 
-    std::vector<FnParam> params;
+    std::vector<std::shared_ptr<FnParam>> params;
     std::optional<std::shared_ptr<TypeNode>> return_type;
 
     if (!check(TokenType::RIGHT_PAREN)) {
@@ -540,7 +540,7 @@ std::shared_ptr<FnDecl> Parser::parse_fn_declaration() {
                 type = parse_type();
             }
 
-            params.push_back({std::move(pattern), std::move(type)});
+            params.push_back(std::make_shared<FnParam>(std::move(pattern), std::move(type)));
 
         } while (match({TokenType::COMMA}));
     }
@@ -568,12 +568,12 @@ std::shared_ptr<StructDecl> Parser::parse_struct_declaration() {
 
     if (peek().type == TokenType::LEFT_BRACE) {
         consume(TokenType::LEFT_BRACE, "Expect '{' before struct body.");
-        std::vector<Field> fields;
+        std::vector<std::shared_ptr<Field>> fields;
         while (!check(TokenType::RIGHT_BRACE) && !is_at_end()) {
             Token field_name = consume(TokenType::IDENTIFIER, "Expect field name.");
             consume(TokenType::COLON, "Expect ':' after field name.");
             auto field_type = parse_type();
-            fields.push_back({field_name, std::move(field_type)});
+            fields.push_back(std::make_shared<Field>(field_name, std::move(field_type)));
             if (!match({TokenType::COMMA}))
                 break;
         }
@@ -600,7 +600,7 @@ std::shared_ptr<StructDecl> Parser::parse_struct_declaration() {
 
 std::shared_ptr<Expr> Parser::parse_struct_initializer(std::shared_ptr<Expr> name) {
     consume(TokenType::LEFT_BRACE, "Expect '{' for struct initializer.");
-    std::vector<FieldInitializer> fields;
+    std::vector<std::shared_ptr<FieldInitializer>> fields;
     while (!check(TokenType::RIGHT_BRACE) && !is_at_end()) {
         Token field_name = advance();
         if (field_name.type != TokenType::IDENTIFIER && field_name.type != TokenType::NUMBER) {
@@ -611,7 +611,7 @@ std::shared_ptr<Expr> Parser::parse_struct_initializer(std::shared_ptr<Expr> nam
         consume(TokenType::COLON, "Expect ':' after field name.");
         auto value = parse_expression(Precedence::NONE);
 
-        fields.push_back({field_name, std::move(value)});
+        fields.push_back(std::make_shared<FieldInitializer>(field_name, std::move(value)));
         if (!check(TokenType::RIGHT_BRACE)) {
             consume(TokenType::COMMA, "Expect ',' after field value.");
         }
@@ -657,13 +657,13 @@ std::shared_ptr<EnumVariant> Parser::parse_enum_variant() {
     if (peek().type == TokenType::LEFT_BRACE) {
         advance();
 
-        std::vector<Field> fields;
+        std::vector<std::shared_ptr<Field>> fields;
         if (!check(TokenType::RIGHT_BRACE)) {
             do {
                 Token field_name = consume(TokenType::IDENTIFIER, "Expect field name.");
                 consume(TokenType::COLON, "Expect ':' after field name.");
                 auto field_type = parse_type();
-                fields.push_back({field_name, std::move(field_type)});
+                fields.push_back(std::make_shared<Field>(field_name, std::move(field_type)));
             } while (match({TokenType::COMMA}));
         }
 
@@ -949,7 +949,6 @@ std::shared_ptr<MatchArm> Parser::parse_match_arm() {
 }
 
 std::shared_ptr<MatchExpr> Parser::parse_match_expression() {
-    puts("hello");
     auto scrutinee = parse_expression(Precedence::NONE, 0);
 
     consume(TokenType::LEFT_BRACE, "Expect '{' after match scrutinee.");
@@ -962,6 +961,22 @@ std::shared_ptr<MatchExpr> Parser::parse_match_expression() {
     consume(TokenType::RIGHT_BRACE, "Expect '}' to close match expression.");
 
     return std::make_shared<MatchExpr>(std::move(scrutinee), std::move(arms));
+}
+
+std::shared_ptr<Expr> Parser::parse_path_expression() {
+    if (!check(TokenType::IDENTIFIER)) {
+        report_error(peek(), "Expected a path-like identifier for a type.");
+    }
+
+    std::shared_ptr<Expr> path = std::make_shared<VariableExpr>(advance());
+    while (match({TokenType::COLON_COLON})) {
+        Token op = previous();
+        Token right =
+            consume(TokenType::IDENTIFIER, "Expect identifier after '::' in a type path.");
+        path = std::make_shared<PathExpr>(std::move(path), op, right);
+    }
+
+    return path;
 }
 
 // tools

@@ -150,8 +150,8 @@ void StructInitializerExpr::print(std::ostream &os, int indent) const {
     os << "Fields:\n";
     for (const auto &field : fields) {
         print_indent(os, indent + 2);
-        os << field.name.lexeme << ":\n";
-        field.value->print(os, indent + 3);
+        os << field->name.lexeme << ":\n";
+        field->value->print(os, indent + 3);
     }
 }
 
@@ -337,9 +337,9 @@ void FnDecl::print(std::ostream &os, int indent) const {
     print_indent(os, indent + 1);
     os << "Params: \n";
     for (const auto &param : params) {
-        param.pattern->print(os, indent + 2);
-        if (param.type) {
-            param.type->print(os, indent + 2);
+        param->pattern->print(os, indent + 2);
+        if (param->type) {
+            param->type->print(os, indent + 2);
         } else {
             os << "Any";
         }
@@ -378,10 +378,10 @@ void StructDecl::print(std::ostream &os, int indent) const {
     os << "Fields:\n";
     for (const auto &field : fields) {
         print_indent(os, indent + 2);
-        os << "Field(name=" << field.name.lexeme << ")\n";
+        os << "Field(name=" << field->name.lexeme << ")\n";
         print_indent(os, indent + 3);
         os << "Type:\n";
-        field.type->print(os, indent + 4);
+        field->type->print(os, indent + 4);
     }
 }
 
@@ -422,10 +422,10 @@ void EnumVariant::print(std::ostream &os, int indent) const {
         os << "Fields:\n";
         for (const auto &field : fields) {
             print_indent(os, indent + 2);
-            os << "Field(name=" << field.name.lexeme << ")\n";
+            os << "Field(name=" << field->name.lexeme << ")\n";
             print_indent(os, indent + 3);
             os << "Type:\n";
-            field.type->print(os, indent + 4);
+            field->type->print(os, indent + 4);
         }
         break;
     }
@@ -588,13 +588,14 @@ void TuplePattern::print(std::ostream &os, int indent) const {
         element->print(os, indent + 2);
     }
 }
-void print_struct_pattern_field(const StructPatternField &field, std::ostream &os, int indent) {
+void print_struct_pattern_field(const std::shared_ptr<StructPatternField> &field, std::ostream &os,
+                                int indent) {
     print_indent(os, indent);
-    os << "StructPatternField(name=" << field.field_name.lexeme << ")\n";
-    if (field.pattern) {
+    os << "StructPatternField(name=" << field->field_name.lexeme << ")\n";
+    if (field->pattern) {
         print_indent(os, indent + 1);
         os << "Pattern:\n";
-        (*field.pattern)->print(os, indent + 2);
+        (*field->pattern)->print(os, indent + 2);
     } else {
         print_indent(os, indent + 1);
         os << "Pattern: (shorthand)\n";
@@ -629,6 +630,14 @@ void SlicePattern::print(std::ostream &os, int indent) const {
         element->print(os, indent + 2);
     }
 }
+
+void FnParam::print(std::ostream &os, int indent) const {}
+
+void Field::print(std::ostream &os, int indent) const {}
+
+void FieldInitializer::print(std::ostream &os, int indent) const {}
+
+void StructPatternField::print(std::ostream &os, int indent) const {}
 
 void LiteralExpr::accept(Visitor *visitor) { visitor->visit(this); }
 
@@ -743,3 +752,11 @@ void TraitDecl::accept(Visitor *visitor) { visitor->visit(this); }
 void ImplBlock::accept(Visitor *visitor) { visitor->visit(this); }
 
 void MatchArm::accept(Visitor *visitor) { visitor->visit(this); }
+
+void FnParam::accept(Visitor *visitor) { visitor->visit(this); }
+
+void StructPatternField::accept(Visitor *visitor) { visitor->visit(this); }
+
+void Field::accept(Visitor *visitor) { visitor->visit(this); }
+
+void FieldInitializer::accept(Visitor *visitor) { visitor->visit(this); }

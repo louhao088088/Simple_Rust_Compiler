@@ -89,6 +89,10 @@ struct RestPattern;
 
 // Other forward declarations
 struct MatchArm;
+struct FnParam;
+struct Field;
+struct FieldInitializer;
+struct StructPatternField;
 
 // Visitor interface for AST traversal
 class Visitor {
@@ -162,7 +166,11 @@ class Visitor {
     virtual void visit(RestPattern *node) = 0;
 
     // Other visitors
-    virtual void visit(MatchArm *node) {}
+    virtual void visit(FnParam *node){};
+    virtual void visit(MatchArm *node){};
+    virtual void visit(Field *node){};
+    virtual void visit(FieldInitializer *node){};
+    virtual void visit(StructPatternField *node){};
 };
 
 // Base classes
@@ -317,15 +325,19 @@ struct CompoundAssignmentExpr : public Expr {
     void accept(Visitor *visitor) override;
 };
 
-struct FieldInitializer {
+struct FieldInitializer : public Node {
     Token name;
     std::shared_ptr<Expr> value;
+
+    FieldInitializer(Token n, std::shared_ptr<Expr> v) : name(std::move(n)), value(std::move(v)) {}
+    void print(std::ostream &os, int indent = 0) const override;
+    void accept(Visitor *visitor) override;
 };
 
 struct StructInitializerExpr : public Expr {
     std::shared_ptr<Expr> name;
-    std::vector<FieldInitializer> fields;
-    StructInitializerExpr(std::shared_ptr<Expr> n, std::vector<FieldInitializer> f)
+    std::vector<std::shared_ptr<FieldInitializer>> fields;
+    StructInitializerExpr(std::shared_ptr<Expr> n, std::vector<std::shared_ptr<FieldInitializer>> f)
         : name(std::move(n)), fields(std::move(f)) {}
     void print(std::ostream &os, int indent = 0) const override;
     void accept(Visitor *visitor) override;
@@ -544,17 +556,21 @@ struct SelfTypeNode : public TypeNode {
     void accept(Visitor *visitor) override;
 };
 // Top-level Items
-struct FnParam {
+struct FnParam : public Node {
     std::shared_ptr<Pattern> pattern;
     std::shared_ptr<TypeNode> type;
+    FnParam(std::shared_ptr<Pattern> p, std::shared_ptr<TypeNode> t)
+        : pattern(std::move(p)), type(std::move(t)) {}
+    void print(std::ostream &os, int indent = 0) const override;
+    void accept(Visitor *visitor) override;
 };
 struct FnDecl : public Item {
     Token name;
-    std::vector<FnParam> params;
+    std::vector<std::shared_ptr<FnParam>> params;
     std::optional<std::shared_ptr<TypeNode>> return_type;
     std::optional<std::shared_ptr<BlockStmt>> body;
 
-    FnDecl(Token name, std::vector<FnParam> params,
+    FnDecl(Token name, std::vector<std::shared_ptr<FnParam>> params,
            std::optional<std::shared_ptr<TypeNode>> return_type,
            std::optional<std::shared_ptr<BlockStmt>> body)
         : name(std::move(name)), params(std::move(params)), return_type(std::move(return_type)),
@@ -564,19 +580,22 @@ struct FnDecl : public Item {
 
     std::shared_ptr<Symbol> resolved_symbol;
 };
-struct Field {
+struct Field : public Node {
     Token name;
     std::shared_ptr<TypeNode> type;
+    Field(Token n, std::shared_ptr<TypeNode> t) : name(std::move(n)), type(std::move(t)) {}
+    void print(std::ostream &os, int indent = 0) const override;
+    void accept(Visitor *visitor) override;
 };
 enum class StructKind { Normal, Tuple, Unit };
 
 struct StructDecl : public Item {
     Token name;
     StructKind kind;
-    std::vector<Field> fields;
+    std::vector<std::shared_ptr<Field>> fields;
     std::vector<std::shared_ptr<TypeNode>> tuple_fields;
 
-    StructDecl(Token n, std::vector<Field> f) // Normal
+    StructDecl(Token n, std::vector<std::shared_ptr<Field>> f) // Normal
         : name(std::move(n)), kind(StructKind::Normal), fields(std::move(f)) {}
 
     StructDecl(Token n, std::vector<std::shared_ptr<TypeNode>> tf) // Tuple
@@ -611,7 +630,7 @@ struct EnumVariant : public Node {
 
     std::vector<std::shared_ptr<TypeNode>> tuple_types;
 
-    std::vector<Field> fields;
+    std::vector<std::shared_ptr<Field>> fields;
 
     EnumVariant(Token n, std::optional<std::shared_ptr<Expr>> disc = std::nullopt)
         : name(std::move(n)), kind(EnumVariantKind::Plain), discriminant(std::move(disc)) {}
@@ -619,7 +638,7 @@ struct EnumVariant : public Node {
     EnumVariant(Token n, std::vector<std::shared_ptr<TypeNode>> types)
         : name(std::move(n)), kind(EnumVariantKind::Tuple), tuple_types(std::move(types)) {}
 
-    EnumVariant(Token n, std::vector<Field> f)
+    EnumVariant(Token n, std::vector<std::shared_ptr<Field>> f)
         : name(std::move(n)), kind(EnumVariantKind::Struct), fields(std::move(f)) {}
 
     void print(std::ostream &os, int indent = 0) const override;
@@ -716,18 +735,23 @@ struct MatchArm : public Node {
     void accept(Visitor *visitor) override;
 };
 
-struct StructPatternField {
+struct StructPatternField : public Node {
     Token field_name;
     std::optional<std::shared_ptr<Pattern>> pattern;
+    StructPatternField(Token name, std::optional<std::shared_ptr<Pattern>> pat = std::nullopt)
+        : field_name(std::move(name)), pattern(std::move(pat)) {}
+    void print(std::ostream &os, int indent = 0) const override;
+    void accept(Visitor *visitor) override;
 };
 
 struct StructPattern : public Pattern {
     std::shared_ptr<Expr> path;
 
-    std::vector<StructPatternField> fields;
+    std::vector<std::shared_ptr<StructPatternField>> fields;
     bool has_rest;
 
-    StructPattern(std::shared_ptr<Expr> p, std::vector<StructPatternField> f, bool rest)
+    StructPattern(std::shared_ptr<Expr> p, std::vector<std::shared_ptr<StructPatternField>> f,
+                  bool rest)
         : path(std::move(p)), fields(std::move(f)), has_rest(rest) {}
 
     void print(std::ostream &os, int indent = 0) const override;
