@@ -188,78 +188,101 @@ NameResolutionVisitor::NameResolutionVisitor(ErrorReporter &error_reporter)
     symbol_table_.enter_scope();
 }
 
-void NameResolutionVisitor::visit(LiteralExpr *node) {}
+std::shared_ptr<Symbol> NameResolutionVisitor::visit(LiteralExpr *node) { return nullptr; }
 
-void NameResolutionVisitor::visit(ArrayLiteralExpr *node) {
+std::shared_ptr<Symbol> NameResolutionVisitor::visit(ArrayLiteralExpr *node) {
     for (auto &element : node->elements) {
         element->accept(this);
     }
+    return nullptr;
 }
 
-void NameResolutionVisitor::visit(ArrayInitializerExpr *node) {
+std::shared_ptr<Symbol> NameResolutionVisitor::visit(ArrayInitializerExpr *node) {
     node->value->accept(this);
     node->size->accept(this);
+    return nullptr;
 }
 
-void NameResolutionVisitor::visit(VariableExpr *node) {
+std::shared_ptr<Symbol> NameResolutionVisitor::visit(VariableExpr *node) {
     auto symbol = symbol_table_.lookup(node->name.lexeme);
     if (!symbol) {
         error_reporter_.report_error("Undefined variable '" + node->name.lexeme + "'",
                                      node->name.line, node->name.column);
+        return nullptr;
     } else {
         node->resolved_symbol = symbol;
+        return symbol;
     }
 }
 
-void NameResolutionVisitor::visit(UnaryExpr *node) { node->right->accept(this); }
-
-void NameResolutionVisitor::visit(BinaryExpr *node) {
-    node->left->accept(this);
+std::shared_ptr<Symbol> NameResolutionVisitor::visit(UnaryExpr *node) {
     node->right->accept(this);
+    return nullptr;
 }
 
-void NameResolutionVisitor::visit(CallExpr *node) {
+std::shared_ptr<Symbol> NameResolutionVisitor::visit(BinaryExpr *node) {
+    node->left->accept(this);
+    node->right->accept(this);
+    return nullptr;
+}
+
+std::shared_ptr<Symbol> NameResolutionVisitor::visit(CallExpr *node) {
     node->callee->accept(this);
     for (auto &arg : node->arguments) {
         arg->accept(this);
     }
+    return nullptr;
 }
 
-void NameResolutionVisitor::visit(IfExpr *node) {
+std::shared_ptr<Symbol> NameResolutionVisitor::visit(IfExpr *node) {
     node->condition->accept(this);
     node->then_branch->accept(this);
     if (node->else_branch) {
         (*node->else_branch)->accept(this);
     }
+    return nullptr;
 }
 
-void NameResolutionVisitor::visit(LoopExpr *node) { node->body->accept(this); }
+std::shared_ptr<Symbol> NameResolutionVisitor::visit(LoopExpr *node) {
+    node->body->accept(this);
+    return nullptr;
+}
 
-void NameResolutionVisitor::visit(WhileExpr *node) {
+std::shared_ptr<Symbol> NameResolutionVisitor::visit(WhileExpr *node) {
     node->condition->accept(this);
     node->body->accept(this);
+    return nullptr;
 }
 
-void NameResolutionVisitor::visit(IndexExpr *node) {
+std::shared_ptr<Symbol> NameResolutionVisitor::visit(IndexExpr *node) {
     node->object->accept(this);
     node->index->accept(this);
+    return nullptr;
 }
 
-void NameResolutionVisitor::visit(FieldAccessExpr *node) { node->object->accept(this); }
+std::shared_ptr<Symbol> NameResolutionVisitor::visit(FieldAccessExpr *node) {
+    node->object->accept(this);
+    return nullptr;
+}
 
-void NameResolutionVisitor::visit(AssignmentExpr *node) {
+std::shared_ptr<Symbol> NameResolutionVisitor::visit(AssignmentExpr *node) {
     node->target->accept(this);
     node->value->accept(this);
+    return nullptr;
 }
 
-void NameResolutionVisitor::visit(CompoundAssignmentExpr *node) {
+std::shared_ptr<Symbol> NameResolutionVisitor::visit(CompoundAssignmentExpr *node) {
     node->target->accept(this);
     node->value->accept(this);
+    return nullptr;
 }
 
-void NameResolutionVisitor::visit(ReferenceExpr *node) { node->expression->accept(this); }
+std::shared_ptr<Symbol> NameResolutionVisitor::visit(ReferenceExpr *node) {
+    node->expression->accept(this);
+    return nullptr;
+}
 
-void NameResolutionVisitor::visit(UnderscoreExpr *node) {}
+std::shared_ptr<Symbol> NameResolutionVisitor::visit(UnderscoreExpr *node) { return nullptr; }
 
 void NameResolutionVisitor::visit(BlockStmt *node) {
     symbol_table_.enter_scope();
@@ -333,20 +356,15 @@ void NameResolutionVisitor::visit(Program *node) {
     }
 }
 
-// Pattern visitors (simplified implementations)
+// Pattern visitors
 void NameResolutionVisitor::visit(IdentifierPattern *node) {
-    // Define the variable symbol
     auto var_symbol = std::make_shared<Symbol>(node->name.lexeme, Symbol::VARIABLE);
     symbol_table_.define(node->name.lexeme, var_symbol);
 }
 
-void NameResolutionVisitor::visit(WildcardPattern *node) {
-    // Wildcard patterns don't bind variables
-}
+void NameResolutionVisitor::visit(WildcardPattern *node) {}
 
-void NameResolutionVisitor::visit(LiteralPattern *node) {
-    // Literal patterns don't bind variables
-}
+void NameResolutionVisitor::visit(LiteralPattern *node) {}
 
 void NameResolutionVisitor::visit(TuplePattern *node) {
     for (auto &element : node->elements) {
@@ -360,55 +378,108 @@ void NameResolutionVisitor::visit(SlicePattern *node) {
     }
 }
 
-void NameResolutionVisitor::visit(StructPattern *node) {
-    // TODO: Handle struct pattern fields
-}
+void NameResolutionVisitor::visit(StructPattern *node) {}
 
-void NameResolutionVisitor::visit(RestPattern *node) {
-    // Rest patterns don't bind variables themselves
-}
+void NameResolutionVisitor::visit(RestPattern *node) {}
 
-// Missing expression visitors for NameResolutionVisitor
-void NameResolutionVisitor::visit(StructInitializerExpr *node) {
+std::shared_ptr<Symbol> NameResolutionVisitor::visit(StructInitializerExpr *node) {
     node->name->accept(this);
     for (auto &field : node->fields) {
         field->value->accept(this);
     }
+    return nullptr;
 }
 
-void NameResolutionVisitor::visit(UnitExpr *node) {
-    // Unit expressions have no sub-expressions to visit
+std::shared_ptr<Symbol> NameResolutionVisitor::visit(UnitExpr *node) { return nullptr; }
+
+std::shared_ptr<Symbol> NameResolutionVisitor::visit(GroupingExpr *node) {
+    return node->expression->accept(this);
 }
 
-void NameResolutionVisitor::visit(GroupingExpr *node) { node->expression->accept(this); }
-
-void NameResolutionVisitor::visit(TupleExpr *node) {
+std::shared_ptr<Symbol> NameResolutionVisitor::visit(TupleExpr *node) {
     for (auto &element : node->elements) {
         element->accept(this);
     }
+    return nullptr;
 }
 
-void NameResolutionVisitor::visit(AsExpr *node) {
+std::shared_ptr<Symbol> NameResolutionVisitor::visit(AsExpr *node) {
     node->expression->accept(this);
     node->target_type->accept(this);
+    return nullptr;
 }
 
-void NameResolutionVisitor::visit(MatchExpr *node) {
+std::shared_ptr<Symbol> NameResolutionVisitor::visit(MatchExpr *node) {
     node->scrutinee->accept(this);
     for (auto &arm : node->arms) {
         arm->accept(this);
     }
+    return nullptr;
 }
 
-void NameResolutionVisitor::visit(PathExpr *node) {
-    // TODO: Resolve path expressions
+std::optional<std::string> get_name_from_expr(Expr *expr) {
+    if (!expr) {
+        return std::nullopt;
+    }
+    if (auto *var_expr = dynamic_cast<VariableExpr *>(expr)) {
+        return var_expr->name.lexeme;
+    }
+    return std::nullopt;
 }
 
-void NameResolutionVisitor::visit(RangeExpr *node) {
+std::string get_full_path_string(Expr *expr) {
+    if (!expr)
+        return "";
+
+    if (auto *var = dynamic_cast<VariableExpr *>(expr)) {
+        return var->name.lexeme;
+    }
+    if (auto *path = dynamic_cast<PathExpr *>(expr)) {
+        auto right_name = get_name_from_expr(path->right.get());
+        return get_full_path_string(path->left.get()) + "::" + (right_name ? *right_name : "?");
+    }
+
+    return "<complex_expression>";
+}
+
+std::shared_ptr<Symbol> NameResolutionVisitor::visit(PathExpr *node) {
+    auto left_symbol = node->left->accept(this);
+
+    if (!left_symbol) {
+        return nullptr;
+    }
+
+    if (!left_symbol->members) {
+        std::string left_path_str = get_full_path_string(node->left.get());
+        error_reporter_.report_error("'" + left_path_str + "' is not a module or enum");
+        return nullptr;
+    }
+
+    auto right_name_opt = get_name_from_expr(node->right.get());
+    if (!right_name_opt) {
+        error_reporter_.report_error("Invalid right-hand side of a '::' path");
+        return nullptr;
+    }
+    std::string right_name = *right_name_opt;
+
+    auto final_symbol = left_symbol->members->lookup(right_name);
+
+    if (!final_symbol) {
+        error_reporter_.report_error("name '" + right_name + "' is not found in '" +
+                                     left_symbol->name + "'");
+        return nullptr;
+    }
+
+    node->resolved_symbol = final_symbol;
+    return final_symbol;
+}
+
+std::shared_ptr<Symbol> NameResolutionVisitor::visit(RangeExpr *node) {
     if (node->start)
         (*node->start)->accept(this);
     if (node->end)
         (*node->end)->accept(this);
+    return nullptr;
 }
 
 // Missing statement visitors for NameResolutionVisitor
@@ -483,98 +554,114 @@ void NameResolutionVisitor::visit(MatchArm *node) {
 TypeCheckVisitor::TypeCheckVisitor(ErrorReporter &error_reporter)
     : error_reporter_(error_reporter) {}
 
-void TypeCheckVisitor::visit(LiteralExpr *node) {
+std::shared_ptr<Symbol> TypeCheckVisitor::visit(LiteralExpr *node) {
     // TODO: Infer type from literal token
+    return nullptr; // TODO: Implement proper type checking
 }
 
-void TypeCheckVisitor::visit(ArrayLiteralExpr *node) {
+std::shared_ptr<Symbol> TypeCheckVisitor::visit(ArrayLiteralExpr *node) {
     // TODO: Type check array elements and infer array type
     for (auto &element : node->elements) {
         element->accept(this);
     }
+    return nullptr; // TODO: Implement proper type checking
 }
 
-void TypeCheckVisitor::visit(ArrayInitializerExpr *node) {
+std::shared_ptr<Symbol> TypeCheckVisitor::visit(ArrayInitializerExpr *node) {
     node->value->accept(this);
     node->size->accept(this);
     // TODO: Type check and infer array type
+    return nullptr; // TODO: Implement proper type checking
 }
 
-void TypeCheckVisitor::visit(VariableExpr *node) {
+std::shared_ptr<Symbol> TypeCheckVisitor::visit(VariableExpr *node) {
     if (node->resolved_symbol && node->resolved_symbol->type) {
         node->type = node->resolved_symbol->type;
     }
+    return nullptr; // TODO: Implement proper type checking
 }
 
-void TypeCheckVisitor::visit(UnaryExpr *node) {
+std::shared_ptr<Symbol> TypeCheckVisitor::visit(UnaryExpr *node) {
     node->right->accept(this);
     // TODO: Type check unary operations
+    return nullptr; // TODO: Implement proper type checking
 }
 
-void TypeCheckVisitor::visit(BinaryExpr *node) {
+std::shared_ptr<Symbol> TypeCheckVisitor::visit(BinaryExpr *node) {
     node->left->accept(this);
     node->right->accept(this);
     // TODO: Type check binary operations
+    return nullptr; // TODO: Implement proper type checking
 }
 
-void TypeCheckVisitor::visit(CallExpr *node) {
+std::shared_ptr<Symbol> TypeCheckVisitor::visit(CallExpr *node) {
     node->callee->accept(this);
     for (auto &arg : node->arguments) {
         arg->accept(this);
     }
     // TODO: Type check function call
+    return nullptr; // TODO: Implement proper type checking
 }
 
-void TypeCheckVisitor::visit(IfExpr *node) {
+std::shared_ptr<Symbol> TypeCheckVisitor::visit(IfExpr *node) {
     node->condition->accept(this);
     node->then_branch->accept(this);
     if (node->else_branch) {
         (*node->else_branch)->accept(this);
     }
     // TODO: Type check if expression
+    return nullptr; // TODO: Implement proper type checking
 }
 
-void TypeCheckVisitor::visit(LoopExpr *node) {
+std::shared_ptr<Symbol> TypeCheckVisitor::visit(LoopExpr *node) {
     node->body->accept(this);
     // TODO: Loop expressions return ()
+    return nullptr; // TODO: Implement proper type checking
 }
 
-void TypeCheckVisitor::visit(WhileExpr *node) {
+std::shared_ptr<Symbol> TypeCheckVisitor::visit(WhileExpr *node) {
     node->condition->accept(this);
     node->body->accept(this);
     // TODO: While expressions return ()
+    return nullptr; // TODO: Implement proper type checking
 }
 
-void TypeCheckVisitor::visit(IndexExpr *node) {
+std::shared_ptr<Symbol> TypeCheckVisitor::visit(IndexExpr *node) {
     node->object->accept(this);
     node->index->accept(this);
     // TODO: Type check array/index access
+    return nullptr; // TODO: Implement proper type checking
 }
 
-void TypeCheckVisitor::visit(FieldAccessExpr *node) {
+std::shared_ptr<Symbol> TypeCheckVisitor::visit(FieldAccessExpr *node) {
     node->object->accept(this);
     // TODO: Type check field access
+    return nullptr; // TODO: Implement proper type checking
 }
 
-void TypeCheckVisitor::visit(AssignmentExpr *node) {
+std::shared_ptr<Symbol> TypeCheckVisitor::visit(AssignmentExpr *node) {
     node->target->accept(this);
     node->value->accept(this);
     // TODO: Type check assignment compatibility
+    return nullptr; // TODO: Implement proper type checking
 }
 
-void TypeCheckVisitor::visit(CompoundAssignmentExpr *node) {
+std::shared_ptr<Symbol> TypeCheckVisitor::visit(CompoundAssignmentExpr *node) {
     node->target->accept(this);
     node->value->accept(this);
     // TODO: Type check compound assignment compatibility
+    return nullptr; // TODO: Implement proper type checking
 }
 
-void TypeCheckVisitor::visit(ReferenceExpr *node) {
+std::shared_ptr<Symbol> TypeCheckVisitor::visit(ReferenceExpr *node) {
     node->expression->accept(this);
     // TODO: Handle reference type checking
+    return nullptr; // TODO: Implement proper type checking
 }
 
-void TypeCheckVisitor::visit(UnderscoreExpr *node) {
+std::shared_ptr<Symbol> TypeCheckVisitor::visit(UnderscoreExpr *node) {
     // Underscore expression has unknown type for now
+    return nullptr; // TODO: Implement proper type checking
 }
 
 void TypeCheckVisitor::visit(BlockStmt *node) {
@@ -678,46 +765,55 @@ void TypeCheckVisitor::visit(RestPattern *node) {
 }
 
 // Missing expression visitors for TypeCheckVisitor
-void TypeCheckVisitor::visit(StructInitializerExpr *node) {
+std::shared_ptr<Symbol> TypeCheckVisitor::visit(StructInitializerExpr *node) {
     node->name->accept(this);
     for (auto &field : node->fields) {
         field->value->accept(this);
     }
+    return nullptr; // TODO: Implement proper type checking
 }
 
-void TypeCheckVisitor::visit(UnitExpr *node) {
+std::shared_ptr<Symbol> TypeCheckVisitor::visit(UnitExpr *node) {
     // Unit expressions have unit type
+    return nullptr; // TODO: Implement proper type checking
 }
 
-void TypeCheckVisitor::visit(GroupingExpr *node) { node->expression->accept(this); }
+std::shared_ptr<Symbol> TypeCheckVisitor::visit(GroupingExpr *node) {
+    return node->expression->accept(this);
+}
 
-void TypeCheckVisitor::visit(TupleExpr *node) {
+std::shared_ptr<Symbol> TypeCheckVisitor::visit(TupleExpr *node) {
     for (auto &element : node->elements) {
         element->accept(this);
     }
+    return nullptr; // TODO: Implement proper type checking
 }
 
-void TypeCheckVisitor::visit(AsExpr *node) {
+std::shared_ptr<Symbol> TypeCheckVisitor::visit(AsExpr *node) {
     node->expression->accept(this);
     node->target_type->accept(this);
+    return nullptr; // TODO: Implement proper type checking
 }
 
-void TypeCheckVisitor::visit(MatchExpr *node) {
+std::shared_ptr<Symbol> TypeCheckVisitor::visit(MatchExpr *node) {
     node->scrutinee->accept(this);
     for (auto &arm : node->arms) {
         arm->accept(this);
     }
+    return nullptr; // TODO: Implement proper type checking
 }
 
-void TypeCheckVisitor::visit(PathExpr *node) {
+std::shared_ptr<Symbol> TypeCheckVisitor::visit(PathExpr *node) {
     // TODO: Type check path expressions
+    return nullptr; // TODO: Implement proper type checking
 }
 
-void TypeCheckVisitor::visit(RangeExpr *node) {
+std::shared_ptr<Symbol> TypeCheckVisitor::visit(RangeExpr *node) {
     if (node->start)
         (*node->start)->accept(this);
     if (node->end)
         (*node->end)->accept(this);
+    return nullptr; // TODO: Implement proper type checking
 }
 
 // Missing statement visitors for TypeCheckVisitor

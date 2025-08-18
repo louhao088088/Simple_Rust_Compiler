@@ -92,6 +92,7 @@ struct ArrayType : public Type {
 };
 
 // Symbol class for symbol table
+class SymbolTable;
 class Symbol {
   public:
     enum Kind { VARIABLE, FUNCTION, TYPE };
@@ -99,9 +100,11 @@ class Symbol {
     std::string name;
     Kind kind;
     std::shared_ptr<Type> type;
+    std::shared_ptr<SymbolTable> members;
 
     Symbol(std::string name, Kind kind, std::shared_ptr<Type> type = nullptr)
-        : name(std::move(name)), kind(kind), type(std::move(type)) {}
+        : name(std::move(name)), kind(kind), type(std::move(type)),
+          members(std::make_shared<SymbolTable>()) {}
 
     virtual ~Symbol() = default;
 };
@@ -119,35 +122,41 @@ class SymbolTable {
 };
 
 // Name resolution visitor
-class NameResolutionVisitor : public Visitor {
+// Name resolution visitor
+class NameResolutionVisitor : public ExprVisitor,
+                              public StmtVisitor,
+                              public ItemVisitor,
+                              public TypeVisitor,
+                              public PatternVisitor,
+                              public OtherVisitor {
   public:
     NameResolutionVisitor(ErrorReporter &error_reporter);
 
     // Expression visitors
-    void visit(LiteralExpr *node) override;
-    void visit(ArrayLiteralExpr *node) override;
-    void visit(ArrayInitializerExpr *node) override;
-    void visit(VariableExpr *node) override;
-    void visit(UnaryExpr *node) override;
-    void visit(BinaryExpr *node) override;
-    void visit(CallExpr *node) override;
-    void visit(IfExpr *node) override;
-    void visit(LoopExpr *node) override;
-    void visit(WhileExpr *node) override;
-    void visit(IndexExpr *node) override;
-    void visit(FieldAccessExpr *node) override;
-    void visit(AssignmentExpr *node) override;
-    void visit(CompoundAssignmentExpr *node) override;
-    void visit(ReferenceExpr *node) override;
-    void visit(UnderscoreExpr *node) override;
-    void visit(StructInitializerExpr *node) override;
-    void visit(UnitExpr *node) override;
-    void visit(GroupingExpr *node) override;
-    void visit(TupleExpr *node) override;
-    void visit(AsExpr *node) override;
-    void visit(MatchExpr *node) override;
-    void visit(PathExpr *node) override;
-    void visit(RangeExpr *node) override;
+    std::shared_ptr<Symbol> visit(LiteralExpr *node) override;
+    std::shared_ptr<Symbol> visit(ArrayLiteralExpr *node) override;
+    std::shared_ptr<Symbol> visit(ArrayInitializerExpr *node) override;
+    std::shared_ptr<Symbol> visit(VariableExpr *node) override;
+    std::shared_ptr<Symbol> visit(UnaryExpr *node) override;
+    std::shared_ptr<Symbol> visit(BinaryExpr *node) override;
+    std::shared_ptr<Symbol> visit(CallExpr *node) override;
+    std::shared_ptr<Symbol> visit(IfExpr *node) override;
+    std::shared_ptr<Symbol> visit(LoopExpr *node) override;
+    std::shared_ptr<Symbol> visit(WhileExpr *node) override;
+    std::shared_ptr<Symbol> visit(IndexExpr *node) override;
+    std::shared_ptr<Symbol> visit(FieldAccessExpr *node) override;
+    std::shared_ptr<Symbol> visit(AssignmentExpr *node) override;
+    std::shared_ptr<Symbol> visit(CompoundAssignmentExpr *node) override;
+    std::shared_ptr<Symbol> visit(ReferenceExpr *node) override;
+    std::shared_ptr<Symbol> visit(UnderscoreExpr *node) override;
+    std::shared_ptr<Symbol> visit(StructInitializerExpr *node) override;
+    std::shared_ptr<Symbol> visit(UnitExpr *node) override;
+    std::shared_ptr<Symbol> visit(GroupingExpr *node) override;
+    std::shared_ptr<Symbol> visit(TupleExpr *node) override;
+    std::shared_ptr<Symbol> visit(AsExpr *node) override;
+    std::shared_ptr<Symbol> visit(MatchExpr *node) override;
+    std::shared_ptr<Symbol> visit(PathExpr *node) override;
+    std::shared_ptr<Symbol> visit(RangeExpr *node) override;
 
     // Statement visitors
     void visit(BlockStmt *node) override;
@@ -198,35 +207,40 @@ class NameResolutionVisitor : public Visitor {
 };
 
 // Type check visitor
-class TypeCheckVisitor : public Visitor {
+class TypeCheckVisitor : public ExprVisitor,
+                         public StmtVisitor,
+                         public ItemVisitor,
+                         public TypeVisitor,
+                         public PatternVisitor,
+                         public OtherVisitor {
   public:
     TypeCheckVisitor(ErrorReporter &error_reporter);
 
     // Expression visitors
-    void visit(LiteralExpr *node) override;
-    void visit(ArrayLiteralExpr *node) override;
-    void visit(ArrayInitializerExpr *node) override;
-    void visit(VariableExpr *node) override;
-    void visit(UnaryExpr *node) override;
-    void visit(BinaryExpr *node) override;
-    void visit(CallExpr *node) override;
-    void visit(IfExpr *node) override;
-    void visit(LoopExpr *node) override;
-    void visit(WhileExpr *node) override;
-    void visit(IndexExpr *node) override;
-    void visit(FieldAccessExpr *node) override;
-    void visit(AssignmentExpr *node) override;
-    void visit(CompoundAssignmentExpr *node) override;
-    void visit(ReferenceExpr *node) override;
-    void visit(UnderscoreExpr *node) override;
-    void visit(StructInitializerExpr *node) override;
-    void visit(UnitExpr *node) override;
-    void visit(GroupingExpr *node) override;
-    void visit(TupleExpr *node) override;
-    void visit(AsExpr *node) override;
-    void visit(MatchExpr *node) override;
-    void visit(PathExpr *node) override;
-    void visit(RangeExpr *node) override;
+    std::shared_ptr<Symbol> visit(LiteralExpr *node) override;
+    std::shared_ptr<Symbol> visit(ArrayLiteralExpr *node) override;
+    std::shared_ptr<Symbol> visit(ArrayInitializerExpr *node) override;
+    std::shared_ptr<Symbol> visit(VariableExpr *node) override;
+    std::shared_ptr<Symbol> visit(UnaryExpr *node) override;
+    std::shared_ptr<Symbol> visit(BinaryExpr *node) override;
+    std::shared_ptr<Symbol> visit(CallExpr *node) override;
+    std::shared_ptr<Symbol> visit(IfExpr *node) override;
+    std::shared_ptr<Symbol> visit(LoopExpr *node) override;
+    std::shared_ptr<Symbol> visit(WhileExpr *node) override;
+    std::shared_ptr<Symbol> visit(IndexExpr *node) override;
+    std::shared_ptr<Symbol> visit(FieldAccessExpr *node) override;
+    std::shared_ptr<Symbol> visit(AssignmentExpr *node) override;
+    std::shared_ptr<Symbol> visit(CompoundAssignmentExpr *node) override;
+    std::shared_ptr<Symbol> visit(ReferenceExpr *node) override;
+    std::shared_ptr<Symbol> visit(UnderscoreExpr *node) override;
+    std::shared_ptr<Symbol> visit(StructInitializerExpr *node) override;
+    std::shared_ptr<Symbol> visit(UnitExpr *node) override;
+    std::shared_ptr<Symbol> visit(GroupingExpr *node) override;
+    std::shared_ptr<Symbol> visit(TupleExpr *node) override;
+    std::shared_ptr<Symbol> visit(AsExpr *node) override;
+    std::shared_ptr<Symbol> visit(MatchExpr *node) override;
+    std::shared_ptr<Symbol> visit(PathExpr *node) override;
+    std::shared_ptr<Symbol> visit(RangeExpr *node) override;
 
     // Statement visitors
     void visit(BlockStmt *node) override;

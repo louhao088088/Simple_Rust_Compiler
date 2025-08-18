@@ -306,8 +306,9 @@ Parser::Parser(const std::vector<Token> &tokens, ErrorReporter &error_reporter)
     });
     register_infix(TokenType::COLON_COLON, Precedence::PATH, [this](auto left) {
         Token op = previous();
-        Token right = consume(TokenType::IDENTIFIER, "Expect identifier after '::'.");
-        return std::make_shared<PathExpr>(std::move(left), op, right);
+        auto right_token = consume(TokenType::IDENTIFIER, "Expect identifier after '::'.");
+        auto right = std::make_shared<VariableExpr>(right_token);
+        return std::make_shared<PathExpr>(std::move(left), op, std::move(right));
     });
     auto range_infix_parser = [this](auto left) -> std::shared_ptr<Expr> {
         bool is_inclusive = previous().type == TokenType::DOT_DOT_EQUAL;
@@ -971,9 +972,10 @@ std::shared_ptr<Expr> Parser::parse_path_expression() {
     std::shared_ptr<Expr> path = std::make_shared<VariableExpr>(advance());
     while (match({TokenType::COLON_COLON})) {
         Token op = previous();
-        Token right =
+        Token right_token =
             consume(TokenType::IDENTIFIER, "Expect identifier after '::' in a type path.");
-        path = std::make_shared<PathExpr>(std::move(path), op, right);
+        auto right = std::make_shared<VariableExpr>(right_token);
+        path = std::make_shared<PathExpr>(std::move(path), op, std::move(right));
     }
 
     return path;

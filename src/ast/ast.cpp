@@ -233,7 +233,7 @@ void PathExpr::print(std::ostream &os, int indent) const {
     os << op.lexeme << "\n";
     print_indent(os, indent + 1);
     os << "Right: ";
-    os << right.lexeme << "\n";
+    right->print(os, indent + 2);
 }
 
 void ReferenceExpr::print(std::ostream &os, int indent) const {
@@ -639,124 +639,89 @@ void FieldInitializer::print(std::ostream &os, int indent) const {}
 
 void StructPatternField::print(std::ostream &os, int indent) const {}
 
-void LiteralExpr::accept(Visitor *visitor) { visitor->visit(this); }
+// Expression accept methods - use ExprVisitor
+std::shared_ptr<Symbol> LiteralExpr::accept(ExprVisitor *visitor) { return visitor->visit(this); }
+std::shared_ptr<Symbol> ArrayLiteralExpr::accept(ExprVisitor *visitor) {
+    return visitor->visit(this);
+}
+std::shared_ptr<Symbol> ArrayInitializerExpr::accept(ExprVisitor *visitor) {
+    return visitor->visit(this);
+}
+std::shared_ptr<Symbol> VariableExpr::accept(ExprVisitor *visitor) { return visitor->visit(this); }
+std::shared_ptr<Symbol> UnaryExpr::accept(ExprVisitor *visitor) { return visitor->visit(this); }
+std::shared_ptr<Symbol> BinaryExpr::accept(ExprVisitor *visitor) { return visitor->visit(this); }
+std::shared_ptr<Symbol> CallExpr::accept(ExprVisitor *visitor) { return visitor->visit(this); }
+std::shared_ptr<Symbol> IfExpr::accept(ExprVisitor *visitor) { return visitor->visit(this); }
+std::shared_ptr<Symbol> LoopExpr::accept(ExprVisitor *visitor) { return visitor->visit(this); }
+std::shared_ptr<Symbol> WhileExpr::accept(ExprVisitor *visitor) { return visitor->visit(this); }
+std::shared_ptr<Symbol> IndexExpr::accept(ExprVisitor *visitor) { return visitor->visit(this); }
+std::shared_ptr<Symbol> FieldAccessExpr::accept(ExprVisitor *visitor) {
+    return visitor->visit(this);
+}
+std::shared_ptr<Symbol> AssignmentExpr::accept(ExprVisitor *visitor) {
+    return visitor->visit(this);
+}
+std::shared_ptr<Symbol> CompoundAssignmentExpr::accept(ExprVisitor *visitor) {
+    return visitor->visit(this);
+}
+std::shared_ptr<Symbol> ReferenceExpr::accept(ExprVisitor *visitor) { return visitor->visit(this); }
+std::shared_ptr<Symbol> UnderscoreExpr::accept(ExprVisitor *visitor) {
+    return visitor->visit(this);
+}
+std::shared_ptr<Symbol> StructInitializerExpr::accept(ExprVisitor *visitor) {
+    return visitor->visit(this);
+}
+std::shared_ptr<Symbol> UnitExpr::accept(ExprVisitor *visitor) { return visitor->visit(this); }
+std::shared_ptr<Symbol> GroupingExpr::accept(ExprVisitor *visitor) { return visitor->visit(this); }
+std::shared_ptr<Symbol> TupleExpr::accept(ExprVisitor *visitor) { return visitor->visit(this); }
+std::shared_ptr<Symbol> AsExpr::accept(ExprVisitor *visitor) { return visitor->visit(this); }
+std::shared_ptr<Symbol> MatchExpr::accept(ExprVisitor *visitor) { return visitor->visit(this); }
+std::shared_ptr<Symbol> PathExpr::accept(ExprVisitor *visitor) { return visitor->visit(this); }
+std::shared_ptr<Symbol> RangeExpr::accept(ExprVisitor *visitor) { return visitor->visit(this); }
 
-void ArrayLiteralExpr::accept(Visitor *visitor) { visitor->visit(this); }
+// Statement accept methods
+void BlockStmt::accept(StmtVisitor *visitor) { visitor->visit(this); }
+void ExprStmt::accept(StmtVisitor *visitor) { visitor->visit(this); }
+void LetStmt::accept(StmtVisitor *visitor) { visitor->visit(this); }
+void ReturnStmt::accept(StmtVisitor *visitor) { visitor->visit(this); }
+void BreakStmt::accept(StmtVisitor *visitor) { visitor->visit(this); }
+void ContinueStmt::accept(StmtVisitor *visitor) { visitor->visit(this); }
+void ItemStmt::accept(StmtVisitor *visitor) { visitor->visit(this); }
 
-void ArrayInitializerExpr::accept(Visitor *visitor) { visitor->visit(this); }
+// Type node accept methods 
+void TypeNameNode::accept(TypeVisitor *visitor) { visitor->visit(this); }
+void ArrayTypeNode::accept(TypeVisitor *visitor) { visitor->visit(this); }
+void UnitTypeNode::accept(TypeVisitor *visitor) { visitor->visit(this); }
+void TupleTypeNode::accept(TypeVisitor *visitor) { visitor->visit(this); }
+void PathTypeNode::accept(TypeVisitor *visitor) { visitor->visit(this); }
+void RawPointerTypeNode::accept(TypeVisitor *visitor) { visitor->visit(this); }
+void ReferenceTypeNode::accept(TypeVisitor *visitor) { visitor->visit(this); }
+void SliceTypeNode::accept(TypeVisitor *visitor) { visitor->visit(this); }
+void SelfTypeNode::accept(TypeVisitor *visitor) { visitor->visit(this); }
 
-void VariableExpr::accept(Visitor *visitor) { visitor->visit(this); }
+// Item accept methods
+void FnDecl::accept(ItemVisitor *visitor) { visitor->visit(this); }
+void StructDecl::accept(ItemVisitor *visitor) { visitor->visit(this); }
+void ConstDecl::accept(ItemVisitor *visitor) { visitor->visit(this); }
+void EnumDecl::accept(ItemVisitor *visitor) { visitor->visit(this); }
+void ModDecl::accept(ItemVisitor *visitor) { visitor->visit(this); }
+void TraitDecl::accept(ItemVisitor *visitor) { visitor->visit(this); }
+void ImplBlock::accept(ItemVisitor *visitor) { visitor->visit(this); }
+void Program::accept(ItemVisitor *visitor) { visitor->visit(this); }
 
-void UnaryExpr::accept(Visitor *visitor) { visitor->visit(this); }
+// Pattern accept methods
+void IdentifierPattern::accept(PatternVisitor *visitor) { visitor->visit(this); }
+void WildcardPattern::accept(PatternVisitor *visitor) { visitor->visit(this); }
+void LiteralPattern::accept(PatternVisitor *visitor) { visitor->visit(this); }
+void TuplePattern::accept(PatternVisitor *visitor) { visitor->visit(this); }
+void SlicePattern::accept(PatternVisitor *visitor) { visitor->visit(this); }
+void StructPattern::accept(PatternVisitor *visitor) { visitor->visit(this); }
+void RestPattern::accept(PatternVisitor *visitor) { visitor->visit(this); }
 
-void BinaryExpr::accept(Visitor *visitor) { visitor->visit(this); }
-
-void CallExpr::accept(Visitor *visitor) { visitor->visit(this); }
-
-void IfExpr::accept(Visitor *visitor) { visitor->visit(this); }
-
-void LoopExpr::accept(Visitor *visitor) { visitor->visit(this); }
-
-void WhileExpr::accept(Visitor *visitor) { visitor->visit(this); }
-
-void IndexExpr::accept(Visitor *visitor) { visitor->visit(this); }
-
-void FieldAccessExpr::accept(Visitor *visitor) { visitor->visit(this); }
-
-void AssignmentExpr::accept(Visitor *visitor) { visitor->visit(this); }
-
-void CompoundAssignmentExpr::accept(Visitor *visitor) { visitor->visit(this); }
-
-void BlockStmt::accept(Visitor *visitor) { visitor->visit(this); }
-
-void ExprStmt::accept(Visitor *visitor) { visitor->visit(this); }
-
-void LetStmt::accept(Visitor *visitor) { visitor->visit(this); }
-
-void ReturnStmt::accept(Visitor *visitor) { visitor->visit(this); }
-
-void BreakStmt::accept(Visitor *visitor) { visitor->visit(this); }
-
-void ContinueStmt::accept(Visitor *visitor) { visitor->visit(this); }
-
-void TypeNameNode::accept(Visitor *visitor) { visitor->visit(this); }
-
-void ArrayTypeNode::accept(Visitor *visitor) { visitor->visit(this); }
-
-void UnitTypeNode::accept(Visitor *visitor) { visitor->visit(this); }
-
-void TupleTypeNode::accept(Visitor *visitor) { visitor->visit(this); }
-
-void FnDecl::accept(Visitor *visitor) { visitor->visit(this); }
-
-void Program::accept(Visitor *visitor) { visitor->visit(this); }
-
-void IdentifierPattern::accept(Visitor *visitor) { visitor->visit(this); }
-
-void WildcardPattern::accept(Visitor *visitor) { visitor->visit(this); }
-
-void LiteralPattern::accept(Visitor *visitor) { visitor->visit(this); }
-
-void TuplePattern::accept(Visitor *visitor) { visitor->visit(this); }
-
-void SlicePattern::accept(Visitor *visitor) { visitor->visit(this); }
-
-void StructPattern::accept(Visitor *visitor) { visitor->visit(this); }
-
-void RestPattern::accept(Visitor *visitor) { visitor->visit(this); }
-
-void StructInitializerExpr::accept(Visitor *visitor) { visitor->visit(this); }
-
-void UnitExpr::accept(Visitor *visitor) { visitor->visit(this); }
-
-void GroupingExpr::accept(Visitor *visitor) { visitor->visit(this); }
-
-void TupleExpr::accept(Visitor *visitor) { visitor->visit(this); }
-
-void AsExpr::accept(Visitor *visitor) { visitor->visit(this); }
-
-void MatchExpr::accept(Visitor *visitor) { visitor->visit(this); }
-
-void UnderscoreExpr::accept(Visitor *visitor) { visitor->visit(this); }
-
-void PathExpr::accept(Visitor *visitor) { visitor->visit(this); }
-
-void ReferenceExpr::accept(Visitor *visitor) { visitor->visit(this); }
-
-void RangeExpr::accept(Visitor *visitor) { visitor->visit(this); }
-
-void ItemStmt::accept(Visitor *visitor) { visitor->visit(this); }
-
-void PathTypeNode::accept(Visitor *visitor) { visitor->visit(this); }
-
-void RawPointerTypeNode::accept(Visitor *visitor) { visitor->visit(this); }
-
-void ReferenceTypeNode::accept(Visitor *visitor) { visitor->visit(this); }
-
-void SliceTypeNode::accept(Visitor *visitor) { visitor->visit(this); }
-
-void SelfTypeNode::accept(Visitor *visitor) { visitor->visit(this); }
-
-void StructDecl::accept(Visitor *visitor) { visitor->visit(this); }
-
-void ConstDecl::accept(Visitor *visitor) { visitor->visit(this); }
-
-void EnumVariant::accept(Visitor *visitor) { visitor->visit(this); }
-
-void EnumDecl::accept(Visitor *visitor) { visitor->visit(this); }
-
-void ModDecl::accept(Visitor *visitor) { visitor->visit(this); }
-
-void TraitDecl::accept(Visitor *visitor) { visitor->visit(this); }
-
-void ImplBlock::accept(Visitor *visitor) { visitor->visit(this); }
-
-void MatchArm::accept(Visitor *visitor) { visitor->visit(this); }
-
-void FnParam::accept(Visitor *visitor) { visitor->visit(this); }
-
-void StructPatternField::accept(Visitor *visitor) { visitor->visit(this); }
-
-void Field::accept(Visitor *visitor) { visitor->visit(this); }
-
-void FieldInitializer::accept(Visitor *visitor) { visitor->visit(this); }
+// Other accept methods
+void MatchArm::accept(OtherVisitor *visitor) { visitor->visit(this); }
+void FnParam::accept(OtherVisitor *visitor) { visitor->visit(this); }
+void StructPatternField::accept(OtherVisitor *visitor) { visitor->visit(this); }
+void Field::accept(OtherVisitor *visitor) { visitor->visit(this); }
+void FieldInitializer::accept(OtherVisitor *visitor) { visitor->visit(this); }
+void EnumVariant::accept(OtherVisitor *visitor) { visitor->visit(this); }
