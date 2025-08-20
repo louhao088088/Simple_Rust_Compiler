@@ -43,7 +43,7 @@ struct GroupingExpr;
 struct TupleExpr;
 struct MatchExpr;
 struct PathExpr;
-struct RangeExpr;
+struct BlockExpr;
 
 // Statement forward declarations
 struct BlockStmt;
@@ -119,7 +119,7 @@ class ExprVisitor {
     virtual std::shared_ptr<Symbol> visit(AsExpr *node) { return nullptr; }
     virtual std::shared_ptr<Symbol> visit(MatchExpr *node) { return nullptr; }
     virtual std::shared_ptr<Symbol> visit(PathExpr *node) { return nullptr; }
-    virtual std::shared_ptr<Symbol> visit(RangeExpr *node) { return nullptr; }
+    virtual std::shared_ptr<Symbol> visit(BlockExpr *node) { return nullptr; }
 };
 
 class StmtVisitor {

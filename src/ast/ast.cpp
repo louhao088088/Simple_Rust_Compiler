@@ -245,22 +245,10 @@ void ReferenceExpr::print(std::ostream &os, int indent) const {
     os << "Expression:\n";
     expression->print(os, indent + 2);
 }
-
-void RangeExpr::print(std::ostream &os, int indent) const {
+void BlockExpr::print(std::ostream &os, int indent) const {
     print_indent(os, indent);
-    os << "RangeExpr\n";
-    print_indent(os, indent + 1);
-    os << "Start:\n";
-    if (start) {
-        (*start)->print(os, indent + 2);
-    }
-    print_indent(os, indent + 1);
-    os << "End:\n";
-    if (end) {
-        (*end)->print(os, indent + 2);
-    }
-    print_indent(os, indent + 1);
-    os << "Is Inclusive: " << (is_inclusive ? "true" : "false") << "\n";
+    os << "BlockExpr\n";
+    block_stmt->print(os, indent + 1);
 }
 
 void SelfTypeNode::print(std::ostream &os, int indent) const {
@@ -677,7 +665,7 @@ std::shared_ptr<Symbol> TupleExpr::accept(ExprVisitor *visitor) { return visitor
 std::shared_ptr<Symbol> AsExpr::accept(ExprVisitor *visitor) { return visitor->visit(this); }
 std::shared_ptr<Symbol> MatchExpr::accept(ExprVisitor *visitor) { return visitor->visit(this); }
 std::shared_ptr<Symbol> PathExpr::accept(ExprVisitor *visitor) { return visitor->visit(this); }
-std::shared_ptr<Symbol> RangeExpr::accept(ExprVisitor *visitor) { return visitor->visit(this); }
+std::shared_ptr<Symbol> BlockExpr::accept(ExprVisitor *visitor) { return visitor->visit(this); }
 
 // Statement accept methods
 void BlockStmt::accept(StmtVisitor *visitor) { visitor->visit(this); }
@@ -688,7 +676,7 @@ void BreakStmt::accept(StmtVisitor *visitor) { visitor->visit(this); }
 void ContinueStmt::accept(StmtVisitor *visitor) { visitor->visit(this); }
 void ItemStmt::accept(StmtVisitor *visitor) { visitor->visit(this); }
 
-// Type node accept methods 
+// Type node accept methods
 void TypeNameNode::accept(TypeVisitor *visitor) { visitor->visit(this); }
 void ArrayTypeNode::accept(TypeVisitor *visitor) { visitor->visit(this); }
 void UnitTypeNode::accept(TypeVisitor *visitor) { visitor->visit(this); }

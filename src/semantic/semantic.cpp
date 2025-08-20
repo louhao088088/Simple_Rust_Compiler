@@ -474,12 +474,9 @@ std::shared_ptr<Symbol> NameResolutionVisitor::visit(PathExpr *node) {
     return final_symbol;
 }
 
-std::shared_ptr<Symbol> NameResolutionVisitor::visit(RangeExpr *node) {
-    if (node->start)
-        (*node->start)->accept(this);
-    if (node->end)
-        (*node->end)->accept(this);
-    return nullptr;
+std::shared_ptr<Symbol> NameResolutionVisitor::visit(BlockExpr *node) {
+    // TODO: Type check path expressions
+    return nullptr; // TODO: Implement proper type checking
 }
 
 // Missing statement visitors for NameResolutionVisitor
@@ -494,14 +491,10 @@ void NameResolutionVisitor::visit(ReferenceTypeNode *node) { node->referenced_ty
 
 void NameResolutionVisitor::visit(SliceTypeNode *node) { node->element_type->accept(this); }
 
-void NameResolutionVisitor::visit(SelfTypeNode *node) {
-    // Self types are handled in context
-}
+void NameResolutionVisitor::visit(SelfTypeNode *node) {}
 
 // Missing item visitors for NameResolutionVisitor
-void NameResolutionVisitor::visit(StructDecl *node) {
-    // TODO: Handle struct declarations
-}
+void NameResolutionVisitor::visit(StructDecl *node) {}
 
 void NameResolutionVisitor::visit(ConstDecl *node) {
     node->value->accept(this);
@@ -808,11 +801,8 @@ std::shared_ptr<Symbol> TypeCheckVisitor::visit(PathExpr *node) {
     return nullptr; // TODO: Implement proper type checking
 }
 
-std::shared_ptr<Symbol> TypeCheckVisitor::visit(RangeExpr *node) {
-    if (node->start)
-        (*node->start)->accept(this);
-    if (node->end)
-        (*node->end)->accept(this);
+std::shared_ptr<Symbol> TypeCheckVisitor::visit(BlockExpr *node) {
+    // TODO: Type check path expressions
     return nullptr; // TODO: Implement proper type checking
 }
 

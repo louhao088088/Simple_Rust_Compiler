@@ -4,7 +4,6 @@
 #include "../lexer/lexer.h"
 #include "visit.h"
 
-
 // Base classes with specialized accept methods
 
 struct Node {
@@ -255,14 +254,9 @@ struct ReferenceExpr : public Expr {
     std::shared_ptr<Symbol> accept(ExprVisitor *visitor) override;
 };
 
-struct RangeExpr : public Expr {
-    std::optional<std::shared_ptr<Expr>> start;
-    std::optional<std::shared_ptr<Expr>> end;
-    bool is_inclusive;
-    RangeExpr(std::optional<std::shared_ptr<Expr>> s, std::optional<std::shared_ptr<Expr>> e,
-              bool inclusive)
-        : start(std::move(s)), end(std::move(e)), is_inclusive(inclusive) {}
-
+struct BlockExpr : public Expr {
+    std::shared_ptr<BlockStmt> block_stmt;
+    explicit BlockExpr(std::shared_ptr<BlockStmt> stmt) : block_stmt(std::move(stmt)) {}
     void print(std::ostream &os, int indent = 0) const override;
     std::shared_ptr<Symbol> accept(ExprVisitor *visitor) override;
 };

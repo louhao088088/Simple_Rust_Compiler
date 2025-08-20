@@ -91,7 +91,6 @@ struct ArrayType : public Type {
     }
 };
 
-// Symbol class for symbol table
 class SymbolTable;
 class Symbol {
   public:
@@ -109,7 +108,6 @@ class Symbol {
     virtual ~Symbol() = default;
 };
 
-// Symbol table for scope management
 class SymbolTable {
   public:
     void enter_scope();
@@ -121,7 +119,6 @@ class SymbolTable {
     std::vector<std::map<std::string, std::shared_ptr<Symbol>>> scopes_;
 };
 
-// Name resolution visitor
 // Name resolution visitor
 class NameResolutionVisitor : public ExprVisitor,
                               public StmtVisitor,
@@ -156,7 +153,7 @@ class NameResolutionVisitor : public ExprVisitor,
     std::shared_ptr<Symbol> visit(AsExpr *node) override;
     std::shared_ptr<Symbol> visit(MatchExpr *node) override;
     std::shared_ptr<Symbol> visit(PathExpr *node) override;
-    std::shared_ptr<Symbol> visit(RangeExpr *node) override;
+    std::shared_ptr<Symbol> visit(BlockExpr *node) override;
 
     // Statement visitors
     void visit(BlockStmt *node) override;
@@ -240,7 +237,7 @@ class TypeCheckVisitor : public ExprVisitor,
     std::shared_ptr<Symbol> visit(AsExpr *node) override;
     std::shared_ptr<Symbol> visit(MatchExpr *node) override;
     std::shared_ptr<Symbol> visit(PathExpr *node) override;
-    std::shared_ptr<Symbol> visit(RangeExpr *node) override;
+    std::shared_ptr<Symbol> visit(BlockExpr *node) override;
 
     // Statement visitors
     void visit(BlockStmt *node) override;

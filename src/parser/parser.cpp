@@ -1,6 +1,8 @@
 // parser.cpp
 #include "parser.h"
 
+#include <memory>
+
 using std::string;
 using std::vector;
 
@@ -52,19 +54,6 @@ Parser::Parser(const std::vector<Token> &tokens, ErrorReporter &error_reporter)
         auto right = parse_expression(Precedence::UNARY);
         return std::make_shared<UnaryExpr>(op, std::move(right));
     });
-    auto range_prefix_parser = [this]() -> std::shared_ptr<Expr> {
-        bool is_inclusive = previous().type == TokenType::DOT_DOT_EQUAL;
-        std::optional<std::shared_ptr<Expr>> end;
-        if (!check(TokenType::RIGHT_BRACKET) && !check(TokenType::RIGHT_BRACE) &&
-            !check(TokenType::SEMICOLON) && !check(TokenType::COMMA)) {
-            end = parse_expression(Precedence::RANGE);
-        }
-
-        return std::make_shared<RangeExpr>(std::nullopt, std::move(end), is_inclusive);
-    };
-    register_prefix(TokenType::DOT_DOT, range_prefix_parser);
-    register_prefix(TokenType::DOT_DOT_EQUAL, range_prefix_parser);
-
     register_prefix(TokenType::IF, [this] { return parse_if_expression(); });
     register_prefix(TokenType::WHILE, [this] { return parse_while_expression(); });
     register_prefix(TokenType::LOOP, [this] { return parse_loop_expression(); });
@@ -123,6 +112,13 @@ Parser::Parser(const std::vector<Token> &tokens, ErrorReporter &error_reporter)
     register_prefix(TokenType::SELF_TYPE,
                     [this] { return std::make_shared<VariableExpr>(previous()); });
     register_prefix(TokenType::SELF, [this] { return std::make_shared<VariableExpr>(previous()); });
+
+    register_prefix(TokenType::LEFT_BRACE, [this] {
+        current_--;
+        auto block = parse_block_statement();
+
+        return std::make_shared<BlockExpr>(std::move(block));
+    });
 
     register_infix(TokenType::AS, Precedence::AS, [this](auto left) -> std::shared_ptr<Expr> {
         auto target_type = parse_type();
@@ -310,18 +306,6 @@ Parser::Parser(const std::vector<Token> &tokens, ErrorReporter &error_reporter)
         auto right = std::make_shared<VariableExpr>(right_token);
         return std::make_shared<PathExpr>(std::move(left), op, std::move(right));
     });
-    auto range_infix_parser = [this](auto left) -> std::shared_ptr<Expr> {
-        bool is_inclusive = previous().type == TokenType::DOT_DOT_EQUAL;
-        std::optional<std::shared_ptr<Expr>> end;
-        if (!check(TokenType::RIGHT_BRACKET) && !check(TokenType::RIGHT_BRACE) &&
-            !check(TokenType::SEMICOLON) && !check(TokenType::COMMA)) {
-            end = parse_expression(Precedence::RANGE);
-        }
-
-        return std::make_shared<RangeExpr>(std::move(left), std::move(end), is_inclusive);
-    };
-    register_infix(TokenType::DOT_DOT, Precedence::RANGE, range_infix_parser);
-    register_infix(TokenType::DOT_DOT_EQUAL, Precedence::RANGE, range_infix_parser);
 }
 
 // Main parsing loop
@@ -503,6 +487,7 @@ std::shared_ptr<Item> Parser::parse_item() {
     }
 
     report_error(peek(), "Expect a top-level item like 'fn'.");
+    advance();
     return nullptr;
 }
 
