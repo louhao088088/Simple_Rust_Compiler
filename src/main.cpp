@@ -31,7 +31,6 @@ int main() {
     if (ast && !parser_error_reporter.has_errors()) {
         ast->print(std::cout);
         std::cout << "\n";
-        return 0;
         // Test semantic analysis
         std::cout << "--- Semantic Analysis ---" << std::endl;
         ErrorReporter error_reporter;

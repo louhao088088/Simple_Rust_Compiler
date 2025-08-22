@@ -166,10 +166,12 @@ void SymbolTable::exit_scope() {
     }
 }
 
-void SymbolTable::define(const std::string &name, std::shared_ptr<Symbol> symbol) {
+bool SymbolTable::define(const std::string &name, std::shared_ptr<Symbol> symbol) {
     if (!scopes_.empty()) {
         scopes_.back()[name] = symbol;
+        return true;
     }
+    return false;
 }
 
 std::shared_ptr<Symbol> SymbolTable::lookup(const std::string &name) {
@@ -298,6 +300,10 @@ void NameResolutionVisitor::visit(BlockStmt *node) {
 void NameResolutionVisitor::visit(ExprStmt *node) { node->expression->accept(this); }
 
 void NameResolutionVisitor::visit(LetStmt *node) {
+    if (node->type_annotation) {
+        (*node->type_annotation)->accept(this);
+    }
+
     if (node->initializer) {
         (*node->initializer)->accept(this);
     }
@@ -475,14 +481,12 @@ std::shared_ptr<Symbol> NameResolutionVisitor::visit(PathExpr *node) {
 }
 
 std::shared_ptr<Symbol> NameResolutionVisitor::visit(BlockExpr *node) {
-    // TODO: Type check path expressions
-    return nullptr; // TODO: Implement proper type checking
+    node->block_stmt->accept(this);
+    return nullptr;
 }
 
-// Missing statement visitors for NameResolutionVisitor
 void NameResolutionVisitor::visit(ItemStmt *node) { node->item->accept(this); }
 
-// Missing type node visitors for NameResolutionVisitor
 void NameResolutionVisitor::visit(PathTypeNode *node) { node->path->accept(this); }
 
 void NameResolutionVisitor::visit(RawPointerTypeNode *node) { node->pointee_type->accept(this); }
@@ -493,22 +497,78 @@ void NameResolutionVisitor::visit(SliceTypeNode *node) { node->element_type->acc
 
 void NameResolutionVisitor::visit(SelfTypeNode *node) {}
 
-// Missing item visitors for NameResolutionVisitor
-void NameResolutionVisitor::visit(StructDecl *node) {}
+void NameResolutionVisitor::visit(StructDecl *node) {
+
+    auto struct_symbol = std::make_shared<Symbol>(node->name.lexeme, Symbol::TYPE);
+
+    struct_symbol->members = std::make_shared<SymbolTable>();
+
+    if (!symbol_table_.define(node->name.lexeme, struct_symbol)) {
+        error_reporter_.report_error("Type '" + node->name.lexeme + "' is already defined.",
+                                     node->name.line);
+    }
+
+    node->resolved_symbol = struct_symbol;
+
+    switch (node->kind) {
+    case StructKind::Normal: {
+        for (const auto &field : node->fields) {
+            auto field_symbol = std::make_shared<Symbol>(field->name.lexeme, Symbol::VARIABLE);
+
+            if (!struct_symbol->members->define(field->name.lexeme, field_symbol)) {
+                error_reporter_.report_error("Field '" + field->name.lexeme +
+                                                 "' is already defined in struct '" +
+                                                 node->name.lexeme + "'.",
+                                             field->name.line);
+            }
+            field->type->accept(this);
+        }
+        break;
+    }
+
+    case StructKind::Unit: {
+        break;
+    }
+    }
+}
 
 void NameResolutionVisitor::visit(ConstDecl *node) {
+    node->type->accept(this);
     node->value->accept(this);
-    if (node->type)
-        node->type->accept(this);
+
+    auto const_symbol = std::make_shared<Symbol>(node->name.lexeme, Symbol::CONSTANT);
+
+    if (!symbol_table_.define(node->name.lexeme, const_symbol)) {
+        error_reporter_.report_error("Constant '" + node->name.lexeme + "' is already defined.",
+                                     node->name.line);
+    }
+
+    node->resolved_symbol = const_symbol;
 }
 
 void NameResolutionVisitor::visit(EnumDecl *node) {
-    for (auto &variant : node->variants) {
-        variant->accept(this);
+    auto enum_symbol = std::make_shared<Symbol>(node->name.lexeme, Symbol::TYPE);
+
+    enum_symbol->members = std::make_unique<SymbolTable>();
+
+    symbol_table_.define(node->name.lexeme, enum_symbol);
+    node->resolved_symbol = enum_symbol;
+
+    for (const auto &variant : node->variants) {
+        auto variant_symbol = std::make_shared<Symbol>(variant->name.lexeme, Symbol::VARIANT);
+        enum_symbol->members->define(variant->name.lexeme, variant_symbol);
     }
 }
 
 void NameResolutionVisitor::visit(ModDecl *node) {
+    auto mod_symbol = std::make_shared<Symbol>(node->name.lexeme, Symbol::MODULE);
+    mod_symbol->members = std::make_unique<SymbolTable>();
+
+    if (!symbol_table_.define(node->name.lexeme, mod_symbol)) {
+        error_reporter_.report_error("Module '" + node->name.lexeme + "' is already defined.",
+                                     node->name.line);
+    }
+    node->resolved_symbol = mod_symbol;
     symbol_table_.enter_scope();
     for (auto &item : node->items) {
         item->accept(this);
@@ -526,15 +586,25 @@ void NameResolutionVisitor::visit(ImplBlock *node) {
     if (node->trait_name)
         (*node->trait_name)->accept(this);
     node->target_type->accept(this);
+
+    symbol_table_.enter_scope();
+
+    auto target_type_symbol = node->target_type->resolved_symbol;
+    if (target_type_symbol) {
+        auto self_symbol = std::make_shared<Symbol>("Self", Symbol::TYPE);
+        self_symbol->aliased_symbol = target_type_symbol;
+        symbol_table_.define("Self", self_symbol);
+    }
+
     for (auto &item : node->implemented_items) {
         item->accept(this);
     }
+
+    symbol_table_.exit_scope();
 }
 
 // Missing other visitors for NameResolutionVisitor
-void NameResolutionVisitor::visit(EnumVariant *node) {
-    // TODO: Handle enum variant fields
-}
+void NameResolutionVisitor::visit(EnumVariant *node) {}
 
 void NameResolutionVisitor::visit(MatchArm *node) {
     node->pattern->accept(this);
@@ -544,6 +614,7 @@ void NameResolutionVisitor::visit(MatchArm *node) {
 }
 
 // TypeCheckVisitor implementation
+
 TypeCheckVisitor::TypeCheckVisitor(ErrorReporter &error_reporter)
     : error_reporter_(error_reporter) {}
 
@@ -861,9 +932,7 @@ void TypeCheckVisitor::visit(ImplBlock *node) {
 }
 
 // Missing other visitors for TypeCheckVisitor
-void TypeCheckVisitor::visit(EnumVariant *node) {
-    // TODO: Handle enum variant type checking
-}
+void TypeCheckVisitor::visit(EnumVariant *node) {}
 
 void TypeCheckVisitor::visit(MatchArm *node) {
     node->pattern->accept(this);

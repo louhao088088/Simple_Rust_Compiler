@@ -31,7 +31,9 @@ enum class TypeKind {
     CHAR,
     BOOL,
     ARRAY,
-    UNKOWN,
+    STRUCT,
+    UNIT,
+    UNKNOWN,
 };
 
 struct Type {
@@ -91,19 +93,46 @@ struct ArrayType : public Type {
     }
 };
 
+struct StructType : public Type {
+    std::string name;
+    std::map<std::string, std::shared_ptr<Type>> fields;
+    std::weak_ptr<Symbol> symbol;
+
+    StructType(std::string name, std::weak_ptr<Symbol> symbol)
+        : name(std::move(name)), symbol(symbol) {
+        this->kind = TypeKind::STRUCT;
+    }
+
+    std::string to_string() const override { return name; }
+
+    bool equals(const Type *other) const override {
+        if (auto *other_struct = dynamic_cast<const StructType *>(other)) {
+            return name == other_struct->name;
+        }
+        return false;
+    }
+};
+
+struct UnitType : public Type {
+    UnitType() { this->kind = TypeKind::UNIT; }
+    std::string to_string() const override { return "()"; }
+    bool equals(const Type *other) const override { return other->kind == TypeKind::UNIT; }
+};
+
 class SymbolTable;
 class Symbol {
   public:
-    enum Kind { VARIABLE, FUNCTION, TYPE };
+    enum Kind { VARIABLE, FUNCTION, TYPE, MODULE, VARIANT, CONSTANT };
 
     std::string name;
     Kind kind;
     std::shared_ptr<Type> type;
     std::shared_ptr<SymbolTable> members;
+    std::shared_ptr<Symbol> aliased_symbol;
 
     Symbol(std::string name, Kind kind, std::shared_ptr<Type> type = nullptr)
         : name(std::move(name)), kind(kind), type(std::move(type)),
-          members(std::make_shared<SymbolTable>()) {}
+          members(std::make_shared<SymbolTable>()), aliased_symbol(nullptr) {}
 
     virtual ~Symbol() = default;
 };
@@ -112,11 +141,11 @@ class SymbolTable {
   public:
     void enter_scope();
     void exit_scope();
-    void define(const std::string &name, std::shared_ptr<Symbol> symbol);
+    bool define(const std::string &name, std::shared_ptr<Symbol> symbol);
     std::shared_ptr<Symbol> lookup(const std::string &name);
 
   private:
-    std::vector<std::map<std::string, std::shared_ptr<Symbol>>> scopes_;
+    std::vector<std::unordered_map<std::string, std::shared_ptr<Symbol>>> scopes_;
 };
 
 // Name resolution visitor
@@ -125,7 +154,8 @@ class NameResolutionVisitor : public ExprVisitor,
                               public ItemVisitor,
                               public TypeVisitor,
                               public PatternVisitor,
-                              public OtherVisitor {
+                              public OtherVisitor,
+                              public ProgramVisitor {
   public:
     NameResolutionVisitor(ErrorReporter &error_reporter);
 
@@ -183,7 +213,6 @@ class NameResolutionVisitor : public ExprVisitor,
     void visit(ModDecl *node) override;
     void visit(TraitDecl *node) override;
     void visit(ImplBlock *node) override;
-    void visit(Program *node) override;
 
     // Pattern visitors
     void visit(IdentifierPattern *node) override;
@@ -198,6 +227,8 @@ class NameResolutionVisitor : public ExprVisitor,
     void visit(EnumVariant *node) override;
     void visit(MatchArm *node) override;
 
+    void visit(Program *node) override;
+
   private:
     SymbolTable symbol_table_;
     ErrorReporter &error_reporter_;
@@ -209,7 +240,8 @@ class TypeCheckVisitor : public ExprVisitor,
                          public ItemVisitor,
                          public TypeVisitor,
                          public PatternVisitor,
-                         public OtherVisitor {
+                         public OtherVisitor,
+                         public ProgramVisitor {
   public:
     TypeCheckVisitor(ErrorReporter &error_reporter);
 
@@ -267,7 +299,6 @@ class TypeCheckVisitor : public ExprVisitor,
     void visit(ModDecl *node) override;
     void visit(TraitDecl *node) override;
     void visit(ImplBlock *node) override;
-    void visit(Program *node) override;
 
     // Pattern visitors
     void visit(IdentifierPattern *node) override;
@@ -281,6 +312,8 @@ class TypeCheckVisitor : public ExprVisitor,
     // Other visitors
     void visit(EnumVariant *node) override;
     void visit(MatchArm *node) override;
+
+    void visit(Program *node) override;
 
   private:
     ErrorReporter &error_reporter_;

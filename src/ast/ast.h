@@ -4,6 +4,10 @@
 #include "../lexer/lexer.h"
 #include "visit.h"
 
+// Forward declarations
+class Symbol;
+class Type;
+
 // Base classes with specialized accept methods
 
 struct Node {
@@ -23,10 +27,12 @@ struct Stmt : public Node {
 };
 
 struct Item : public Node {
+    std::shared_ptr<Symbol> resolved_symbol;
     virtual void accept(ItemVisitor *visitor) = 0;
 };
 
 struct TypeNode : public Node {
+    std::shared_ptr<Symbol> resolved_symbol;
     virtual void accept(TypeVisitor *visitor) = 0;
 };
 
@@ -545,6 +551,8 @@ struct LiteralPattern : public Pattern {
 struct IdentifierPattern : public Pattern {
     Token name;
     bool is_mutable;
+    std::shared_ptr<Symbol> resolved_symbol;
+
     IdentifierPattern(Token n, bool is_mut) : name(std::move(n)), is_mutable(is_mut) {}
     void print(std::ostream &os, int indent = 0) const override;
     void accept(PatternVisitor *visitor) override;
@@ -610,8 +618,8 @@ struct SlicePattern : public Pattern {
 };
 
 // Root node
-struct Program : public Item {
+struct Program : public Node {
     std::vector<std::shared_ptr<Item>> items;
     void print(std::ostream &os, int indent = 0) const override;
-    void accept(ItemVisitor *visitor) override;
+    void accept(ProgramVisitor *visitor);
 };

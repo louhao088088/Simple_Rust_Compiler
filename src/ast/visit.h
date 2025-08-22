@@ -117,9 +117,9 @@ class ExprVisitor {
     virtual std::shared_ptr<Symbol> visit(GroupingExpr *node) { return nullptr; }
     virtual std::shared_ptr<Symbol> visit(TupleExpr *node) { return nullptr; }
     virtual std::shared_ptr<Symbol> visit(AsExpr *node) { return nullptr; }
-    virtual std::shared_ptr<Symbol> visit(MatchExpr *node) { return nullptr; }
-    virtual std::shared_ptr<Symbol> visit(PathExpr *node) { return nullptr; }
-    virtual std::shared_ptr<Symbol> visit(BlockExpr *node) { return nullptr; }
+    virtual std::shared_ptr<Symbol> visit(MatchExpr *node) = 0;
+    virtual std::shared_ptr<Symbol> visit(PathExpr *node) = 0;
+    virtual std::shared_ptr<Symbol> visit(BlockExpr *node) = 0;
 };
 
 class StmtVisitor {
@@ -149,7 +149,6 @@ class ItemVisitor {
     virtual void visit(ModDecl *node) {}
     virtual void visit(TraitDecl *node) {}
     virtual void visit(ImplBlock *node) {}
-    virtual void visit(Program *node) = 0;
 };
 
 class TypeVisitor {
@@ -193,4 +192,11 @@ class OtherVisitor {
     virtual void visit(FieldInitializer *node){};
     virtual void visit(StructPatternField *node){};
     virtual void visit(EnumVariant *node){};
+};
+
+class ProgramVisitor {
+  public:
+    virtual ~ProgramVisitor() = default;
+
+    virtual void visit(Program *node) = 0;
 };

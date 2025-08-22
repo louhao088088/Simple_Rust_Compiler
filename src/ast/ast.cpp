@@ -695,7 +695,6 @@ void EnumDecl::accept(ItemVisitor *visitor) { visitor->visit(this); }
 void ModDecl::accept(ItemVisitor *visitor) { visitor->visit(this); }
 void TraitDecl::accept(ItemVisitor *visitor) { visitor->visit(this); }
 void ImplBlock::accept(ItemVisitor *visitor) { visitor->visit(this); }
-void Program::accept(ItemVisitor *visitor) { visitor->visit(this); }
 
 // Pattern accept methods
 void IdentifierPattern::accept(PatternVisitor *visitor) { visitor->visit(this); }
@@ -713,3 +712,5 @@ void StructPatternField::accept(OtherVisitor *visitor) { visitor->visit(this); }
 void Field::accept(OtherVisitor *visitor) { visitor->visit(this); }
 void FieldInitializer::accept(OtherVisitor *visitor) { visitor->visit(this); }
 void EnumVariant::accept(OtherVisitor *visitor) { visitor->visit(this); }
+
+void Program::accept(ProgramVisitor *visitor) { visitor->visit(this); }
