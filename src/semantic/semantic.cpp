@@ -2,161 +2,6 @@
 
 #include "semantic.h"
 
-Number number_of_tokens(string token) {
-    long long num = -1;
-    if (token.length() > 2 && token[0] == '0' && token[1] == 'x') {
-        for (size_t i = 2; i < token.length(); i++) {
-            if (token[i] == '_')
-                continue;
-
-            if (!(token[i] >= '0' && token[i] <= '9') || !(token[i] >= 'a' && token[i] <= 'f') ||
-                !(token[i] >= 'A' && token[i] <= 'F')) {
-                if ((token[i] == 'i' || token[i] == 'u') &&
-                    ((token.length() == i + 2 && token[i + 1] == '3' && token[i + 2] == '2') ||
-                     (token.length() == i + 4 && token[i + 1] == 's' && token[i + 2] == 'i' &&
-                      token[i + 3] == 'z' && token[i + 4] == 'e'))) {
-                    if (token[i] == 'i') {
-                        if (num > 2147483647) {
-                            puts("Integer overflow");
-                            return {-1, false};
-                        }
-                        return {num, false};
-                    } else if (token[i] == 'u') {
-                        if (num > 4294967295) {
-                            puts("Unsigned integer overflow");
-                            return {-1, false};
-                        }
-                        return {num, true};
-                    }
-
-                } else {
-                    puts("Invalid number format");
-                    return {-1, false};
-                }
-            }
-            if (num == -1)
-                num = 0;
-            num = num * 16 +
-                  (token[i] >= '0' && token[i] <= '9'
-                       ? token[i] - '0'
-                       : (token[i] >= 'a' && token[i] <= 'f'
-                              ? token[i] - 'a' + 10
-                              : (token[i] >= 'A' && token[i] <= 'F' ? token[i] - 'A' + 10 : -1)));
-        }
-    } else if (token.length() > 2 && token[0] == '0' && token[1] == 'b') {
-        for (size_t i = 2; i < token.length(); i++) {
-            if (token[i] == '_')
-                continue;
-
-            if (token[i] != '0' && token[i] != '1') {
-                if ((token[i] == 'i' || token[i] == 'u') &&
-                    ((token.length() == i + 2 && token[i + 1] == '3' && token[i + 2] == '2') ||
-                     (token.length() == i + 4 && token[i + 1] == 's' && token[i + 2] == 'i' &&
-                      token[i + 3] == 'z' && token[i + 4] == 'e'))) {
-                    if (token[i] == 'i') {
-                        if (num > 2147483647) {
-                            puts("Integer overflow");
-                            return {-1, false};
-                        }
-                        return {num, false};
-                    } else if (token[i] == 'u') {
-                        if (num > 4294967295) {
-                            puts("Unsigned integer overflow");
-                            return {-1, false};
-                        }
-                        return {num, true};
-                    }
-
-                } else {
-                    puts("Invalid number format");
-                    return {-1, false};
-                }
-            }
-            if (num == -1)
-                num = 0;
-            num = num * 2 + (token[i] == '0' ? 0 : 1);
-        }
-
-    } else if (token.length() > 1 && token[0] == '0' && token[1] == 'o') {
-        for (size_t i = 2; i < token.length(); i++) {
-            if (token[i] == '_')
-                continue;
-
-            if (!(token[i] >= '0' && token[i] <= '7')) {
-                if ((token[i] == 'i' || token[i] == 'u') &&
-                    ((token.length() == i + 2 && token[i + 1] == '3' && token[i + 2] == '2') ||
-                     (token.length() == i + 4 && token[i + 1] == 's' && token[i + 2] == 'i' &&
-                      token[i + 3] == 'z' && token[i + 4] == 'e'))) {
-                    if (token[i] == 'i') {
-                        if (num > 2147483647) {
-                            puts("Integer overflow");
-                            return {-1, false};
-                        }
-                        return {num, false};
-                    } else if (token[i] == 'u') {
-                        if (num > 4294967295) {
-                            puts("Unsigned integer overflow");
-                            return {-1, false};
-                        }
-                        return {num, true};
-                    }
-
-                } else {
-                    puts("Invalid number format");
-                    return {-1, false};
-                }
-            }
-            if (num == -1)
-                num = 0;
-            num = num * 8 + (token[i] - '0');
-        }
-
-    } else {
-        if (token[0] == '_') {
-            puts("Invalid number format");
-            return {-1, false};
-        }
-        for (size_t i = 0; i < token.length(); i++) {
-            if (token[i] == '_')
-                continue;
-
-            if (!(token[i] >= '0' && token[i] <= '9')) {
-                if ((token[i] == 'i' || token[i] == 'u') &&
-                    ((token.length() == i + 2 && token[i + 1] == '3' && token[i + 2] == '2') ||
-                     (token.length() == i + 4 && token[i + 1] == 's' && token[i + 2] == 'i' &&
-                      token[i + 3] == 'z' && token[i + 4] == 'e'))) {
-                    if (token[i] == 'i') {
-                        if (num > 2147483647) {
-                            puts("Integer overflow");
-                            return {-1, false};
-                        }
-                        return {num, false};
-                    } else if (token[i] == 'u') {
-                        if (num > 4294967295) {
-                            puts("Unsigned integer overflow");
-                            return {-1, false};
-                        }
-                        return {num, true};
-                    }
-
-                } else {
-                    puts("Invalid number format");
-                    return {-1, false};
-                }
-            }
-            if (num == -1)
-                num = 0;
-            num = num * 10 + (token[i] - '0');
-        }
-    }
-
-    if (num < 0) {
-        puts("Invalid number format");
-        return {-1, false};
-    }
-    return {num, true};
-}
-
 // SymbolTable implementation
 void SymbolTable::enter_scope() { scopes_.emplace_back(); }
 
@@ -186,7 +31,7 @@ std::shared_ptr<Symbol> SymbolTable::lookup(const std::string &name) {
 
 // NameResolutionVisitor implementation
 NameResolutionVisitor::NameResolutionVisitor(ErrorReporter &error_reporter)
-    : error_reporter_(error_reporter) {
+    : error_reporter_(error_reporter), type_resolver_(*this, symbol_table_, error_reporter_) {
     symbol_table_.enter_scope();
 }
 
@@ -300,16 +145,22 @@ void NameResolutionVisitor::visit(BlockStmt *node) {
 void NameResolutionVisitor::visit(ExprStmt *node) { node->expression->accept(this); }
 
 void NameResolutionVisitor::visit(LetStmt *node) {
+    std::shared_ptr<Type> var_type = nullptr;
     if (node->type_annotation) {
-        (*node->type_annotation)->accept(this);
+        var_type = type_resolver_.resolve(node->type_annotation->get());
+        if (!var_type) {
+            error_reporter_.report_error("Cannot resolve type annotation for variable.");
+        }
+    } else {
+        error_reporter_.report_error("Variable declaration must have a type annotation.");
     }
-
     if (node->initializer) {
         (*node->initializer)->accept(this);
     }
-    if (node->pattern) {
-        node->pattern->accept(this);
-    }
+
+    current_let_type_ = var_type;
+    node->pattern->accept(this);
+    current_let_type_ = nullptr;
 }
 
 void NameResolutionVisitor::visit(ReturnStmt *node) {
@@ -364,8 +215,16 @@ void NameResolutionVisitor::visit(Program *node) {
 
 // Pattern visitors
 void NameResolutionVisitor::visit(IdentifierPattern *node) {
-    auto var_symbol = std::make_shared<Symbol>(node->name.lexeme, Symbol::VARIABLE);
-    symbol_table_.define(node->name.lexeme, var_symbol);
+    auto var_symbol =
+        std::make_shared<Symbol>(node->name.lexeme, Symbol::VARIABLE, current_let_type_);
+
+    if (!symbol_table_.define(node->name.lexeme, var_symbol)) {
+        error_reporter_.report_error("Variable '" + node->name.lexeme +
+                                         "' is already defined in this scope.",
+                                     node->name.line);
+    }
+
+    node->resolved_symbol = var_symbol;
 }
 
 void NameResolutionVisitor::visit(WildcardPattern *node) {}
@@ -500,28 +359,38 @@ void NameResolutionVisitor::visit(SelfTypeNode *node) {}
 void NameResolutionVisitor::visit(StructDecl *node) {
 
     auto struct_symbol = std::make_shared<Symbol>(node->name.lexeme, Symbol::TYPE);
-
-    struct_symbol->members = std::make_shared<SymbolTable>();
+    auto struct_type =
+        std::make_shared<StructType>(node->name.lexeme, std::weak_ptr<Symbol>(struct_symbol));
+    struct_symbol->type = struct_type;
 
     if (!symbol_table_.define(node->name.lexeme, struct_symbol)) {
         error_reporter_.report_error("Type '" + node->name.lexeme + "' is already defined.",
                                      node->name.line);
+        return;
     }
-
     node->resolved_symbol = struct_symbol;
 
     switch (node->kind) {
     case StructKind::Normal: {
-        for (const auto &field : node->fields) {
-            auto field_symbol = std::make_shared<Symbol>(field->name.lexeme, Symbol::VARIABLE);
+        for (const auto &field_node : node->fields) {
+            std::shared_ptr<Type> field_type = type_resolver_.resolve(field_node->type.get());
+            if (!field_type) {
+                error_reporter_.report_error("Unknown type for field '" + field_node->name.lexeme +
+                                                 "'.",
+                                             field_node->name.line);
+                continue;
+            }
+            auto field_symbol =
+                std::make_shared<Symbol>(field_node->name.lexeme, Symbol::VARIABLE, field_type);
 
-            if (!struct_symbol->members->define(field->name.lexeme, field_symbol)) {
-                error_reporter_.report_error("Field '" + field->name.lexeme +
+            if (!struct_symbol->members->define(field_node->name.lexeme, field_symbol)) {
+                error_reporter_.report_error("Field '" + field_node->name.lexeme +
                                                  "' is already defined in struct '" +
                                                  node->name.lexeme + "'.",
-                                             field->name.line);
+                                             field_node->name.line);
             }
-            field->type->accept(this);
+
+            struct_type->fields[field_node->name.lexeme] = field_type;
         }
         break;
     }
@@ -939,4 +808,87 @@ void TypeCheckVisitor::visit(MatchArm *node) {
     if (node->guard)
         (*node->guard)->accept(this);
     node->body->accept(this);
+}
+
+// TypeResolver Implementation
+
+TypeResolver::TypeResolver(NameResolutionVisitor &resolver, SymbolTable &symbols,
+                           ErrorReporter &reporter)
+    : name_resolver_(resolver), symbol_table_(symbols), error_reporter_(reporter) {}
+
+std::shared_ptr<Type> TypeResolver::resolve(TypeNode *node) {
+    if (!node)
+        return nullptr;
+
+    resolved_type_ = nullptr;
+    node->accept(this);
+    return resolved_type_;
+}
+
+void TypeResolver::visit(TypeNameNode *node) {
+    // Handle primitive types
+    if (node->name.lexeme == "i32") {
+        resolved_type_ = std::make_shared<PrimitiveType>(TypeKind::INTEGER);
+    } else if (node->name.lexeme == "u32") {
+        resolved_type_ = std::make_shared<PrimitiveType>(TypeKind::UNSIGNED_INTEGER);
+    } else if (node->name.lexeme == "isize") {
+        resolved_type_ = std::make_shared<PrimitiveType>(TypeKind::INTEGER);
+    } else if (node->name.lexeme == "usize") {
+        resolved_type_ = std::make_shared<PrimitiveType>(TypeKind::UNSIGNED_INTEGER);
+    } else if (node->name.lexeme == "bool") {
+        resolved_type_ = std::make_shared<PrimitiveType>(TypeKind::BOOL);
+    } else if (node->name.lexeme == "char") {
+        resolved_type_ = std::make_shared<PrimitiveType>(TypeKind::CHAR);
+    } else if (node->name.lexeme == "string") {
+        resolved_type_ = std::make_shared<PrimitiveType>(TypeKind::STRING);
+    } else {
+        auto symbol = symbol_table_.lookup(node->name.lexeme);
+        if (symbol && symbol->kind == Symbol::TYPE) {
+            resolved_type_ = symbol->type;
+            node->resolved_symbol = symbol;
+        } else {
+            resolved_type_ = nullptr;
+        }
+    }
+}
+
+void TypeResolver::visit(ArrayTypeNode *node) {
+    auto element_type = resolve(node->element_type.get());
+    if (element_type && node->size) {
+        // For now, assume size is a literal - later we'll need constant evaluation
+        resolved_type_ = std::make_shared<ArrayType>(element_type, 0); // Placeholder size
+    }
+}
+
+void TypeResolver::visit(UnitTypeNode *node) { resolved_type_ = std::make_shared<UnitType>(); }
+
+void TypeResolver::visit(TupleTypeNode *node) {
+    // For now, just create a unit type - full tuple support later
+    resolved_type_ = std::make_shared<UnitType>();
+}
+
+void TypeResolver::visit(PathTypeNode *node) {
+    // For simple path types (like ct names), treat similar to TypeNameNode
+    // TODO:
+    resolved_type_ = nullptr;
+}
+
+void TypeResolver::visit(RawPointerTypeNode *node) {
+    // Placeholder for pointer types
+    resolved_type_ = nullptr;
+}
+
+void TypeResolver::visit(ReferenceTypeNode *node) {
+    // For references, resolve the referenced type
+    resolved_type_ = resolve(node->referenced_type.get());
+}
+
+void TypeResolver::visit(SliceTypeNode *node) {
+    // Placeholder for slice types
+    resolved_type_ = nullptr;
+}
+
+void TypeResolver::visit(SelfTypeNode *node) {
+    // Placeholder for Self type
+    resolved_type_ = nullptr;
 }

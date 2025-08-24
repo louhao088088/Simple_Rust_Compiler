@@ -14,11 +14,6 @@
 using std::string;
 using std::vector;
 
-struct Number {
-    long long value;
-    bool is_signed;
-};
-
 // Type system base class
 
 enum class TypeKind {
@@ -120,6 +115,31 @@ struct UnitType : public Type {
 };
 
 class SymbolTable;
+class NameResolutionVisitor;
+
+class TypeResolver : public TypeVisitor {
+  public:
+    TypeResolver(NameResolutionVisitor &resolver, SymbolTable &symbols, ErrorReporter &reporter);
+
+    std::shared_ptr<Type> resolve(TypeNode *node);
+
+    void visit(TypeNameNode *node) override;
+    void visit(ArrayTypeNode *node) override;
+    void visit(UnitTypeNode *node) override;
+    void visit(TupleTypeNode *node) override;
+    void visit(PathTypeNode *node) override;
+    void visit(RawPointerTypeNode *node) override;
+    void visit(ReferenceTypeNode *node) override;
+    void visit(SliceTypeNode *node) override;
+    void visit(SelfTypeNode *node) override;
+
+  private:
+    NameResolutionVisitor &name_resolver_;
+    SymbolTable &symbol_table_;
+    std::shared_ptr<Type> resolved_type_;
+    ErrorReporter &error_reporter_;
+};
+
 class Symbol {
   public:
     enum Kind { VARIABLE, FUNCTION, TYPE, MODULE, VARIANT, CONSTANT };
@@ -148,7 +168,7 @@ class SymbolTable {
     std::vector<std::unordered_map<std::string, std::shared_ptr<Symbol>>> scopes_;
 };
 
-// Name resolution visitor
+// Name resolution visitor - specialized for returning Symbol
 class NameResolutionVisitor : public ExprVisitor,
                               public StmtVisitor,
                               public ItemVisitor,
@@ -232,6 +252,8 @@ class NameResolutionVisitor : public ExprVisitor,
   private:
     SymbolTable symbol_table_;
     ErrorReporter &error_reporter_;
+    TypeResolver type_resolver_;
+    std::shared_ptr<Type> current_let_type_ = nullptr;
 };
 
 // Type check visitor

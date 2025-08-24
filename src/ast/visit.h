@@ -1,3 +1,4 @@
+// visit.h
 #pragma once
 
 #include <iostream>
@@ -120,6 +121,38 @@ class ExprVisitor {
     virtual std::shared_ptr<Symbol> visit(MatchExpr *node) = 0;
     virtual std::shared_ptr<Symbol> visit(PathExpr *node) = 0;
     virtual std::shared_ptr<Symbol> visit(BlockExpr *node) = 0;
+};
+
+// Type checking visitor (for type checking phase)
+class TypeExprVisitor {
+  public:
+    virtual ~TypeExprVisitor() = default;
+
+    // Expression visitors that return Type
+    virtual std::shared_ptr<Type> visit(LiteralExpr *node) = 0;
+    virtual std::shared_ptr<Type> visit(ArrayLiteralExpr *node) = 0;
+    virtual std::shared_ptr<Type> visit(ArrayInitializerExpr *node) = 0;
+    virtual std::shared_ptr<Type> visit(VariableExpr *node) = 0;
+    virtual std::shared_ptr<Type> visit(UnaryExpr *node) = 0;
+    virtual std::shared_ptr<Type> visit(BinaryExpr *node) = 0;
+    virtual std::shared_ptr<Type> visit(CallExpr *node) = 0;
+    virtual std::shared_ptr<Type> visit(IfExpr *node) = 0;
+    virtual std::shared_ptr<Type> visit(LoopExpr *node) = 0;
+    virtual std::shared_ptr<Type> visit(WhileExpr *node) = 0;
+    virtual std::shared_ptr<Type> visit(IndexExpr *node) = 0;
+    virtual std::shared_ptr<Type> visit(FieldAccessExpr *node) = 0;
+    virtual std::shared_ptr<Type> visit(AssignmentExpr *node) = 0;
+    virtual std::shared_ptr<Type> visit(CompoundAssignmentExpr *node) = 0;
+    virtual std::shared_ptr<Type> visit(ReferenceExpr *node) = 0;
+    virtual std::shared_ptr<Type> visit(UnderscoreExpr *node) = 0;
+    virtual std::shared_ptr<Type> visit(StructInitializerExpr *node) { return nullptr; }
+    virtual std::shared_ptr<Type> visit(UnitExpr *node) { return nullptr; }
+    virtual std::shared_ptr<Type> visit(GroupingExpr *node) { return nullptr; }
+    virtual std::shared_ptr<Type> visit(TupleExpr *node) { return nullptr; }
+    virtual std::shared_ptr<Type> visit(AsExpr *node) { return nullptr; }
+    virtual std::shared_ptr<Type> visit(MatchExpr *node) = 0;
+    virtual std::shared_ptr<Type> visit(PathExpr *node) = 0;
+    virtual std::shared_ptr<Type> visit(BlockExpr *node) = 0;
 };
 
 class StmtVisitor {

@@ -19,6 +19,8 @@ struct Expr : public Node {
     // Semantic analysis annotations
     std::shared_ptr<Type> type;
     std::shared_ptr<Symbol> resolved_symbol;
+
+    // For name resolution (returns Symbol)
     virtual std::shared_ptr<Symbol> accept(ExprVisitor *visitor) = 0;
 };
 
