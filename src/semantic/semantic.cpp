@@ -402,16 +402,22 @@ void NameResolutionVisitor::visit(StructDecl *node) {
 }
 
 void NameResolutionVisitor::visit(ConstDecl *node) {
-    node->type->accept(this);
+    auto const_type = type_resolver_.resolve(node->type.get());
+
+    if (!const_type) {
+        error_reporter_.report_error("Unknown type used in const declaration.", node->name.line,
+                                     node->name.column);
+        return;
+    }
+
     node->value->accept(this);
 
-    auto const_symbol = std::make_shared<Symbol>(node->name.lexeme, Symbol::CONSTANT);
+    auto const_symbol = std::make_shared<Symbol>(node->name.lexeme, Symbol::CONSTANT, const_type);
 
     if (!symbol_table_.define(node->name.lexeme, const_symbol)) {
         error_reporter_.report_error("Constant '" + node->name.lexeme + "' is already defined.",
                                      node->name.line);
     }
-
     node->resolved_symbol = const_symbol;
 }
 
@@ -868,9 +874,42 @@ void TypeResolver::visit(TupleTypeNode *node) {
 }
 
 void TypeResolver::visit(PathTypeNode *node) {
-    // For simple path types (like ct names), treat similar to TypeNameNode
-    // TODO:
-    resolved_type_ = nullptr;
+
+    if (auto *var_expr = dynamic_cast<VariableExpr *>(node->path.get())) {
+        const auto &name = var_expr->name.lexeme;
+
+        if (name == "i32" || name == "isize") {
+            resolved_type_ = std::make_shared<PrimitiveType>(TypeKind::INTEGER);
+        } else if (name == "u32" || name == "usize") {
+            resolved_type_ = std::make_shared<PrimitiveType>(TypeKind::UNSIGNED_INTEGER);
+        } else if (name == "bool") {
+            resolved_type_ = std::make_shared<PrimitiveType>(TypeKind::BOOL);
+        } else if (name == "char") {
+            resolved_type_ = std::make_shared<PrimitiveType>(TypeKind::CHAR);
+        } else if (name == "string") {
+            resolved_type_ = std::make_shared<PrimitiveType>(TypeKind::STRING);
+        } else {
+            auto symbol = symbol_table_.lookup(name);
+            if (symbol && symbol->kind == Symbol::TYPE) {
+                resolved_type_ = symbol->type;
+                node->resolved_symbol = symbol;
+            } else {
+                resolved_type_ = nullptr;
+            }
+        }
+    } else if (auto *path_expr = dynamic_cast<PathExpr *>(node->path.get())) {
+
+        auto symbol = path_expr->accept(&name_resolver_);
+        if (symbol && symbol->kind == Symbol::TYPE) {
+            resolved_type_ = symbol->type;
+            node->resolved_symbol = symbol;
+        } else {
+            resolved_type_ = nullptr;
+        }
+    }
+    else {
+        resolved_type_ = nullptr;
+    }
 }
 
 void TypeResolver::visit(RawPointerTypeNode *node) {

@@ -732,6 +732,7 @@ vector<Token> lexer_program(const Prog &program, ErrorReporter &error_reporter) 
         new_token.column = program.positions[i - 1].second;
         result.push_back(new_token);
     }
+   
     return result;
 }
 

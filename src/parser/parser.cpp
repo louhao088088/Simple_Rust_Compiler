@@ -1,6 +1,7 @@
 // parser.cpp
 #include "parser.h"
 
+#include <iostream>
 #include <memory>
 
 using std::string;
@@ -316,7 +317,6 @@ std::shared_ptr<Program> Parser::parse() {
         if (item) {
             program->items.push_back(item);
         }
-        // Continue parsing even if there are errors
     }
     return program;
 }

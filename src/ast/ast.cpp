@@ -706,4 +706,7 @@ void StructPattern::accept(PatternVisitor *visitor) { visitor->visit(this); }
 void RestPattern::accept(PatternVisitor *visitor) { visitor->visit(this); }
 
 // Other accept methods
-
+void EnumVariant::accept(OtherVisitor *visitor) { visitor->visit(this); }
+void MatchArm::accept(OtherVisitor *visitor) { visitor->visit(this); }
+void FnParam::accept(OtherVisitor *visitor) { visitor->visit(this); }
+void Program::accept(ProgramVisitor *visitor) { visitor->visit(this); }
