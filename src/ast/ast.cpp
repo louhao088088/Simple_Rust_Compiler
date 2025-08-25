@@ -628,44 +628,6 @@ void FieldInitializer::print(std::ostream &os, int indent) const {}
 void StructPatternField::print(std::ostream &os, int indent) const {}
 
 // Expression accept methods - use ExprVisitor
-std::shared_ptr<Symbol> LiteralExpr::accept(ExprVisitor *visitor) { return visitor->visit(this); }
-std::shared_ptr<Symbol> ArrayLiteralExpr::accept(ExprVisitor *visitor) {
-    return visitor->visit(this);
-}
-std::shared_ptr<Symbol> ArrayInitializerExpr::accept(ExprVisitor *visitor) {
-    return visitor->visit(this);
-}
-std::shared_ptr<Symbol> VariableExpr::accept(ExprVisitor *visitor) { return visitor->visit(this); }
-std::shared_ptr<Symbol> UnaryExpr::accept(ExprVisitor *visitor) { return visitor->visit(this); }
-std::shared_ptr<Symbol> BinaryExpr::accept(ExprVisitor *visitor) { return visitor->visit(this); }
-std::shared_ptr<Symbol> CallExpr::accept(ExprVisitor *visitor) { return visitor->visit(this); }
-std::shared_ptr<Symbol> IfExpr::accept(ExprVisitor *visitor) { return visitor->visit(this); }
-std::shared_ptr<Symbol> LoopExpr::accept(ExprVisitor *visitor) { return visitor->visit(this); }
-std::shared_ptr<Symbol> WhileExpr::accept(ExprVisitor *visitor) { return visitor->visit(this); }
-std::shared_ptr<Symbol> IndexExpr::accept(ExprVisitor *visitor) { return visitor->visit(this); }
-std::shared_ptr<Symbol> FieldAccessExpr::accept(ExprVisitor *visitor) {
-    return visitor->visit(this);
-}
-std::shared_ptr<Symbol> AssignmentExpr::accept(ExprVisitor *visitor) {
-    return visitor->visit(this);
-}
-std::shared_ptr<Symbol> CompoundAssignmentExpr::accept(ExprVisitor *visitor) {
-    return visitor->visit(this);
-}
-std::shared_ptr<Symbol> ReferenceExpr::accept(ExprVisitor *visitor) { return visitor->visit(this); }
-std::shared_ptr<Symbol> UnderscoreExpr::accept(ExprVisitor *visitor) {
-    return visitor->visit(this);
-}
-std::shared_ptr<Symbol> StructInitializerExpr::accept(ExprVisitor *visitor) {
-    return visitor->visit(this);
-}
-std::shared_ptr<Symbol> UnitExpr::accept(ExprVisitor *visitor) { return visitor->visit(this); }
-std::shared_ptr<Symbol> GroupingExpr::accept(ExprVisitor *visitor) { return visitor->visit(this); }
-std::shared_ptr<Symbol> TupleExpr::accept(ExprVisitor *visitor) { return visitor->visit(this); }
-std::shared_ptr<Symbol> AsExpr::accept(ExprVisitor *visitor) { return visitor->visit(this); }
-std::shared_ptr<Symbol> MatchExpr::accept(ExprVisitor *visitor) { return visitor->visit(this); }
-std::shared_ptr<Symbol> PathExpr::accept(ExprVisitor *visitor) { return visitor->visit(this); }
-std::shared_ptr<Symbol> BlockExpr::accept(ExprVisitor *visitor) { return visitor->visit(this); }
 
 // Statement accept methods
 void BlockStmt::accept(StmtVisitor *visitor) { visitor->visit(this); }
@@ -706,7 +668,3 @@ void StructPattern::accept(PatternVisitor *visitor) { visitor->visit(this); }
 void RestPattern::accept(PatternVisitor *visitor) { visitor->visit(this); }
 
 // Other accept methods
-void EnumVariant::accept(OtherVisitor *visitor) { visitor->visit(this); }
-void MatchArm::accept(OtherVisitor *visitor) { visitor->visit(this); }
-void FnParam::accept(OtherVisitor *visitor) { visitor->visit(this); }
-void Program::accept(ProgramVisitor *visitor) { visitor->visit(this); }

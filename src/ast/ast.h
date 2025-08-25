@@ -4,6 +4,9 @@
 #include "../lexer/lexer.h"
 #include "visit.h"
 
+#include <memory>
+#include <type_traits>
+
 // Forward declarations
 class Symbol;
 class Type;
@@ -20,8 +23,8 @@ struct Expr : public Node {
     std::shared_ptr<Type> type;
     std::shared_ptr<Symbol> resolved_symbol;
 
-    // For name resolution (returns Symbol)
-    virtual std::shared_ptr<Symbol> accept(ExprVisitor *visitor) = 0;
+    // Template accept method for different visitor return types
+    template <typename R> R accept(ExprVisitor<R> *visitor);
 };
 
 struct Stmt : public Node {
@@ -48,7 +51,6 @@ struct LiteralExpr : public Expr {
     Token literal;
     explicit LiteralExpr(Token lit) : literal(std::move(lit)) {}
     void print(std::ostream &os, int indent = 0) const override;
-    std::shared_ptr<Symbol> accept(ExprVisitor *visitor) override;
 };
 
 struct ArrayLiteralExpr : public Expr {
@@ -57,7 +59,6 @@ struct ArrayLiteralExpr : public Expr {
     ArrayLiteralExpr(std::vector<std::shared_ptr<Expr>> elems) : elements(std::move(elems)) {}
 
     void print(std::ostream &os, int indent = 0) const override;
-    std::shared_ptr<Symbol> accept(ExprVisitor *visitor) override;
 };
 
 struct ArrayInitializerExpr : public Expr {
@@ -68,14 +69,12 @@ struct ArrayInitializerExpr : public Expr {
         : value(std::move(val)), size(std::move(cnt)) {}
 
     void print(std::ostream &os, int indent = 0) const override;
-    std::shared_ptr<Symbol> accept(ExprVisitor *visitor) override;
 };
 
 struct VariableExpr : public Expr {
     Token name;
     explicit VariableExpr(Token name) : name(std::move(name)) {}
     void print(std::ostream &os, int indent = 0) const override;
-    std::shared_ptr<Symbol> accept(ExprVisitor *visitor) override;
 };
 
 struct UnaryExpr : public Expr {
@@ -83,7 +82,6 @@ struct UnaryExpr : public Expr {
     std::shared_ptr<Expr> right;
     UnaryExpr(Token op, std::shared_ptr<Expr> right) : op(std::move(op)), right(std::move(right)) {}
     void print(std::ostream &os, int indent = 0) const override;
-    std::shared_ptr<Symbol> accept(ExprVisitor *visitor) override;
 };
 
 struct BinaryExpr : public Expr {
@@ -93,7 +91,6 @@ struct BinaryExpr : public Expr {
     BinaryExpr(std::shared_ptr<Expr> left, Token op, std::shared_ptr<Expr> right)
         : left(std::move(left)), op(std::move(op)), right(std::move(right)) {}
     void print(std::ostream &os, int indent = 0) const override;
-    std::shared_ptr<Symbol> accept(ExprVisitor *visitor) override;
 };
 
 struct CallExpr : public Expr {
@@ -102,7 +99,6 @@ struct CallExpr : public Expr {
     CallExpr(std::shared_ptr<Expr> callee, std::vector<std::shared_ptr<Expr>> args)
         : callee(std::move(callee)), arguments(std::move(args)) {}
     void print(std::ostream &os, int indent = 0) const override;
-    std::shared_ptr<Symbol> accept(ExprVisitor *visitor) override;
 };
 
 struct IfExpr : public Expr {
@@ -114,14 +110,12 @@ struct IfExpr : public Expr {
         : condition(std::move(cond)), then_branch(std::move(then_b)),
           else_branch(std::move(else_b)) {}
     void print(std::ostream &os, int indent = 0) const override;
-    std::shared_ptr<Symbol> accept(ExprVisitor *visitor) override;
 };
 
 struct LoopExpr : public Expr {
     std::shared_ptr<Stmt> body;
     LoopExpr(std::shared_ptr<Stmt> body) : body(std::move(body)) {}
     void print(std::ostream &os, int indent = 0) const override;
-    std::shared_ptr<Symbol> accept(ExprVisitor *visitor) override;
 };
 
 struct WhileExpr : public Expr {
@@ -130,7 +124,6 @@ struct WhileExpr : public Expr {
     WhileExpr(std::shared_ptr<Expr> cond, std::shared_ptr<Stmt> body)
         : condition(std::move(cond)), body(std::move(body)) {}
     void print(std::ostream &os, int indent = 0) const override;
-    std::shared_ptr<Symbol> accept(ExprVisitor *visitor) override;
 };
 
 struct IndexExpr : public Expr {
@@ -141,7 +134,6 @@ struct IndexExpr : public Expr {
         : object(std::move(obj)), index(std::move(idx)) {}
 
     void print(std::ostream &os, int indent = 0) const override;
-    std::shared_ptr<Symbol> accept(ExprVisitor *visitor) override;
 };
 
 struct FieldAccessExpr : public Expr {
@@ -152,7 +144,6 @@ struct FieldAccessExpr : public Expr {
         : object(std::move(obj)), field(std::move(fld)) {}
 
     void print(std::ostream &os, int indent = 0) const override;
-    std::shared_ptr<Symbol> accept(ExprVisitor *visitor) override;
 };
 
 struct AssignmentExpr : public Expr {
@@ -161,7 +152,6 @@ struct AssignmentExpr : public Expr {
     AssignmentExpr(std::shared_ptr<Expr> t, std::shared_ptr<Expr> v)
         : target(std::move(t)), value(std::move(v)) {}
     void print(std::ostream &os, int indent = 0) const override;
-    std::shared_ptr<Symbol> accept(ExprVisitor *visitor) override;
 };
 
 struct CompoundAssignmentExpr : public Expr {
@@ -171,7 +161,6 @@ struct CompoundAssignmentExpr : public Expr {
     CompoundAssignmentExpr(std::shared_ptr<Expr> t, Token o, std::shared_ptr<Expr> v)
         : target(std::move(t)), op(std::move(o)), value(std::move(v)) {}
     void print(std::ostream &os, int indent = 0) const override;
-    std::shared_ptr<Symbol> accept(ExprVisitor *visitor) override;
 };
 
 struct FieldInitializer : public Node {
@@ -180,7 +169,6 @@ struct FieldInitializer : public Node {
 
     FieldInitializer(Token n, std::shared_ptr<Expr> v) : name(std::move(n)), value(std::move(v)) {}
     void print(std::ostream &os, int indent = 0) const override;
-    void accept(OtherVisitor *visitor);
 };
 
 struct StructInitializerExpr : public Expr {
@@ -189,26 +177,22 @@ struct StructInitializerExpr : public Expr {
     StructInitializerExpr(std::shared_ptr<Expr> n, std::vector<std::shared_ptr<FieldInitializer>> f)
         : name(std::move(n)), fields(std::move(f)) {}
     void print(std::ostream &os, int indent = 0) const override;
-    std::shared_ptr<Symbol> accept(ExprVisitor *visitor) override;
 };
 
 struct UnitExpr : public Expr {
     void print(std::ostream &os, int indent = 0) const override;
-    std::shared_ptr<Symbol> accept(ExprVisitor *visitor) override;
 };
 
 struct GroupingExpr : public Expr {
     std::shared_ptr<Expr> expression;
     explicit GroupingExpr(std::shared_ptr<Expr> expr) : expression(std::move(expr)) {}
     void print(std::ostream &os, int indent = 0) const override;
-    std::shared_ptr<Symbol> accept(ExprVisitor *visitor) override;
 };
 
 struct TupleExpr : public Expr {
     std::vector<std::shared_ptr<Expr>> elements;
     explicit TupleExpr(std::vector<std::shared_ptr<Expr>> elems) : elements(std::move(elems)) {}
     void print(std::ostream &os, int indent = 0) const override;
-    std::shared_ptr<Symbol> accept(ExprVisitor *visitor) override;
 };
 
 struct AsExpr : public Expr {
@@ -217,7 +201,6 @@ struct AsExpr : public Expr {
     AsExpr(std::shared_ptr<Expr> expr, std::shared_ptr<TypeNode> type)
         : expression(std::move(expr)), target_type(std::move(type)) {}
     void print(std::ostream &os, int indent = 0) const override;
-    std::shared_ptr<Symbol> accept(ExprVisitor *visitor) override;
 };
 
 struct MatchArm;
@@ -229,14 +212,12 @@ struct MatchExpr : public Expr {
         : scrutinee(std::move(scrut)), arms(std::move(arms_vec)) {}
 
     void print(std::ostream &os, int indent = 0) const override;
-    std::shared_ptr<Symbol> accept(ExprVisitor *visitor) override;
 };
 
 struct UnderscoreExpr : public Expr {
     Token underscore_token;
     explicit UnderscoreExpr(Token token) : underscore_token(std::move(token)) {}
     void print(std::ostream &os, int indent = 0) const override;
-    std::shared_ptr<Symbol> accept(ExprVisitor *visitor) override;
 };
 
 struct PathExpr : public Expr {
@@ -248,7 +229,6 @@ struct PathExpr : public Expr {
         : left(std::move(l)), op(std::move(o)), right(std::move(r)) {}
 
     void print(std::ostream &os, int indent = 0) const override;
-    std::shared_ptr<Symbol> accept(ExprVisitor *visitor) override;
 };
 
 struct ReferenceExpr : public Expr {
@@ -259,14 +239,12 @@ struct ReferenceExpr : public Expr {
         : is_mutable(is_mut), expression(std::move(expr)) {}
 
     void print(std::ostream &os, int indent = 0) const override;
-    std::shared_ptr<Symbol> accept(ExprVisitor *visitor) override;
 };
 
 struct BlockExpr : public Expr {
     std::shared_ptr<BlockStmt> block_stmt;
     explicit BlockExpr(std::shared_ptr<BlockStmt> stmt) : block_stmt(std::move(stmt)) {}
     void print(std::ostream &os, int indent = 0) const override;
-    std::shared_ptr<Symbol> accept(ExprVisitor *visitor) override;
 };
 
 // Statements
@@ -407,7 +385,6 @@ struct FnParam : public Node {
     FnParam(std::shared_ptr<Pattern> p, std::shared_ptr<TypeNode> t)
         : pattern(std::move(p)), type(std::move(t)) {}
     void print(std::ostream &os, int indent = 0) const override;
-    void accept(OtherVisitor *visitor);
 };
 
 struct FnDecl : public Item {
@@ -432,7 +409,6 @@ struct Field : public Node {
     std::shared_ptr<TypeNode> type;
     Field(Token n, std::shared_ptr<TypeNode> t) : name(std::move(n)), type(std::move(t)) {}
     void print(std::ostream &os, int indent = 0) const override;
-    void accept(OtherVisitor *visitor);
 };
 
 enum class StructKind { Normal, Tuple, Unit };
@@ -488,7 +464,6 @@ struct EnumVariant : public Node {
         : name(std::move(n)), kind(EnumVariantKind::Struct), fields(std::move(f)) {}
 
     void print(std::ostream &os, int indent = 0) const override;
-    void accept(OtherVisitor *visitor);
 };
 
 struct EnumDecl : public Item {
@@ -580,7 +555,6 @@ struct MatchArm : public Node {
         : pattern(std::move(pat)), guard(std::move(grd)), body(std::move(bdy)) {}
 
     void print(std::ostream &os, int indent = 0) const override;
-    void accept(OtherVisitor *visitor);
 };
 
 struct StructPatternField : public Node {
@@ -589,7 +563,6 @@ struct StructPatternField : public Node {
     StructPatternField(Token name, std::optional<std::shared_ptr<Pattern>> pat = std::nullopt)
         : field_name(std::move(name)), pattern(std::move(pat)) {}
     void print(std::ostream &os, int indent = 0) const override;
-    void accept(OtherVisitor *visitor);
 };
 
 struct StructPattern : public Pattern {
@@ -623,5 +596,86 @@ struct SlicePattern : public Pattern {
 struct Program : public Node {
     std::vector<std::shared_ptr<Item>> items;
     void print(std::ostream &os, int indent = 0) const override;
-    void accept(ProgramVisitor *visitor);
 };
+
+// ================= Template implementation of Expr::accept =================
+// 合并自 ast_impl.h，inline保证多重包含无链接冲突
+template <typename R> inline R Expr::accept(ExprVisitor<R> *visitor) {
+    if (auto lit = dynamic_cast<LiteralExpr *>(this)) {
+        return visitor->visit(lit);
+    }
+    if (auto arr = dynamic_cast<ArrayLiteralExpr *>(this)) {
+        return visitor->visit(arr);
+    }
+    if (auto arr_init = dynamic_cast<ArrayInitializerExpr *>(this)) {
+        return visitor->visit(arr_init);
+    }
+    if (auto var = dynamic_cast<VariableExpr *>(this)) {
+        return visitor->visit(var);
+    }
+    if (auto unary = dynamic_cast<UnaryExpr *>(this)) {
+        return visitor->visit(unary);
+    }
+    if (auto binary = dynamic_cast<BinaryExpr *>(this)) {
+        return visitor->visit(binary);
+    }
+    if (auto call = dynamic_cast<CallExpr *>(this)) {
+        return visitor->visit(call);
+    }
+    if (auto if_expr = dynamic_cast<IfExpr *>(this)) {
+        return visitor->visit(if_expr);
+    }
+    if (auto loop = dynamic_cast<LoopExpr *>(this)) {
+        return visitor->visit(loop);
+    }
+    if (auto while_expr = dynamic_cast<WhileExpr *>(this)) {
+        return visitor->visit(while_expr);
+    }
+    if (auto index = dynamic_cast<IndexExpr *>(this)) {
+        return visitor->visit(index);
+    }
+    if (auto field = dynamic_cast<FieldAccessExpr *>(this)) {
+        return visitor->visit(field);
+    }
+    if (auto assign = dynamic_cast<AssignmentExpr *>(this)) {
+        return visitor->visit(assign);
+    }
+    if (auto comp_assign = dynamic_cast<CompoundAssignmentExpr *>(this)) {
+        return visitor->visit(comp_assign);
+    }
+    if (auto ref = dynamic_cast<ReferenceExpr *>(this)) {
+        return visitor->visit(ref);
+    }
+    if (auto underscore = dynamic_cast<UnderscoreExpr *>(this)) {
+        return visitor->visit(underscore);
+    }
+    if (auto struct_init = dynamic_cast<StructInitializerExpr *>(this)) {
+        return visitor->visit(struct_init);
+    }
+    if (auto unit = dynamic_cast<UnitExpr *>(this)) {
+        return visitor->visit(unit);
+    }
+    if (auto group = dynamic_cast<GroupingExpr *>(this)) {
+        return visitor->visit(group);
+    }
+    if (auto tuple = dynamic_cast<TupleExpr *>(this)) {
+        return visitor->visit(tuple);
+    }
+    if (auto as_expr = dynamic_cast<AsExpr *>(this)) {
+        return visitor->visit(as_expr);
+    }
+    if (auto match = dynamic_cast<MatchExpr *>(this)) {
+        return visitor->visit(match);
+    }
+    if (auto path = dynamic_cast<PathExpr *>(this)) {
+        return visitor->visit(path);
+    }
+    if (auto block = dynamic_cast<BlockExpr *>(this)) {
+        return visitor->visit(block);
+    }
+    if constexpr (std::is_void_v<R>) {
+        return;
+    } else {
+        return R{};
+    }
+}

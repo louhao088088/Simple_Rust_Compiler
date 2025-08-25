@@ -15,6 +15,7 @@ add_executable(code
     src/ast/ast.cpp
     src/parser/parser.cpp
     src/semantic/semantic.cpp
+    src/tool/number.cpp
     src/error/error.cpp
     src/main.cpp
 )

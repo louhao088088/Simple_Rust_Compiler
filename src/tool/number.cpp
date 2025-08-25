@@ -1,6 +1,6 @@
 #include "number.h"
 
-Number number_of_tokens(string token) {
+Number number_of_tokens(string token, ErrorReporter &error_reporter) {
     long long num = -1;
     if (token.length() > 2 && token[0] == '0' && token[1] == 'x') {
         for (size_t i = 2; i < token.length(); i++) {
@@ -15,20 +15,20 @@ Number number_of_tokens(string token) {
                       token[i + 3] == 'z' && token[i + 4] == 'e'))) {
                     if (token[i] == 'i') {
                         if (num > 2147483647) {
-                            puts("Integer overflow");
+                            error_reporter.report_error("Integer overflow");
                             return {-1, false};
                         }
                         return {num, false};
                     } else if (token[i] == 'u') {
                         if (num > 4294967295) {
-                            puts("Unsigned integer overflow");
+                            error_reporter.report_error("Unsigned integer overflow");
                             return {-1, false};
                         }
                         return {num, true};
                     }
 
                 } else {
-                    puts("Invalid number format");
+                    error_reporter.report_error("Invalid number format");
                     return {-1, false};
                 }
             }
@@ -53,20 +53,20 @@ Number number_of_tokens(string token) {
                       token[i + 3] == 'z' && token[i + 4] == 'e'))) {
                     if (token[i] == 'i') {
                         if (num > 2147483647) {
-                            puts("Integer overflow");
+                            error_reporter.report_error("Integer overflow");
                             return {-1, false};
                         }
                         return {num, false};
                     } else if (token[i] == 'u') {
                         if (num > 4294967295) {
-                            puts("Unsigned integer overflow");
+                            error_reporter.report_error("Unsigned integer overflow");
                             return {-1, false};
                         }
                         return {num, true};
                     }
 
                 } else {
-                    puts("Invalid number format");
+                    error_reporter.report_error("Invalid number format");
                     return {-1, false};
                 }
             }
@@ -87,20 +87,20 @@ Number number_of_tokens(string token) {
                       token[i + 3] == 'z' && token[i + 4] == 'e'))) {
                     if (token[i] == 'i') {
                         if (num > 2147483647) {
-                            puts("Integer overflow");
+                            error_reporter.report_error("Integer overflow");
                             return {-1, false};
                         }
                         return {num, false};
                     } else if (token[i] == 'u') {
                         if (num > 4294967295) {
-                            puts("Unsigned integer overflow");
+                            error_reporter.report_error("Unsigned integer overflow");
                             return {-1, false};
                         }
                         return {num, true};
                     }
 
                 } else {
-                    puts("Invalid number format");
+                    error_reporter.report_error("Invalid number format");
                     return {-1, false};
                 }
             }
@@ -111,7 +111,7 @@ Number number_of_tokens(string token) {
 
     } else {
         if (token[0] == '_') {
-            puts("Invalid number format");
+            error_reporter.report_error("Invalid number format");
             return {-1, false};
         }
         for (size_t i = 0; i < token.length(); i++) {
@@ -125,20 +125,20 @@ Number number_of_tokens(string token) {
                       token[i + 3] == 'z' && token[i + 4] == 'e'))) {
                     if (token[i] == 'i') {
                         if (num > 2147483647) {
-                            puts("Integer overflow");
+                            error_reporter.report_error("Integer overflow");
                             return {-1, false};
                         }
                         return {num, false};
                     } else if (token[i] == 'u') {
                         if (num > 4294967295) {
-                            puts("Unsigned integer overflow");
+                            error_reporter.report_error("Unsigned integer overflow");
                             return {-1, false};
                         }
                         return {num, true};
                     }
 
                 } else {
-                    puts("Invalid number format");
+                    error_reporter.report_error("Invalid number format");
                     return {-1, false};
                 }
             }
@@ -149,7 +149,7 @@ Number number_of_tokens(string token) {
     }
 
     if (num < 0) {
-        puts("Invalid number format");
+        error_reporter.report_error("Invalid number format");
         return {-1, false};
     }
     return {num, true};

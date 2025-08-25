@@ -1,4 +1,3 @@
-// visit.h
 #pragma once
 
 #include <iostream>
@@ -92,119 +91,88 @@ struct Field;
 struct FieldInitializer;
 struct StructPatternField;
 
-class ExprVisitor {
+// Template-based expression visitor for different return types
+template <typename R> class ExprVisitor {
   public:
     virtual ~ExprVisitor() = default;
 
-    // Expression visitors
-    virtual std::shared_ptr<Symbol> visit(LiteralExpr *node) = 0;
-    virtual std::shared_ptr<Symbol> visit(ArrayLiteralExpr *node) = 0;
-    virtual std::shared_ptr<Symbol> visit(ArrayInitializerExpr *node) = 0;
-    virtual std::shared_ptr<Symbol> visit(VariableExpr *node) = 0;
-    virtual std::shared_ptr<Symbol> visit(UnaryExpr *node) = 0;
-    virtual std::shared_ptr<Symbol> visit(BinaryExpr *node) = 0;
-    virtual std::shared_ptr<Symbol> visit(CallExpr *node) = 0;
-    virtual std::shared_ptr<Symbol> visit(IfExpr *node) = 0;
-    virtual std::shared_ptr<Symbol> visit(LoopExpr *node) = 0;
-    virtual std::shared_ptr<Symbol> visit(WhileExpr *node) = 0;
-    virtual std::shared_ptr<Symbol> visit(IndexExpr *node) = 0;
-    virtual std::shared_ptr<Symbol> visit(FieldAccessExpr *node) = 0;
-    virtual std::shared_ptr<Symbol> visit(AssignmentExpr *node) = 0;
-    virtual std::shared_ptr<Symbol> visit(CompoundAssignmentExpr *node) = 0;
-    virtual std::shared_ptr<Symbol> visit(ReferenceExpr *node) = 0;
-    virtual std::shared_ptr<Symbol> visit(UnderscoreExpr *node) = 0;
-    virtual std::shared_ptr<Symbol> visit(StructInitializerExpr *node) { return nullptr; }
-    virtual std::shared_ptr<Symbol> visit(UnitExpr *node) { return nullptr; }
-    virtual std::shared_ptr<Symbol> visit(GroupingExpr *node) { return nullptr; }
-    virtual std::shared_ptr<Symbol> visit(TupleExpr *node) { return nullptr; }
-    virtual std::shared_ptr<Symbol> visit(AsExpr *node) { return nullptr; }
-    virtual std::shared_ptr<Symbol> visit(MatchExpr *node) = 0;
-    virtual std::shared_ptr<Symbol> visit(PathExpr *node) = 0;
-    virtual std::shared_ptr<Symbol> visit(BlockExpr *node) = 0;
+    // Expression visitors with template return type R
+    virtual R visit(LiteralExpr *node) = 0;
+    virtual R visit(ArrayLiteralExpr *node) = 0;
+    virtual R visit(ArrayInitializerExpr *node) = 0;
+    virtual R visit(VariableExpr *node) = 0;
+    virtual R visit(UnaryExpr *node) = 0;
+    virtual R visit(BinaryExpr *node) = 0;
+    virtual R visit(CallExpr *node) = 0;
+    virtual R visit(IfExpr *node) = 0;
+    virtual R visit(LoopExpr *node) = 0;
+    virtual R visit(WhileExpr *node) = 0;
+    virtual R visit(IndexExpr *node) = 0;
+    virtual R visit(FieldAccessExpr *node) = 0;
+    virtual R visit(AssignmentExpr *node) = 0;
+    virtual R visit(CompoundAssignmentExpr *node) = 0;
+    virtual R visit(ReferenceExpr *node) = 0;
+    virtual R visit(UnderscoreExpr *node) = 0;
+    virtual R visit(StructInitializerExpr *node) = 0;
+    virtual R visit(UnitExpr *node) = 0;
+    virtual R visit(GroupingExpr *node) = 0;
+    virtual R visit(TupleExpr *node) = 0;
+    virtual R visit(AsExpr *node) = 0;
+    virtual R visit(MatchExpr *node) = 0;
+    virtual R visit(PathExpr *node) = 0;
+    virtual R visit(BlockExpr *node) = 0;
 };
 
-// Type checking visitor (for type checking phase)
-class TypeExprVisitor {
-  public:
-    virtual ~TypeExprVisitor() = default;
-
-    // Expression visitors that return Type
-    virtual std::shared_ptr<Type> visit(LiteralExpr *node) = 0;
-    virtual std::shared_ptr<Type> visit(ArrayLiteralExpr *node) = 0;
-    virtual std::shared_ptr<Type> visit(ArrayInitializerExpr *node) = 0;
-    virtual std::shared_ptr<Type> visit(VariableExpr *node) = 0;
-    virtual std::shared_ptr<Type> visit(UnaryExpr *node) = 0;
-    virtual std::shared_ptr<Type> visit(BinaryExpr *node) = 0;
-    virtual std::shared_ptr<Type> visit(CallExpr *node) = 0;
-    virtual std::shared_ptr<Type> visit(IfExpr *node) = 0;
-    virtual std::shared_ptr<Type> visit(LoopExpr *node) = 0;
-    virtual std::shared_ptr<Type> visit(WhileExpr *node) = 0;
-    virtual std::shared_ptr<Type> visit(IndexExpr *node) = 0;
-    virtual std::shared_ptr<Type> visit(FieldAccessExpr *node) = 0;
-    virtual std::shared_ptr<Type> visit(AssignmentExpr *node) = 0;
-    virtual std::shared_ptr<Type> visit(CompoundAssignmentExpr *node) = 0;
-    virtual std::shared_ptr<Type> visit(ReferenceExpr *node) = 0;
-    virtual std::shared_ptr<Type> visit(UnderscoreExpr *node) = 0;
-    virtual std::shared_ptr<Type> visit(StructInitializerExpr *node) { return nullptr; }
-    virtual std::shared_ptr<Type> visit(UnitExpr *node) { return nullptr; }
-    virtual std::shared_ptr<Type> visit(GroupingExpr *node) { return nullptr; }
-    virtual std::shared_ptr<Type> visit(TupleExpr *node) { return nullptr; }
-    virtual std::shared_ptr<Type> visit(AsExpr *node) { return nullptr; }
-    virtual std::shared_ptr<Type> visit(MatchExpr *node) = 0;
-    virtual std::shared_ptr<Type> visit(PathExpr *node) = 0;
-    virtual std::shared_ptr<Type> visit(BlockExpr *node) = 0;
-};
+// Type aliases for common visitor types
+using NameResolutionVisitor_t = ExprVisitor<std::shared_ptr<Symbol>>;
+using TypeCheckVisitor_t = ExprVisitor<std::shared_ptr<Type>>;
+using ConstEvaluator_t = ExprVisitor<std::optional<long long>>;
 
 class StmtVisitor {
   public:
     virtual ~StmtVisitor() = default;
 
-    // Statement visitors
     virtual void visit(BlockStmt *node) = 0;
     virtual void visit(ExprStmt *node) = 0;
     virtual void visit(LetStmt *node) = 0;
     virtual void visit(ReturnStmt *node) = 0;
     virtual void visit(BreakStmt *node) = 0;
     virtual void visit(ContinueStmt *node) = 0;
-    virtual void visit(ItemStmt *node) {}
+    virtual void visit(ItemStmt *node) = 0;
 };
 
 class ItemVisitor {
   public:
     virtual ~ItemVisitor() = default;
 
-    // Item visitors
     virtual void visit(FnDecl *node) = 0;
-    virtual void visit(StructDecl *node) {}
-    virtual void visit(ConstDecl *node) {}
-    virtual void visit(EnumDecl *node) {}
-    virtual void visit(EnumVariant *node) {}
-    virtual void visit(ModDecl *node) {}
-    virtual void visit(TraitDecl *node) {}
-    virtual void visit(ImplBlock *node) {}
+    virtual void visit(StructDecl *node) = 0;
+    virtual void visit(ConstDecl *node) = 0;
+    virtual void visit(EnumDecl *node) = 0;
+    virtual void visit(ModDecl *node) = 0;
+    virtual void visit(TraitDecl *node) = 0;
+    virtual void visit(ImplBlock *node) = 0;
 };
 
 class TypeVisitor {
   public:
     virtual ~TypeVisitor() = default;
 
-    // Type node visitors
     virtual void visit(TypeNameNode *node) = 0;
     virtual void visit(ArrayTypeNode *node) = 0;
     virtual void visit(UnitTypeNode *node) = 0;
     virtual void visit(TupleTypeNode *node) = 0;
-    virtual void visit(PathTypeNode *node) {}
-    virtual void visit(RawPointerTypeNode *node) {}
-    virtual void visit(ReferenceTypeNode *node) {}
-    virtual void visit(SliceTypeNode *node) {}
-    virtual void visit(SelfTypeNode *node) {}
+    virtual void visit(PathTypeNode *node) = 0;
+    virtual void visit(RawPointerTypeNode *node) = 0;
+    virtual void visit(ReferenceTypeNode *node) = 0;
+    virtual void visit(SliceTypeNode *node) = 0;
+    virtual void visit(SelfTypeNode *node) = 0;
 };
 
 class PatternVisitor {
   public:
     virtual ~PatternVisitor() = default;
 
-    // Pattern visitors
     virtual void visit(IdentifierPattern *node) = 0;
     virtual void visit(WildcardPattern *node) = 0;
     virtual void visit(LiteralPattern *node) = 0;
@@ -212,24 +180,4 @@ class PatternVisitor {
     virtual void visit(SlicePattern *node) = 0;
     virtual void visit(StructPattern *node) = 0;
     virtual void visit(RestPattern *node) = 0;
-};
-
-class OtherVisitor {
-  public:
-    virtual ~OtherVisitor() = default;
-
-    // Other node visitors
-    virtual void visit(FnParam *node){};
-    virtual void visit(MatchArm *node){};
-    virtual void visit(Field *node){};
-    virtual void visit(FieldInitializer *node){};
-    virtual void visit(StructPatternField *node){};
-    virtual void visit(EnumVariant *node){};
-};
-
-class ProgramVisitor {
-  public:
-    virtual ~ProgramVisitor() = default;
-
-    virtual void visit(Program *node) = 0;
 };

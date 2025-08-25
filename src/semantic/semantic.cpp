@@ -2,6 +2,8 @@
 
 #include "semantic.h"
 
+#include "../tool/number.h"
+
 // SymbolTable implementation
 void SymbolTable::enter_scope() { scopes_.emplace_back(); }
 
@@ -200,16 +202,13 @@ void NameResolutionVisitor::visit(FnDecl *node) {
     if (node->body) {
         symbol_table_.enter_scope();
         for (const auto &param : node->params) {
-            param->accept(this);
+            // Handle FnParam manually since it's not an Expr
+            param->pattern->accept(this);
+            if (param->type)
+                param->type->accept(this);
         }
         (*node->body)->accept(this);
         symbol_table_.exit_scope();
-    }
-}
-
-void NameResolutionVisitor::visit(Program *node) {
-    for (auto &item : node->items) {
-        item->accept(this);
     }
 }
 
@@ -277,7 +276,11 @@ std::shared_ptr<Symbol> NameResolutionVisitor::visit(AsExpr *node) {
 std::shared_ptr<Symbol> NameResolutionVisitor::visit(MatchExpr *node) {
     node->scrutinee->accept(this);
     for (auto &arm : node->arms) {
-        arm->accept(this);
+        // Visit components of MatchArm manually since it's not an Expr
+        arm->pattern->accept(this);
+        if (arm->guard)
+            (*arm->guard)->accept(this);
+        arm->body->accept(this);
     }
     return nullptr;
 }
@@ -398,6 +401,21 @@ void NameResolutionVisitor::visit(StructDecl *node) {
     case StructKind::Unit: {
         break;
     }
+
+    case StructKind::Tuple: {
+        // Handle tuple struct fields
+        for (const auto &field_node : node->fields) {
+            std::shared_ptr<Type> field_type = type_resolver_.resolve(field_node->type.get());
+            if (!field_type) {
+                error_reporter_.report_error("Unknown type for tuple field.",
+                                             field_node->name.line);
+                continue;
+            }
+            // For tuple structs, fields are indexed numerically
+            struct_type->fields[std::to_string(struct_type->fields.size())] = field_type;
+        }
+        break;
+    }
     }
 }
 
@@ -476,16 +494,6 @@ void NameResolutionVisitor::visit(ImplBlock *node) {
     }
 
     symbol_table_.exit_scope();
-}
-
-// Missing other visitors for NameResolutionVisitor
-void NameResolutionVisitor::visit(EnumVariant *node) {}
-
-void NameResolutionVisitor::visit(MatchArm *node) {
-    node->pattern->accept(this);
-    if (node->guard)
-        (*node->guard)->accept(this);
-    node->body->accept(this);
 }
 
 // TypeCheckVisitor implementation
@@ -664,12 +672,6 @@ void TypeCheckVisitor::visit(FnDecl *node) {
     }
 }
 
-void TypeCheckVisitor::visit(Program *node) {
-    for (auto &item : node->items) {
-        item->accept(this);
-    }
-}
-
 // Pattern visitors for TypeCheckVisitor (simplified implementations)
 void TypeCheckVisitor::visit(IdentifierPattern *node) {
     // Pattern type checking would go here
@@ -737,7 +739,11 @@ std::shared_ptr<Symbol> TypeCheckVisitor::visit(AsExpr *node) {
 std::shared_ptr<Symbol> TypeCheckVisitor::visit(MatchExpr *node) {
     node->scrutinee->accept(this);
     for (auto &arm : node->arms) {
-        arm->accept(this);
+        // Visit components of MatchArm manually since it's not an Expr
+        arm->pattern->accept(this);
+        if (arm->guard)
+            (*arm->guard)->accept(this);
+        arm->body->accept(this);
     }
     return nullptr; // TODO: Implement proper type checking
 }
@@ -781,7 +787,9 @@ void TypeCheckVisitor::visit(ConstDecl *node) {
 
 void TypeCheckVisitor::visit(EnumDecl *node) {
     for (auto &variant : node->variants) {
-        variant->accept(this);
+        // EnumVariant doesn't have accept method, handle manually if needed
+        // variant->name is just an identifier
+        // variant->fields would need type checking if present
     }
 }
 
@@ -804,16 +812,6 @@ void TypeCheckVisitor::visit(ImplBlock *node) {
     for (auto &item : node->implemented_items) {
         item->accept(this);
     }
-}
-
-// Missing other visitors for TypeCheckVisitor
-void TypeCheckVisitor::visit(EnumVariant *node) {}
-
-void TypeCheckVisitor::visit(MatchArm *node) {
-    node->pattern->accept(this);
-    if (node->guard)
-        (*node->guard)->accept(this);
-    node->body->accept(this);
 }
 
 // TypeResolver Implementation
@@ -906,8 +904,7 @@ void TypeResolver::visit(PathTypeNode *node) {
         } else {
             resolved_type_ = nullptr;
         }
-    }
-    else {
+    } else {
         resolved_type_ = nullptr;
     }
 }
@@ -930,4 +927,63 @@ void TypeResolver::visit(SliceTypeNode *node) {
 void TypeResolver::visit(SelfTypeNode *node) {
     // Placeholder for Self type
     resolved_type_ = nullptr;
+}
+
+std::optional<long long> ConstEvaluator::visit(LiteralExpr *node) {
+    if (node->literal.type == TokenType::NUMBER) {
+
+        return number_of_tokens(node->literal.lexeme, error_reporter_).value;
+    }
+    return std::nullopt;
+}
+
+// 处理对 const 变量的引用
+std::optional<long long> ConstEvaluator::visit(VariableExpr *node) {
+    auto symbol = symbol_table_.lookup(node->name.lexeme);
+    if (symbol && symbol->kind == Symbol::CONSTANT) {
+        // 如果找到的符号是一个 const，就递归地对它的值表达式求值
+        // 假设 ConstDecl 存储了它的值表达式
+        // auto const_decl_node = /* ... 需要一种方法从符号找到其声明节点 ... */;
+
+        error_reporter_.report_error("Constant evaluation of variables is not yet supported.",
+                                     node->name.line);
+    }
+    return std::nullopt;
+}
+
+std::optional<long long> ConstEvaluator::visit(BinaryExpr *node) {
+    auto left_val = evaluate(node->left.get());
+    auto right_val = evaluate(node->right.get());
+
+    if (left_val && right_val) {
+        switch (node->op.type) {
+        case TokenType::PLUS:
+            return *left_val + *right_val;
+        case TokenType::MINUS:
+            return *left_val - *right_val;
+        case TokenType::STAR:
+            return *left_val * *right_val;
+        case TokenType::SLASH:
+            return *left_val / *right_val;
+        default:
+            return std::nullopt;
+        }
+    }
+    return std::nullopt;
+}
+
+std::optional<long long> ConstEvaluator::visit(UnaryExpr *node) {
+    auto operand_val = evaluate(node->right.get());
+    
+    if (operand_val) {
+        switch (node->op.type) {
+        case TokenType::MINUS:
+            return -*operand_val;
+        case TokenType::PLUS:
+            return *operand_val;
+        default:
+            return std::nullopt;
+        }
+    }
+    return std::nullopt;
 }

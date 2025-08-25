@@ -37,7 +37,9 @@ int main() {
 
         // Name resolution pass
         NameResolutionVisitor name_resolver(error_reporter);
-        ast->accept(&name_resolver);
+        for (auto &item : ast->items) {
+            item->accept(&name_resolver);
+        }
 
         if (error_reporter.has_errors()) {
             std::cout << "Name resolution completed with errors." << std::endl;
@@ -46,7 +48,9 @@ int main() {
 
             // Type checking pass
             TypeCheckVisitor type_checker(error_reporter);
-            ast->accept(&type_checker);
+            for (auto &item : ast->items) {
+                item->accept(&type_checker);
+            }
 
             if (error_reporter.has_errors()) {
                 std::cout << "Type checking completed with errors." << std::endl;

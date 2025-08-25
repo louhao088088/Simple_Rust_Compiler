@@ -169,13 +169,11 @@ class SymbolTable {
 };
 
 // Name resolution visitor - specialized for returning Symbol
-class NameResolutionVisitor : public ExprVisitor,
+class NameResolutionVisitor : public ExprVisitor<std::shared_ptr<Symbol>>,
                               public StmtVisitor,
                               public ItemVisitor,
                               public TypeVisitor,
-                              public PatternVisitor,
-                              public OtherVisitor,
-                              public ProgramVisitor {
+                              public PatternVisitor {
   public:
     NameResolutionVisitor(ErrorReporter &error_reporter);
 
@@ -243,12 +241,6 @@ class NameResolutionVisitor : public ExprVisitor,
     void visit(StructPattern *node) override;
     void visit(RestPattern *node) override;
 
-    // Other visitors
-    void visit(EnumVariant *node) override;
-    void visit(MatchArm *node) override;
-
-    void visit(Program *node) override;
-
   private:
     SymbolTable symbol_table_;
     ErrorReporter &error_reporter_;
@@ -257,13 +249,11 @@ class NameResolutionVisitor : public ExprVisitor,
 };
 
 // Type check visitor
-class TypeCheckVisitor : public ExprVisitor,
+class TypeCheckVisitor : public ExprVisitor<std::shared_ptr<Symbol>>,
                          public StmtVisitor,
                          public ItemVisitor,
                          public TypeVisitor,
-                         public PatternVisitor,
-                         public OtherVisitor,
-                         public ProgramVisitor {
+                         public PatternVisitor {
   public:
     TypeCheckVisitor(ErrorReporter &error_reporter);
 
@@ -331,13 +321,52 @@ class TypeCheckVisitor : public ExprVisitor,
     void visit(StructPattern *node) override;
     void visit(RestPattern *node) override;
 
-    // Other visitors
-    void visit(EnumVariant *node) override;
-    void visit(MatchArm *node) override;
-
-    void visit(Program *node) override;
-
   private:
     ErrorReporter &error_reporter_;
     std::shared_ptr<Type> current_return_type_;
+};
+
+// Constant evaluator for compile-time constant expressions
+class ConstEvaluator : public ExprVisitor<std::optional<long long>> {
+  public:
+    ConstEvaluator(SymbolTable &symbol_table, ErrorReporter &error_reporter)
+        : symbol_table_(symbol_table), error_reporter_(error_reporter) {}
+
+    std::optional<long long> evaluate(Expr *expr) {
+        if (!expr)
+            return std::nullopt;
+        return expr->accept(this);
+    }
+
+    // Expression visitors that return optional constant value
+    std::optional<long long> visit(LiteralExpr *node) override;
+    std::optional<long long> visit(VariableExpr *node) override;
+    std::optional<long long> visit(BinaryExpr *node) override;
+    std::optional<long long> visit(UnaryExpr *node) override;
+
+    // Default implementations for non-constant expressions
+    std::optional<long long> visit(ArrayLiteralExpr *node) override { return std::nullopt; }
+    std::optional<long long> visit(ArrayInitializerExpr *node) override { return std::nullopt; }
+    std::optional<long long> visit(CallExpr *node) override { return std::nullopt; }
+    std::optional<long long> visit(IfExpr *node) override { return std::nullopt; }
+    std::optional<long long> visit(LoopExpr *node) override { return std::nullopt; }
+    std::optional<long long> visit(WhileExpr *node) override { return std::nullopt; }
+    std::optional<long long> visit(IndexExpr *node) override { return std::nullopt; }
+    std::optional<long long> visit(FieldAccessExpr *node) override { return std::nullopt; }
+    std::optional<long long> visit(AssignmentExpr *node) override { return std::nullopt; }
+    std::optional<long long> visit(CompoundAssignmentExpr *node) override { return std::nullopt; }
+    std::optional<long long> visit(ReferenceExpr *node) override { return std::nullopt; }
+    std::optional<long long> visit(UnderscoreExpr *node) override { return std::nullopt; }
+    std::optional<long long> visit(StructInitializerExpr *node) override { return std::nullopt; }
+    std::optional<long long> visit(UnitExpr *node) override { return std::nullopt; }
+    std::optional<long long> visit(GroupingExpr *node) override { return std::nullopt; }
+    std::optional<long long> visit(TupleExpr *node) override { return std::nullopt; }
+    std::optional<long long> visit(AsExpr *node) override { return std::nullopt; }
+    std::optional<long long> visit(MatchExpr *node) override { return std::nullopt; }
+    std::optional<long long> visit(PathExpr *node) override { return std::nullopt; }
+    std::optional<long long> visit(BlockExpr *node) override { return std::nullopt; }
+
+  private:
+    SymbolTable &symbol_table_;
+    ErrorReporter &error_reporter_;
 };
