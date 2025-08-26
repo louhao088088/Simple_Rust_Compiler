@@ -159,6 +159,7 @@ class Symbol {
 
 class SymbolTable {
   public:
+    SymbolTable() { enter_scope(); }
     void enter_scope();
     void exit_scope();
     bool define(const std::string &name, std::shared_ptr<Symbol> symbol);

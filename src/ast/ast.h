@@ -598,8 +598,6 @@ struct Program : public Node {
     void print(std::ostream &os, int indent = 0) const override;
 };
 
-// ================= Template implementation of Expr::accept =================
-// 合并自 ast_impl.h，inline保证多重包含无链接冲突
 template <typename R> inline R Expr::accept(ExprVisitor<R> *visitor) {
     if (auto lit = dynamic_cast<LiteralExpr *>(this)) {
         return visitor->visit(lit);

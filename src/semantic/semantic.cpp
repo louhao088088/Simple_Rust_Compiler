@@ -5,6 +5,7 @@
 #include "../tool/number.h"
 
 // SymbolTable implementation
+
 void SymbolTable::enter_scope() { scopes_.emplace_back(); }
 
 void SymbolTable::exit_scope() {
@@ -937,19 +938,7 @@ std::optional<long long> ConstEvaluator::visit(LiteralExpr *node) {
     return std::nullopt;
 }
 
-// 处理对 const 变量的引用
-std::optional<long long> ConstEvaluator::visit(VariableExpr *node) {
-    auto symbol = symbol_table_.lookup(node->name.lexeme);
-    if (symbol && symbol->kind == Symbol::CONSTANT) {
-        // 如果找到的符号是一个 const，就递归地对它的值表达式求值
-        // 假设 ConstDecl 存储了它的值表达式
-        // auto const_decl_node = /* ... 需要一种方法从符号找到其声明节点 ... */;
-
-        error_reporter_.report_error("Constant evaluation of variables is not yet supported.",
-                                     node->name.line);
-    }
-    return std::nullopt;
-}
+std::optional<long long> ConstEvaluator::visit(VariableExpr *node) { return std::nullopt; }
 
 std::optional<long long> ConstEvaluator::visit(BinaryExpr *node) {
     auto left_val = evaluate(node->left.get());
@@ -974,7 +963,7 @@ std::optional<long long> ConstEvaluator::visit(BinaryExpr *node) {
 
 std::optional<long long> ConstEvaluator::visit(UnaryExpr *node) {
     auto operand_val = evaluate(node->right.get());
-    
+
     if (operand_val) {
         switch (node->op.type) {
         case TokenType::MINUS:
