@@ -404,7 +404,7 @@ void NameResolutionVisitor::visit(StructDecl *node) {
     }
 
     case StructKind::Tuple: {
-        // Handle tuple struct fields
+
         for (const auto &field_node : node->fields) {
             std::shared_ptr<Type> field_type = type_resolver_.resolve(field_node->type.get());
             if (!field_type) {
@@ -412,7 +412,7 @@ void NameResolutionVisitor::visit(StructDecl *node) {
                                              field_node->name.line);
                 continue;
             }
-            // For tuple structs, fields are indexed numerically
+
             struct_type->fields[std::to_string(struct_type->fields.size())] = field_type;
         }
         break;
@@ -430,14 +430,17 @@ void NameResolutionVisitor::visit(ConstDecl *node) {
     }
 
     node->value->accept(this);
-
     auto const_symbol = std::make_shared<Symbol>(node->name.lexeme, Symbol::CONSTANT, const_type);
+
+    const_symbol->const_decl_node = node;
 
     if (!symbol_table_.define(node->name.lexeme, const_symbol)) {
         error_reporter_.report_error("Constant '" + node->name.lexeme + "' is already defined.",
                                      node->name.line);
     }
     node->resolved_symbol = const_symbol;
+
+    node->value->accept(this);
 }
 
 void NameResolutionVisitor::visit(EnumDecl *node) {
@@ -503,8 +506,34 @@ TypeCheckVisitor::TypeCheckVisitor(ErrorReporter &error_reporter)
     : error_reporter_(error_reporter) {}
 
 std::shared_ptr<Symbol> TypeCheckVisitor::visit(LiteralExpr *node) {
-    // TODO: Infer type from literal token
-    return nullptr; // TODO: Implement proper type checking
+    const TokenType token_type = node->literal.type;
+    switch (token_type) {
+    case TokenType::NUMBER:
+        if (true) {
+            node->type = std::make_shared<PrimitiveType>(TypeKind::UNSIGNED_INTEGER);
+        } else
+            node->type = std::make_shared<PrimitiveType>(TypeKind::INTEGER);
+
+        break;
+
+    case TokenType::TRUE:
+    case TokenType::FALSE:
+        node->type = std::make_shared<PrimitiveType>(TypeKind::BOOL);
+        break;
+
+    case TokenType::STRING:
+        node->type = std::make_shared<PrimitiveType>(TypeKind::STRING);
+        break;
+
+    case TokenType::CHAR:
+        node->type = std::make_shared<PrimitiveType>(TypeKind::CHAR);
+        break;
+
+    default:
+        error_reporter_.report_error("Unknown literal type encountered.", node->literal.line);
+        break;
+    }
+    return nullptr;
 }
 
 std::shared_ptr<Symbol> TypeCheckVisitor::visit(ArrayLiteralExpr *node) {
@@ -538,7 +567,16 @@ std::shared_ptr<Symbol> TypeCheckVisitor::visit(UnaryExpr *node) {
 std::shared_ptr<Symbol> TypeCheckVisitor::visit(BinaryExpr *node) {
     node->left->accept(this);
     node->right->accept(this);
-    // TODO: Type check binary operations
+
+    auto left_type = node->left->type;
+    auto right_type = node->right->type;
+
+    if (left_type && right_type && left_type->equals(right_type.get())) {
+        node->type = left_type;
+    } else {
+        error_reporter_.report_error("Type mismatch in binary expression.");
+    }
+
     return nullptr; // TODO: Implement proper type checking
 }
 
@@ -624,10 +662,28 @@ void TypeCheckVisitor::visit(BlockStmt *node) {
 void TypeCheckVisitor::visit(ExprStmt *node) { node->expression->accept(this); }
 
 void TypeCheckVisitor::visit(LetStmt *node) {
-    if (node->initializer) {
-        (*node->initializer)->accept(this);
+    if (!node->initializer) {
+        return;
     }
-    // TODO: Type check let statement
+    (*node->initializer)->accept(this);
+    std::shared_ptr<Type> initializer_type = (*node->initializer)->type;
+
+    if (!initializer_type) {
+        return;
+    }
+
+    if (auto id_pattern = dynamic_cast<IdentifierPattern *>(node->pattern.get())) {
+        if (id_pattern->resolved_symbol) {
+            std::shared_ptr<Type> declared_type = id_pattern->resolved_symbol->type;
+
+            // 3. 比较类型
+            if (!declared_type->equals(initializer_type.get())) {
+                error_reporter_.report_error("Mismatched types. Expected '" +
+                                             declared_type->to_string() + "' but found '" +
+                                             initializer_type->to_string() + "'.");
+            }
+        }
+    }
 }
 
 void TypeCheckVisitor::visit(ReturnStmt *node) {
@@ -859,10 +915,22 @@ void TypeResolver::visit(TypeNameNode *node) {
 
 void TypeResolver::visit(ArrayTypeNode *node) {
     auto element_type = resolve(node->element_type.get());
-    if (element_type && node->size) {
-        // For now, assume size is a literal - later we'll need constant evaluation
-        resolved_type_ = std::make_shared<ArrayType>(element_type, 0); // Placeholder size
+    if (!element_type) {
+        resolved_type_ = nullptr;
+        return;
     }
+
+    ConstEvaluator const_evaluator(symbol_table_, error_reporter_);
+    auto size_opt = const_evaluator.evaluate(node->size.get());
+
+    if (!size_opt) {
+        error_reporter_.report_error("Array size must be a constant expression.");
+        resolved_type_ = nullptr;
+        return;
+    }
+
+    size_t size = *size_opt;
+    resolved_type_ = std::make_shared<ArrayType>(element_type, size);
 }
 
 void TypeResolver::visit(UnitTypeNode *node) { resolved_type_ = std::make_shared<UnitType>(); }
@@ -920,15 +988,9 @@ void TypeResolver::visit(ReferenceTypeNode *node) {
     resolved_type_ = resolve(node->referenced_type.get());
 }
 
-void TypeResolver::visit(SliceTypeNode *node) {
-    // Placeholder for slice types
-    resolved_type_ = nullptr;
-}
+void TypeResolver::visit(SliceTypeNode *node) { resolved_type_ = nullptr; }
 
-void TypeResolver::visit(SelfTypeNode *node) {
-    // Placeholder for Self type
-    resolved_type_ = nullptr;
-}
+void TypeResolver::visit(SelfTypeNode *node) { resolved_type_ = nullptr; }
 
 std::optional<long long> ConstEvaluator::visit(LiteralExpr *node) {
     if (node->literal.type == TokenType::NUMBER) {

@@ -150,6 +150,8 @@ class Symbol {
     std::shared_ptr<SymbolTable> members;
     std::shared_ptr<Symbol> aliased_symbol;
 
+    ConstDecl *const_decl_node = nullptr;
+
     Symbol(std::string name, Kind kind, std::shared_ptr<Type> type = nullptr)
         : name(std::move(name)), kind(kind), type(std::move(type)),
           members(std::make_shared<SymbolTable>()), aliased_symbol(nullptr) {}
