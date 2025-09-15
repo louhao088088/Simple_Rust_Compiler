@@ -33,6 +33,7 @@ enum class TypeKind {
     STRUCT,
     UNIT,
     FUNCTION,
+    REFERENCE,
     UNKNOWN,
 };
 
@@ -160,6 +161,33 @@ struct FunctionType : public Type {
                     return false;
             }
             return true;
+        }
+        return false;
+    }
+};
+
+struct ReferenceType : public Type {
+    std::shared_ptr<Type> referenced_type;
+    bool is_mutable;
+
+    ReferenceType(std::shared_ptr<Type> ref_type, bool is_mut = false)
+        : referenced_type(std::move(ref_type)), is_mutable(is_mut) {
+        this->kind = TypeKind::REFERENCE;
+    }
+
+    std::string to_string() const override {
+        if (is_mutable) {
+            return "&mut " + referenced_type->to_string();
+        } else {
+            return "&" + referenced_type->to_string();
+        }
+    }
+
+    bool equals(const Type *other) const override {
+        if (auto *other_ref = dynamic_cast<const ReferenceType *>(other)) {
+
+            return is_mutable == other_ref->is_mutable &&
+                   referenced_type->equals(other_ref->referenced_type.get());
         }
         return false;
     }
@@ -428,6 +456,7 @@ class TypeCheckVisitor : public ExprVisitor<std::shared_ptr<Symbol>>,
   private:
     ErrorReporter &error_reporter_;
     std::shared_ptr<Type> current_return_type_;
+    Symbol *current_function_symbol_ = nullptr;
     int loop_depth_ = 0;
 };
 

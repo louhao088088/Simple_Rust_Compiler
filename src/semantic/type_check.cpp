@@ -99,12 +99,25 @@ std::shared_ptr<Symbol> TypeCheckVisitor::visit(BinaryExpr *node) {
 }
 
 std::shared_ptr<Symbol> TypeCheckVisitor::visit(CallExpr *node) {
+
     node->callee->accept(this);
     for (auto &arg : node->arguments) {
         arg->accept(this);
     }
-    // TODO: Type check function call
-    return nullptr; // TODO: Implement proper type checking
+    // TO DO: Type check function call
+
+    if (node->callee->resolved_symbol) {
+        auto callee_symbol = node->callee->resolved_symbol;
+        if (callee_symbol->name == "exit" && callee_symbol->is_builtin) {
+            if (!current_function_symbol_ || current_function_symbol_->name != "main") {
+                error_reporter_.report_error("Built-in function 'exit' can only be called directly "
+                                             "within the 'main' function.");
+            }
+        }
+    }
+
+    // TO DO
+    return nullptr;
 }
 
 std::shared_ptr<Symbol> TypeCheckVisitor::visit(IfExpr *node) {
@@ -285,10 +298,20 @@ void TypeCheckVisitor::visit(TupleTypeNode *node) {
 }
 
 void TypeCheckVisitor::visit(FnDecl *node) {
+    Symbol *previous_function = current_function_symbol_;
+    current_function_symbol_ = node->resolved_symbol.get();
+
     if (node->body) {
-        // TODO: Set current return type for return statements
         (*node->body)->accept(this);
     }
+
+    if (current_function_symbol_ && current_function_symbol_->name == "main") {
+        if (node->body) {
+            check_main_for_early_exit((*node->body).get());
+        }
+    }
+
+    current_function_symbol_ = previous_function;
 }
 
 // Pattern visitors for TypeCheckVisitor (simplified implementations)

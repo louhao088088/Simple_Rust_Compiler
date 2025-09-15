@@ -118,8 +118,17 @@ void TypeResolver::visit(RawPointerTypeNode *node) {
 }
 
 void TypeResolver::visit(ReferenceTypeNode *node) {
-    // For references, resolve the referenced type
-    resolved_type_ = resolve(node->referenced_type.get());
+    auto resolved_inner_type = resolve(node->referenced_type.get());
+
+    if (!resolved_inner_type) {
+        resolved_type_ = nullptr;
+        return;
+    }
+
+    resolved_type_ = std::make_shared<ReferenceType>(
+        resolved_inner_type,
+        node->is_mutable
+    );
 }
 
 void TypeResolver::visit(SliceTypeNode *node) { resolved_type_ = nullptr; }

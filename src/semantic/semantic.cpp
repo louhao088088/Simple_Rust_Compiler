@@ -78,6 +78,27 @@ std::optional<long long> ConstEvaluator::visit(UnaryExpr *node) {
 }
 
 void define_builtin_functions(SymbolTable &symbol_table) {
+
+    // print(s: &str) -> ()
+    std::vector<std::shared_ptr<Type>> print_param_types = {
+        std::make_shared<ReferenceType>(std::make_shared<PrimitiveType>(TypeKind::STRING))};
+    auto print_return_type = std::make_shared<UnitType>();
+    auto print_type = std::make_shared<FunctionType>(print_return_type, print_param_types);
+
+    auto print_symbol = std::make_shared<Symbol>("print", Symbol::FUNCTION, print_type);
+    print_symbol->is_builtin = true;
+    symbol_table.define("print", print_symbol);
+
+    // println(s: &str) -> ()
+    std::vector<std::shared_ptr<Type>> println_param_types = {
+        std::make_shared<ReferenceType>(std::make_shared<PrimitiveType>(TypeKind::STRING))};
+    auto println_return_type = std::make_shared<UnitType>();
+    auto println_type = std::make_shared<FunctionType>(println_return_type, println_param_types);
+
+    auto println_symbol = std::make_shared<Symbol>("println", Symbol::FUNCTION, println_type);
+    println_symbol->is_builtin = true;
+    symbol_table.define("println", println_symbol);
+
     // printInt(n: i32) -> ()
     std::vector<std::shared_ptr<Type>> printInt_param_types = {
         std::make_shared<PrimitiveType>(TypeKind::I32)};
@@ -89,14 +110,43 @@ void define_builtin_functions(SymbolTable &symbol_table) {
 
     symbol_table.define("printInt", printInt_symbol);
 
+    // printlnInt(n: i32) -> ()
+    std::vector<std::shared_ptr<Type>> printlnInt_param_types = {
+        std::make_shared<PrimitiveType>(TypeKind::I32)};
+    auto printlnInt_return_type = std::make_shared<UnitType>();
+    auto printlnInt_type =
+        std::make_shared<FunctionType>(printlnInt_return_type, printlnInt_param_types);
+
+    auto printlnInt_symbol =
+        std::make_shared<Symbol>("printlnInt", Symbol::FUNCTION, printlnInt_type);
+    printlnInt_symbol->is_builtin = true;
+
+    symbol_table.define("printlnInt", printlnInt_symbol);
+
     //  getInt() -> i32
     auto getInt_type = std::make_shared<FunctionType>(
         std::make_shared<PrimitiveType>(TypeKind::I32), std::vector<std::shared_ptr<Type>>{});
     auto getInt_symbol = std::make_shared<Symbol>("getInt", Symbol::FUNCTION, getInt_type);
     getInt_symbol->is_builtin = true;
     symbol_table.define("getInt", getInt_symbol);
-}
 
+    // getString() -> String
+    auto getString_type = std::make_shared<FunctionType>(
+        std::make_shared<PrimitiveType>(TypeKind::STRING), std::vector<std::shared_ptr<Type>>{});
+    auto getString_symbol = std::make_shared<Symbol>("getString", Symbol::FUNCTION, getString_type);
+    getString_symbol->is_builtin = true;
+    symbol_table.define("getString", getString_symbol);
+
+    // exit(code: i32) -> ()
+    std::vector<std::shared_ptr<Type>> exit_param_types = {
+        std::make_shared<PrimitiveType>(TypeKind::I32)};
+    auto exit_return_type = std::make_shared<UnitType>();
+    auto exit_type = std::make_shared<FunctionType>(exit_return_type, exit_param_types);
+
+    auto exit_symbol = std::make_shared<Symbol>("exit", Symbol::FUNCTION, exit_type);
+    exit_symbol->is_builtin = true;
+    symbol_table.define("exit", exit_symbol);
+}
 void Semantic(std::shared_ptr<Program> &ast, ErrorReporter &error_reporter) {
 
     NameResolutionVisitor name_resolver(error_reporter);
