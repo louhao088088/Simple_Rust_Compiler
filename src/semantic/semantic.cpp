@@ -508,14 +508,25 @@ TypeCheckVisitor::TypeCheckVisitor(ErrorReporter &error_reporter)
 std::shared_ptr<Symbol> TypeCheckVisitor::visit(LiteralExpr *node) {
     const TokenType token_type = node->literal.type;
     switch (token_type) {
-    case TokenType::NUMBER:
-        if (true) {
-            node->type = std::make_shared<PrimitiveType>(TypeKind::UNSIGNED_INTEGER);
-        } else
-            node->type = std::make_shared<PrimitiveType>(TypeKind::INTEGER);
-
+    case TokenType::NUMBER: {
+        Number num = number_of_tokens(node->literal.lexeme, error_reporter_);
+        if (num.Type == "Unknown") {
+            error_reporter_.report_error("Invalid number format.", node->literal.line);
+            return nullptr;
+        }
+        if (num.Type == "i32") {
+            node->type = std::make_shared<PrimitiveType>(TypeKind::I32);
+        } else if (num.Type == "u32") {
+            node->type = std::make_shared<PrimitiveType>(TypeKind::U32);
+        } else if (num.Type == "isize") {
+            node->type = std::make_shared<PrimitiveType>(TypeKind::ISIZE);
+        } else if (num.Type == "usize") {
+            node->type = std::make_shared<PrimitiveType>(TypeKind::USIZE);
+        } else if (num.Type == "anyint") {
+            node->type = std::make_shared<PrimitiveType>(TypeKind::ANY_INTEGER);
+        }
         break;
-
+    }
     case TokenType::TRUE:
     case TokenType::FALSE:
         node->type = std::make_shared<PrimitiveType>(TypeKind::BOOL);
@@ -537,7 +548,7 @@ std::shared_ptr<Symbol> TypeCheckVisitor::visit(LiteralExpr *node) {
 }
 
 std::shared_ptr<Symbol> TypeCheckVisitor::visit(ArrayLiteralExpr *node) {
-    // TODO: Type check array elements and infer array type
+    
     for (auto &element : node->elements) {
         element->accept(this);
     }
@@ -676,7 +687,6 @@ void TypeCheckVisitor::visit(LetStmt *node) {
         if (id_pattern->resolved_symbol) {
             std::shared_ptr<Type> declared_type = id_pattern->resolved_symbol->type;
 
-            // 3. 比较类型
             if (!declared_type->equals(initializer_type.get())) {
                 error_reporter_.report_error("Mismatched types. Expected '" +
                                              declared_type->to_string() + "' but found '" +
@@ -889,13 +899,13 @@ std::shared_ptr<Type> TypeResolver::resolve(TypeNode *node) {
 void TypeResolver::visit(TypeNameNode *node) {
     // Handle primitive types
     if (node->name.lexeme == "i32") {
-        resolved_type_ = std::make_shared<PrimitiveType>(TypeKind::INTEGER);
+        resolved_type_ = std::make_shared<PrimitiveType>(TypeKind::I32);
     } else if (node->name.lexeme == "u32") {
-        resolved_type_ = std::make_shared<PrimitiveType>(TypeKind::UNSIGNED_INTEGER);
+        resolved_type_ = std::make_shared<PrimitiveType>(TypeKind::U32);
     } else if (node->name.lexeme == "isize") {
-        resolved_type_ = std::make_shared<PrimitiveType>(TypeKind::INTEGER);
+        resolved_type_ = std::make_shared<PrimitiveType>(TypeKind::ISIZE);
     } else if (node->name.lexeme == "usize") {
-        resolved_type_ = std::make_shared<PrimitiveType>(TypeKind::UNSIGNED_INTEGER);
+        resolved_type_ = std::make_shared<PrimitiveType>(TypeKind::USIZE);
     } else if (node->name.lexeme == "bool") {
         resolved_type_ = std::make_shared<PrimitiveType>(TypeKind::BOOL);
     } else if (node->name.lexeme == "char") {
@@ -945,10 +955,16 @@ void TypeResolver::visit(PathTypeNode *node) {
     if (auto *var_expr = dynamic_cast<VariableExpr *>(node->path.get())) {
         const auto &name = var_expr->name.lexeme;
 
-        if (name == "i32" || name == "isize") {
-            resolved_type_ = std::make_shared<PrimitiveType>(TypeKind::INTEGER);
-        } else if (name == "u32" || name == "usize") {
-            resolved_type_ = std::make_shared<PrimitiveType>(TypeKind::UNSIGNED_INTEGER);
+        if (name == "i32") {
+            resolved_type_ = std::make_shared<PrimitiveType>(TypeKind::I32);
+        } else if (name == "u32") {
+            resolved_type_ = std::make_shared<PrimitiveType>(TypeKind::U32);
+        } else if (name == "isize") {
+            resolved_type_ = std::make_shared<PrimitiveType>(TypeKind::ISIZE);
+        } else if (name == "usize") {
+            resolved_type_ = std::make_shared<PrimitiveType>(TypeKind::USIZE);
+        } else if (name == "anyint") {
+            resolved_type_ = std::make_shared<PrimitiveType>(TypeKind::ANY_INTEGER);
         } else if (name == "bool") {
             resolved_type_ = std::make_shared<PrimitiveType>(TypeKind::BOOL);
         } else if (name == "char") {

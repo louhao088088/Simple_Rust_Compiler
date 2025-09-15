@@ -7,7 +7,7 @@ using std::string;
 
 struct Number {
     long long value;
-    bool is_signed;
+    string Type; // "i32", "u32", "isize", "usize", "anyint"
 };
 
 Number number_of_tokens(string token, ErrorReporter &error_reporter);

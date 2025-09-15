@@ -17,8 +17,11 @@ using std::vector;
 // Type system base class
 
 enum class TypeKind {
-    INTEGER,
-    UNSIGNED_INTEGER,
+    I32,
+    U32,
+    ISIZE,
+    USIZE,
+    ANY_INTEGER,
     STRING,
     RSTRING,
     CSTRING,
@@ -43,10 +46,16 @@ struct PrimitiveType : public Type {
 
     std::string to_string() const override {
         switch (kind) {
-        case TypeKind::INTEGER:
+        case TypeKind::I32:
             return "i32";
-        case TypeKind::UNSIGNED_INTEGER:
+        case TypeKind::U32:
             return "u32";
+        case TypeKind::ISIZE:
+            return "isize";
+        case TypeKind::USIZE:
+            return "usize";
+        case TypeKind::ANY_INTEGER:
+            return "anyint";
         case TypeKind::BOOL:
             return "bool";
         case TypeKind::STRING:

@@ -16,20 +16,26 @@ Number number_of_tokens(string token, ErrorReporter &error_reporter) {
                     if (token[i] == 'i') {
                         if (num > 2147483647) {
                             error_reporter.report_error("Integer overflow");
-                            return {-1, false};
+                            return {-1, "unknown"};
                         }
-                        return {num, false};
+                        if (token[i + 1] == 's')
+                            return {num, "isize"};
+                        else
+                            return {num, "i32"};
                     } else if (token[i] == 'u') {
                         if (num > 4294967295) {
                             error_reporter.report_error("Unsigned integer overflow");
-                            return {-1, false};
+                            return {-1, "unknown"};
                         }
-                        return {num, true};
+                        if (token[i + 1] == 's')
+                            return {num, "usize"};
+                        else
+                            return {num, "u32"};
                     }
 
                 } else {
                     error_reporter.report_error("Invalid number format");
-                    return {-1, false};
+                    return {-1, "unknown"};
                 }
             }
             if (num == -1)
@@ -54,20 +60,27 @@ Number number_of_tokens(string token, ErrorReporter &error_reporter) {
                     if (token[i] == 'i') {
                         if (num > 2147483647) {
                             error_reporter.report_error("Integer overflow");
-                            return {-1, false};
+                            return {-1, "unknown"};
                         }
-                        return {num, false};
+                        if (token[i + 1] == 's')
+                            return {num, "isize"};
+                        else
+                            return {num, "i32"};
+
                     } else if (token[i] == 'u') {
                         if (num > 4294967295) {
                             error_reporter.report_error("Unsigned integer overflow");
-                            return {-1, false};
+                            return {-1, "unknown"};
                         }
-                        return {num, true};
+                        if (token[i + 1] == 's')
+                            return {num, "usize"};
+                        else
+                            return {num, "u32"};
                     }
 
                 } else {
                     error_reporter.report_error("Invalid number format");
-                    return {-1, false};
+                    return {-1, "unknown"};
                 }
             }
             if (num == -1)
@@ -88,20 +101,26 @@ Number number_of_tokens(string token, ErrorReporter &error_reporter) {
                     if (token[i] == 'i') {
                         if (num > 2147483647) {
                             error_reporter.report_error("Integer overflow");
-                            return {-1, false};
+                            return {-1, "unknown"};
                         }
-                        return {num, false};
+                        if (token[i + 1] == 's')
+                            return {num, "isize"};
+                        else
+                            return {num, "i32"};
                     } else if (token[i] == 'u') {
                         if (num > 4294967295) {
                             error_reporter.report_error("Unsigned integer overflow");
-                            return {-1, false};
+                            return {-1, "unknown"};
                         }
-                        return {num, true};
+                        if (token[i + 1] == 's')
+                            return {num, "isize"};
+                        else
+                            return {num, "i32"};
                     }
 
                 } else {
                     error_reporter.report_error("Invalid number format");
-                    return {-1, false};
+                    return {-1, "unknown"};
                 }
             }
             if (num == -1)
@@ -112,7 +131,7 @@ Number number_of_tokens(string token, ErrorReporter &error_reporter) {
     } else {
         if (token[0] == '_') {
             error_reporter.report_error("Invalid number format");
-            return {-1, false};
+            return {-1, "unknown"};
         }
         for (size_t i = 0; i < token.length(); i++) {
             if (token[i] == '_')
@@ -126,20 +145,26 @@ Number number_of_tokens(string token, ErrorReporter &error_reporter) {
                     if (token[i] == 'i') {
                         if (num > 2147483647) {
                             error_reporter.report_error("Integer overflow");
-                            return {-1, false};
+                            return {-1, "unknown"};
                         }
-                        return {num, false};
+                        if (token[i + 1] == 's')
+                            return {num, "isize"};
+                        else
+                            return {num, "i32"};
                     } else if (token[i] == 'u') {
                         if (num > 4294967295) {
                             error_reporter.report_error("Unsigned integer overflow");
-                            return {-1, false};
+                            return {-1, "unknown"};
                         }
-                        return {num, true};
+                        if (token[i + 1] == 's')
+                            return {num, "usize"};
+                        else
+                            return {num, "u32"};
                     }
 
                 } else {
                     error_reporter.report_error("Invalid number format");
-                    return {-1, false};
+                    return {-1, "unknown"};
                 }
             }
             if (num == -1)
@@ -150,7 +175,7 @@ Number number_of_tokens(string token, ErrorReporter &error_reporter) {
 
     if (num < 0) {
         error_reporter.report_error("Invalid number format");
-        return {-1, false};
+        return {-1, "unknown"};
     }
-    return {num, true};
+    return {num, "anyint"};
 }
