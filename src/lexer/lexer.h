@@ -34,8 +34,8 @@ enum class TokenType {
     QUESTION,              //?
     BANG,                  //!
     BANG_EQUAL,            //!=
-    EQUAL,                 //==
-    EQUAL_EQUAL,           //===
+    EQUAL,                 //=
+    EQUAL_EQUAL,           //==
     GREATER,               //>
     GREATER_EQUAL,         //>=
     LESS,                  //<

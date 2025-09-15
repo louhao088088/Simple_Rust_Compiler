@@ -2,7 +2,7 @@ fn aa() -> i32 {
     2
 }
 fn main() {
-    let a = c"foo #\"# bar";
-    let a = r"addda";
-    let b = aa();
+    let a: string = "foobar";
+    let a: string = "addda";
+    let b: i32 = aa();
 }

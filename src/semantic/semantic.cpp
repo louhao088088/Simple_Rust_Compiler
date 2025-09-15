@@ -548,7 +548,7 @@ std::shared_ptr<Symbol> TypeCheckVisitor::visit(LiteralExpr *node) {
 }
 
 std::shared_ptr<Symbol> TypeCheckVisitor::visit(ArrayLiteralExpr *node) {
-    
+
     for (auto &element : node->elements) {
         element->accept(this);
     }
@@ -581,8 +581,15 @@ std::shared_ptr<Symbol> TypeCheckVisitor::visit(BinaryExpr *node) {
 
     auto left_type = node->left->type;
     auto right_type = node->right->type;
-
-    if (left_type && right_type && left_type->equals(right_type.get())) {
+    if (left_type && right_type && right_type->kind == TypeKind::ANY_INTEGER &&
+        (left_type->kind == TypeKind::I32 || left_type->kind == TypeKind::U32 ||
+         left_type->kind == TypeKind::ISIZE || left_type->kind == TypeKind::USIZE)) {
+        node->type = left_type;
+    } else if (left_type && right_type && left_type->kind == TypeKind::ANY_INTEGER &&
+               (right_type->kind == TypeKind::I32 || right_type->kind == TypeKind::U32 ||
+                right_type->kind == TypeKind::ISIZE || right_type->kind == TypeKind::USIZE)) {
+        node->type = right_type;
+    } else if (left_type && right_type && left_type->equals(right_type.get())) {
         node->type = left_type;
     } else {
         error_reporter_.report_error("Type mismatch in binary expression.");
@@ -686,6 +693,13 @@ void TypeCheckVisitor::visit(LetStmt *node) {
     if (auto id_pattern = dynamic_cast<IdentifierPattern *>(node->pattern.get())) {
         if (id_pattern->resolved_symbol) {
             std::shared_ptr<Type> declared_type = id_pattern->resolved_symbol->type;
+            if (initializer_type->kind == TypeKind::ANY_INTEGER && declared_type &&
+                (declared_type->kind == TypeKind::I32 || declared_type->kind == TypeKind::U32 ||
+                 declared_type->kind == TypeKind::ISIZE ||
+                 declared_type->kind == TypeKind::USIZE)) {
+                id_pattern->resolved_symbol->type = declared_type;
+                return;
+            }
 
             if (!declared_type->equals(initializer_type.get())) {
                 error_reporter_.report_error("Mismatched types. Expected '" +

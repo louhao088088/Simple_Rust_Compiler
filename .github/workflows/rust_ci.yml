@@ -1,55 +1,48 @@
+# 工作流的名称
 name: C++ CI
 
+# 触发工作流的事件
 on:
   push:
-    branches: ["main"]
+    branches: ["main"] # 当推送到 main 分支时
   pull_request:
-    branches: ["main"]
+    branches: ["main"] # 当向 main 分支提交 pull request 时
 
+# 定义一系列任务
 jobs:
-  # This job does a fast release build on all major platforms
-  build_fast:
-    name: Build (Release)
-    strategy:
-      matrix:
-        os: [ubuntu-latest, macos-latest]
-    runs-on: ${{ matrix.os }}
-
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Configure CMake
-        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
-
-      - name: Build with CMake
-        run: cmake --build build --config Release
-
-      # Note: This step will do nothing until you add tests to your CMakeLists.txt
-      - name: Run Unit Tests (ctest)
-        working-directory: ./build
-        run: ctest --output-on-failure
-
-  # This job does a slower, more thorough check on Linux with sanitizers
-  build_sanitized:
-    name: Build (Debug + Sanitizers)
+  # 任务的唯一ID
+  build-and-test:
+    # 任务运行的虚拟机环境
     runs-on: ubuntu-latest
 
+    # 任务包含的步骤
     steps:
+      # 步骤1: 检出你的代码
+      # 使用一个预先构建好的 action 来下载你的仓库代码
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Install Dependencies
-        run: sudo apt-get update && sudo apt-get install -y build-essential cmake
+      # 步骤2: 安装依赖
+      # 安装 C++ 编译器, CMake, Make 等
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential cmake
 
-      - name: Configure CMake with Sanitizers
-        # We enable sanitizers via a CMake option
-        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug -DENABLE_SANITIZERS=ON
+      # 步骤3: 配置和构建你的编译器
+      # 这里以 CMake 为例，如果你的项目用的是 Make，请相应修改
+      - name: Build the compiler
+        run: |
+          mkdir build
+          cd build
+          cmake ..
+          make
+          # 将你的编译器可执行文件命名为 my-rust-compiler
+          # 如果 CMakeLists.txt 中定义了不同的名字，请在这里修改
+          # 示例： mv your_output_name my-rust-compiler
 
-      - name: Build with CMake
-        run: cmake --build build --config Debug
-
-      # Here you would run tests that benefit from sanitizer checks
-      - name: Run Sanitized Tests (ctest)
-        working-directory: ./build
-        run: ctest --output-on-failure
+      # 步骤4: 运行测试
+      - name: Run tests
+        run: |
+          chmod +x ./run_tests.sh
+          ./run_tests.sh
