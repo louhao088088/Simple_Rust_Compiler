@@ -2,7 +2,6 @@
 
 #include "semantic.h"
 
-
 // SymbolTable implementation
 
 void SymbolTable::enter_scope() { scopes_.emplace_back(); }
@@ -30,11 +29,6 @@ std::shared_ptr<Symbol> SymbolTable::lookup(const std::string &name) {
     }
     return nullptr;
 }
-
-
-
-
-
 
 std::optional<long long> ConstEvaluator::visit(LiteralExpr *node) {
     if (node->literal.type == TokenType::NUMBER) {
@@ -81,4 +75,52 @@ std::optional<long long> ConstEvaluator::visit(UnaryExpr *node) {
         }
     }
     return std::nullopt;
+}
+
+void define_builtin_functions(SymbolTable &symbol_table) {
+    // printInt(n: i32) -> ()
+    auto printInt_param_types = {std::make_shared<PrimitiveType>(TypeKind::I32)};
+    auto printInt_return_type = std::make_shared<UnitType>();
+    auto printInt_type = std::make_shared<FunctionType>(printInt_return_type, printInt_param_types);
+
+    auto printInt_symbol = std::make_shared<Symbol>("printInt", Symbol::FUNCTION, printInt_type);
+    printInt_symbol->is_builtin = true;
+
+    symbol_table.define("printInt", printInt_symbol);
+
+    //  getInt() -> i32
+    auto getInt_type = std::make_shared<FunctionType>(
+        std::make_shared<PrimitiveType>(TypeKind::I32), std::vector<std::shared_ptr<Type>>{});
+    auto getInt_symbol = std::make_shared<Symbol>("getInt", Symbol::FUNCTION, getInt_type);
+    getInt_symbol->is_builtin = true;
+    symbol_table.define("getInt", getInt_symbol);
+}
+
+void Semantic(std::shared_ptr<Program> &ast, ErrorReporter &error_reporter) {
+
+    NameResolutionVisitor name_resolver(error_reporter);
+    SymbolTable &global_symbol_table_name = name_resolver.get_global_symbol_table();
+
+    define_builtin_functions(global_symbol_table_name);
+
+    global_symbol_table_name.enter_scope();
+    for (auto &item : ast->items) {
+        item->accept(&name_resolver);
+    }
+    if (error_reporter.has_errors()) {
+        std::cerr << "Name resolution completed with errors." << std::endl;
+        return;
+    }
+
+    global_symbol_table_name.exit_scope();
+
+    TypeCheckVisitor type_checker(error_reporter);
+
+    for (auto &item : ast->items) {
+        item->accept(&type_checker);
+    }
+    if (error_reporter.has_errors()) {
+        std::cerr << "Type checking completed with errors." << std::endl;
+        return;
+    }
 }

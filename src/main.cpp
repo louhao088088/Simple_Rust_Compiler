@@ -31,43 +31,24 @@ int main() {
     if (ast && !parser_error_reporter.has_errors()) {
         ast->print(std::cerr);
         std::cerr << "\n";
-        // Test semantic analysis
-        std::cerr << "--- Semantic Analysis ---" << std::endl;
-        ErrorReporter error_reporter;
-
-        // Name resolution pass
-        NameResolutionVisitor name_resolver(error_reporter);
-        for (auto &item : ast->items) {
-            item->accept(&name_resolver);
-        }
-
-        if (error_reporter.has_errors()) {
-            std::cerr << "Name resolution completed with errors." << std::endl;
-            return 1;
-        } else {
-            std::cerr << "Name resolution completed successfully." << std::endl;
-
-            // Type checking pass
-            TypeCheckVisitor type_checker(error_reporter);
-            for (auto &item : ast->items) {
-                item->accept(&type_checker);
-            }
-
-            if (error_reporter.has_errors()) {
-                std::cerr << "Type checking completed with errors." << std::endl;
-                return 1;
-            } else {
-                std::cerr << "Type checking completed successfully." << std::endl;
-            }
-        }
     } else {
         if (parser_error_reporter.has_errors()) {
             std::cerr << "Parsing failed with errors." << std::endl;
             return 1;
         } else {
             std::cerr << "Parsing produced a null AST without errors." << std::endl;
-            
         }
+    }
+
+    // Test semantic analysis
+    std::cerr << "--- Semantic Analysis ---" << std::endl;
+    ErrorReporter error_reporter;
+    Semantic(ast, error_reporter);
+    if (error_reporter.has_errors()) {
+        std::cerr << "Semantic analysis completed with errors." << std::endl;
+        return 1;
+    } else {
+        std::cerr << "Semantic analysis completed successfully." << std::endl;
     }
 
     return 0;

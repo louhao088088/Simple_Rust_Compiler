@@ -32,6 +32,7 @@ enum class TypeKind {
     ARRAY,
     STRUCT,
     UNIT,
+    FUNCTION,
     UNKNOWN,
 };
 
@@ -124,6 +125,42 @@ struct UnitType : public Type {
     bool equals(const Type *other) const override { return other->kind == TypeKind::UNIT; }
 };
 
+struct FunctionType : public Type {
+    std::shared_ptr<Type> return_type;
+    std::vector<std::shared_ptr<Type>> param_types;
+
+    FunctionType(std::shared_ptr<Type> ret_type, std::vector<std::shared_ptr<Type>> p_types)
+        : return_type(std::move(ret_type)), param_types(std::move(p_types)) {
+        this->kind = TypeKind::FUNCTION;
+    }
+
+    std::string to_string() const override {
+        std::string param_str;
+        for (const auto &param : param_types) {
+            if (!param_str.empty()) {
+                param_str += ", ";
+            }
+            param_str += param->to_string();
+        }
+        return "fn(" + param_str + ") -> " + return_type->to_string();
+    }
+
+    bool equals(const Type *other) const override {
+        if (auto *other_fn = dynamic_cast<const FunctionType *>(other)) {
+            if (!return_type->equals(other_fn->return_type.get()))
+                return false;
+            if (param_types.size() != other_fn->param_types.size())
+                return false;
+            for (size_t i = 0; i < param_types.size(); ++i) {
+                if (!param_types[i]->equals(other_fn->param_types[i].get()))
+                    return false;
+            }
+            return true;
+        }
+        return false;
+    }
+};
+
 class SymbolTable;
 class NameResolutionVisitor;
 
@@ -161,12 +198,14 @@ class Symbol {
     std::shared_ptr<Symbol> aliased_symbol;
 
     bool is_mutable;
+    bool is_builtin;
 
     ConstDecl *const_decl_node = nullptr;
 
     Symbol(std::string name, Kind kind, std::shared_ptr<Type> type = nullptr)
         : name(std::move(name)), kind(kind), type(std::move(type)),
-          members(std::make_shared<SymbolTable>()), aliased_symbol(nullptr), is_mutable(false) {}
+          members(std::make_shared<SymbolTable>()), aliased_symbol(nullptr), is_mutable(false),
+          is_builtin(false) {}
 
     virtual ~Symbol() = default;
 };
@@ -228,8 +267,6 @@ class ConstEvaluator : public ExprVisitor<std::optional<long long>> {
     ErrorReporter &error_reporter_;
 };
 
-
-
 // Name resolution visitor - specialized for returning Symbol
 class NameResolutionVisitor : public ExprVisitor<std::shared_ptr<Symbol>>,
                               public StmtVisitor,
@@ -238,6 +275,7 @@ class NameResolutionVisitor : public ExprVisitor<std::shared_ptr<Symbol>>,
                               public PatternVisitor {
   public:
     NameResolutionVisitor(ErrorReporter &error_reporter);
+    SymbolTable &get_global_symbol_table() { return symbol_table_; }
 
     // Expression visitors
     std::shared_ptr<Symbol> visit(LiteralExpr *node) override;
@@ -309,7 +347,6 @@ class NameResolutionVisitor : public ExprVisitor<std::shared_ptr<Symbol>>,
     TypeResolver type_resolver_;
     std::shared_ptr<Type> current_let_type_ = nullptr;
 };
-
 
 // Type check visitor
 class TypeCheckVisitor : public ExprVisitor<std::shared_ptr<Symbol>>,
@@ -388,3 +425,5 @@ class TypeCheckVisitor : public ExprVisitor<std::shared_ptr<Symbol>>,
     ErrorReporter &error_reporter_;
     std::shared_ptr<Type> current_return_type_;
 };
+
+void Semantic(std::shared_ptr<Program> &ast, ErrorReporter &error_reporter);
