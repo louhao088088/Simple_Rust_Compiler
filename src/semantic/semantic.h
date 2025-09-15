@@ -4,6 +4,7 @@
 
 #include "../ast/ast.h"
 #include "../error/error.h"
+#include "../tool/number.h"
 
 #include <iostream>
 #include <optional>
@@ -159,11 +160,13 @@ class Symbol {
     std::shared_ptr<SymbolTable> members;
     std::shared_ptr<Symbol> aliased_symbol;
 
+    bool is_mutable;
+
     ConstDecl *const_decl_node = nullptr;
 
     Symbol(std::string name, Kind kind, std::shared_ptr<Type> type = nullptr)
         : name(std::move(name)), kind(kind), type(std::move(type)),
-          members(std::make_shared<SymbolTable>()), aliased_symbol(nullptr) {}
+          members(std::make_shared<SymbolTable>()), aliased_symbol(nullptr), is_mutable(false) {}
 
     virtual ~Symbol() = default;
 };
@@ -179,6 +182,53 @@ class SymbolTable {
   private:
     std::vector<std::unordered_map<std::string, std::shared_ptr<Symbol>>> scopes_;
 };
+
+// Constant evaluator for compile-time constant expressions
+class ConstEvaluator : public ExprVisitor<std::optional<long long>> {
+  public:
+    ConstEvaluator(SymbolTable &symbol_table, ErrorReporter &error_reporter)
+        : symbol_table_(symbol_table), error_reporter_(error_reporter) {}
+
+    std::optional<long long> evaluate(Expr *expr) {
+        if (!expr)
+            return std::nullopt;
+        return expr->accept(this);
+    }
+
+    // Expression visitors that return optional constant value
+    std::optional<long long> visit(LiteralExpr *node) override;
+    std::optional<long long> visit(VariableExpr *node) override;
+    std::optional<long long> visit(BinaryExpr *node) override;
+    std::optional<long long> visit(UnaryExpr *node) override;
+
+    // Default implementations for non-constant expressions
+    std::optional<long long> visit(ArrayLiteralExpr *node) override { return std::nullopt; }
+    std::optional<long long> visit(ArrayInitializerExpr *node) override { return std::nullopt; }
+    std::optional<long long> visit(CallExpr *node) override { return std::nullopt; }
+    std::optional<long long> visit(IfExpr *node) override { return std::nullopt; }
+    std::optional<long long> visit(LoopExpr *node) override { return std::nullopt; }
+    std::optional<long long> visit(WhileExpr *node) override { return std::nullopt; }
+    std::optional<long long> visit(IndexExpr *node) override { return std::nullopt; }
+    std::optional<long long> visit(FieldAccessExpr *node) override { return std::nullopt; }
+    std::optional<long long> visit(AssignmentExpr *node) override { return std::nullopt; }
+    std::optional<long long> visit(CompoundAssignmentExpr *node) override { return std::nullopt; }
+    std::optional<long long> visit(ReferenceExpr *node) override { return std::nullopt; }
+    std::optional<long long> visit(UnderscoreExpr *node) override { return std::nullopt; }
+    std::optional<long long> visit(StructInitializerExpr *node) override { return std::nullopt; }
+    std::optional<long long> visit(UnitExpr *node) override { return std::nullopt; }
+    std::optional<long long> visit(GroupingExpr *node) override { return std::nullopt; }
+    std::optional<long long> visit(TupleExpr *node) override { return std::nullopt; }
+    std::optional<long long> visit(AsExpr *node) override { return std::nullopt; }
+    std::optional<long long> visit(MatchExpr *node) override { return std::nullopt; }
+    std::optional<long long> visit(PathExpr *node) override { return std::nullopt; }
+    std::optional<long long> visit(BlockExpr *node) override { return std::nullopt; }
+
+  private:
+    SymbolTable &symbol_table_;
+    ErrorReporter &error_reporter_;
+};
+
+
 
 // Name resolution visitor - specialized for returning Symbol
 class NameResolutionVisitor : public ExprVisitor<std::shared_ptr<Symbol>>,
@@ -260,6 +310,7 @@ class NameResolutionVisitor : public ExprVisitor<std::shared_ptr<Symbol>>,
     std::shared_ptr<Type> current_let_type_ = nullptr;
 };
 
+
 // Type check visitor
 class TypeCheckVisitor : public ExprVisitor<std::shared_ptr<Symbol>>,
                          public StmtVisitor,
@@ -336,49 +387,4 @@ class TypeCheckVisitor : public ExprVisitor<std::shared_ptr<Symbol>>,
   private:
     ErrorReporter &error_reporter_;
     std::shared_ptr<Type> current_return_type_;
-};
-
-// Constant evaluator for compile-time constant expressions
-class ConstEvaluator : public ExprVisitor<std::optional<long long>> {
-  public:
-    ConstEvaluator(SymbolTable &symbol_table, ErrorReporter &error_reporter)
-        : symbol_table_(symbol_table), error_reporter_(error_reporter) {}
-
-    std::optional<long long> evaluate(Expr *expr) {
-        if (!expr)
-            return std::nullopt;
-        return expr->accept(this);
-    }
-
-    // Expression visitors that return optional constant value
-    std::optional<long long> visit(LiteralExpr *node) override;
-    std::optional<long long> visit(VariableExpr *node) override;
-    std::optional<long long> visit(BinaryExpr *node) override;
-    std::optional<long long> visit(UnaryExpr *node) override;
-
-    // Default implementations for non-constant expressions
-    std::optional<long long> visit(ArrayLiteralExpr *node) override { return std::nullopt; }
-    std::optional<long long> visit(ArrayInitializerExpr *node) override { return std::nullopt; }
-    std::optional<long long> visit(CallExpr *node) override { return std::nullopt; }
-    std::optional<long long> visit(IfExpr *node) override { return std::nullopt; }
-    std::optional<long long> visit(LoopExpr *node) override { return std::nullopt; }
-    std::optional<long long> visit(WhileExpr *node) override { return std::nullopt; }
-    std::optional<long long> visit(IndexExpr *node) override { return std::nullopt; }
-    std::optional<long long> visit(FieldAccessExpr *node) override { return std::nullopt; }
-    std::optional<long long> visit(AssignmentExpr *node) override { return std::nullopt; }
-    std::optional<long long> visit(CompoundAssignmentExpr *node) override { return std::nullopt; }
-    std::optional<long long> visit(ReferenceExpr *node) override { return std::nullopt; }
-    std::optional<long long> visit(UnderscoreExpr *node) override { return std::nullopt; }
-    std::optional<long long> visit(StructInitializerExpr *node) override { return std::nullopt; }
-    std::optional<long long> visit(UnitExpr *node) override { return std::nullopt; }
-    std::optional<long long> visit(GroupingExpr *node) override { return std::nullopt; }
-    std::optional<long long> visit(TupleExpr *node) override { return std::nullopt; }
-    std::optional<long long> visit(AsExpr *node) override { return std::nullopt; }
-    std::optional<long long> visit(MatchExpr *node) override { return std::nullopt; }
-    std::optional<long long> visit(PathExpr *node) override { return std::nullopt; }
-    std::optional<long long> visit(BlockExpr *node) override { return std::nullopt; }
-
-  private:
-    SymbolTable &symbol_table_;
-    ErrorReporter &error_reporter_;
 };
