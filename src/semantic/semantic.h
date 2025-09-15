@@ -130,7 +130,11 @@ struct FunctionType : public Type {
     std::vector<std::shared_ptr<Type>> param_types;
 
     FunctionType(std::shared_ptr<Type> ret_type, std::vector<std::shared_ptr<Type>> p_types)
-        : return_type(std::move(ret_type)), param_types(std::move(p_types)) {
+        : return_type(std::move(ret_type)) {
+        param_types.resize(p_types.size());
+        for (size_t i = 0; i < p_types.size(); ++i) {
+            param_types[i] = std::move(p_types[i]);
+        }
         this->kind = TypeKind::FUNCTION;
     }
 
@@ -424,6 +428,7 @@ class TypeCheckVisitor : public ExprVisitor<std::shared_ptr<Symbol>>,
   private:
     ErrorReporter &error_reporter_;
     std::shared_ptr<Type> current_return_type_;
+    int loop_depth_ = 0;
 };
 
 void Semantic(std::shared_ptr<Program> &ast, ErrorReporter &error_reporter);

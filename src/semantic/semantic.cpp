@@ -79,7 +79,8 @@ std::optional<long long> ConstEvaluator::visit(UnaryExpr *node) {
 
 void define_builtin_functions(SymbolTable &symbol_table) {
     // printInt(n: i32) -> ()
-    auto printInt_param_types = {std::make_shared<PrimitiveType>(TypeKind::I32)};
+    std::vector<std::shared_ptr<Type>> printInt_param_types = {
+        std::make_shared<PrimitiveType>(TypeKind::I32)};
     auto printInt_return_type = std::make_shared<UnitType>();
     auto printInt_type = std::make_shared<FunctionType>(printInt_return_type, printInt_param_types);
 

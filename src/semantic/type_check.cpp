@@ -118,16 +118,26 @@ std::shared_ptr<Symbol> TypeCheckVisitor::visit(IfExpr *node) {
 }
 
 std::shared_ptr<Symbol> TypeCheckVisitor::visit(LoopExpr *node) {
+    loop_depth_++;
     node->body->accept(this);
-    // TODO: Loop expressions return ()
-    return nullptr; // TODO: Implement proper type checking
+    loop_depth_--;
+    node->type = std::make_shared<UnitType>();
+    return nullptr;
 }
 
 std::shared_ptr<Symbol> TypeCheckVisitor::visit(WhileExpr *node) {
+
     node->condition->accept(this);
+    if (node->condition == nullptr || node->condition->type == nullptr ||
+        node->condition->type->kind != TypeKind::BOOL) {
+        error_reporter_.report_error("Condition expression of while must be of type 'bool'.");
+        return nullptr;
+    }
+    loop_depth_++;
     node->body->accept(this);
-    // TODO: While expressions return ()
-    return nullptr; // TODO: Implement proper type checking
+    loop_depth_--;
+    node->type = std::make_shared<UnitType>();
+    return nullptr;
 }
 
 std::shared_ptr<Symbol> TypeCheckVisitor::visit(IndexExpr *node) {
@@ -243,12 +253,21 @@ void TypeCheckVisitor::visit(ReturnStmt *node) {
 }
 
 void TypeCheckVisitor::visit(BreakStmt *node) {
+    if (loop_depth_ == 0) {
+        error_reporter_.report_error("'break' can only be used inside a loop.");
+        return;
+    }
     if (node->value) {
         (*node->value)->accept(this);
     }
 }
 
-void TypeCheckVisitor::visit(ContinueStmt *node) {}
+void TypeCheckVisitor::visit(ContinueStmt *node) {
+    if (loop_depth_ == 0) {
+        error_reporter_.report_error("'continue' can only be used inside a loop.");
+        return;
+    }
+}
 
 void TypeCheckVisitor::visit(TypeNameNode *node) {}
 
