@@ -146,8 +146,33 @@ std::shared_ptr<Symbol> TypeCheckVisitor::visit(FieldAccessExpr *node) {
 std::shared_ptr<Symbol> TypeCheckVisitor::visit(AssignmentExpr *node) {
     node->target->accept(this);
     node->value->accept(this);
-    // TODO: Type check assignment compatibility
-    return nullptr; // TODO: Implement proper type checking
+    std::shared_ptr<Symbol> target_symbol = node->target->resolved_symbol;
+
+    if (target_symbol) {
+        if (!target_symbol->is_mutable) {
+            error_reporter_.report_error("Cannot assign to immutable variable '" +
+                                         target_symbol->name + "'.");
+        }
+    } else {
+        error_reporter_.report_error("Undefined variable in assignment.");
+    }
+
+    if (node->target->type && node->value->type) {
+        if (node->value->type->kind == TypeKind::ANY_INTEGER &&
+            (node->target->type->kind == TypeKind::I32 ||
+             node->target->type->kind == TypeKind::U32 ||
+             node->target->type->kind == TypeKind::ISIZE ||
+             node->target->type->kind == TypeKind::USIZE)) {
+            // Nothing happens.
+        } else if (!node->target->type->equals(node->value->type.get())) {
+            error_reporter_.report_error(
+                "Type mismatch in assignment. Cannot assign value of type '" +
+                node->value->type->to_string() + "' to variable of type '" +
+                node->target->type->to_string() + "'.");
+        }
+    }
+    node->type = std::make_shared<UnitType>();
+    return nullptr;
 }
 
 std::shared_ptr<Symbol> TypeCheckVisitor::visit(CompoundAssignmentExpr *node) {

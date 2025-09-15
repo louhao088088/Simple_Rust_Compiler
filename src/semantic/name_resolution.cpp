@@ -185,7 +185,7 @@ void NameResolutionVisitor::visit(FnDecl *node) {
 void NameResolutionVisitor::visit(IdentifierPattern *node) {
     auto var_symbol =
         std::make_shared<Symbol>(node->name.lexeme, Symbol::VARIABLE, current_let_type_);
-
+    var_symbol->is_mutable = node->is_mutable;
     if (!symbol_table_.define(node->name.lexeme, var_symbol)) {
         error_reporter_.report_error("Variable '" + node->name.lexeme +
                                          "' is already defined in this scope.",
