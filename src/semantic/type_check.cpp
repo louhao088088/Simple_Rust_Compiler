@@ -123,13 +123,12 @@ std::shared_ptr<Symbol> TypeCheckVisitor::visit(VariableExpr *node) {
     if (node->resolved_symbol && node->resolved_symbol->type) {
         node->type = node->resolved_symbol->type;
     }
-    return nullptr; // TODO: Implement proper type checking
+    return nullptr;
 }
 
 std::shared_ptr<Symbol> TypeCheckVisitor::visit(UnaryExpr *node) {
     node->right->accept(this);
-    // TODO: Type check unary operations
-    return nullptr; // TODO: Implement proper type checking
+    return nullptr;
 }
 
 std::shared_ptr<Symbol> TypeCheckVisitor::visit(BinaryExpr *node) {
@@ -235,7 +234,6 @@ std::shared_ptr<Symbol> TypeCheckVisitor::visit(BinaryExpr *node) {
     return nullptr;
 }
 
-// in TypeCheckVisitor
 std::shared_ptr<Symbol> TypeCheckVisitor::visit(CallExpr *node) {
 
     node->callee->accept(this);
@@ -318,8 +316,29 @@ std::shared_ptr<Symbol> TypeCheckVisitor::visit(WhileExpr *node) {
 std::shared_ptr<Symbol> TypeCheckVisitor::visit(IndexExpr *node) {
     node->object->accept(this);
     node->index->accept(this);
-    // TODO: Type check array/index access
-    return nullptr; // TODO: Implement proper type checking
+
+    auto object_type = node->object->type;
+    auto index_type = node->index->type;
+
+    if (!object_type || !index_type) {
+        return nullptr;
+    }
+
+    if (object_type->kind != TypeKind::ARRAY) {
+        error_reporter_.report_error("Type '" + object_type->to_string() + "' cannot be indexed.");
+        return nullptr;
+    }
+    auto array_type = std::dynamic_pointer_cast<ArrayType>(object_type);
+
+    if (!is_any_integer_type(index_type->kind)) {
+        error_reporter_.report_error("Array index must be an integer.");
+        return nullptr;
+    }
+
+    node->type = array_type->element_type;
+    node->resolved_symbol = node->object->resolved_symbol;
+
+    return nullptr;
 }
 
 std::shared_ptr<Symbol> TypeCheckVisitor::visit(FieldAccessExpr *node) {
@@ -608,11 +627,11 @@ void TypeCheckVisitor::visit(ConstDecl *node) {
 }
 
 void TypeCheckVisitor::visit(EnumDecl *node) {
-    for (auto &variant : node->variants) {
-        // EnumVariant doesn't have accept method, handle manually if needed
-        // variant->name is just an identifier
-        // variant->fields would need type checking if present
-    }
+    // for (auto &variant : node->variants) {
+    //  EnumVariant doesn't have accept method, handle manually if needed
+    //  variant->name is just an identifier
+    //  variant->fields would need type checking if present
+    // }
 }
 
 void TypeCheckVisitor::visit(ModDecl *node) {

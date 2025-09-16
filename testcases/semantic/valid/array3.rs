@@ -1,0 +1,11 @@
+/*
+Time: 2025-08-07
+Verdict: Success
+Comment: array test, basic array declaration and mutable modification
+*/
+
+fn main() {
+    let mut flags: [bool; 5] = [false; 5];
+    flags[2] = true;
+    exit(0);
+}

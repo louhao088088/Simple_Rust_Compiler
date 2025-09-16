@@ -474,8 +474,8 @@ class TypeCheckVisitor : public ExprVisitor<std::shared_ptr<Symbol>>,
     void visit(RestPattern *node) override;
 
   private:
-    ErrorReporter &error_reporter_;
     SymbolTable &symbol_table_;
+    ErrorReporter &error_reporter_;
     std::shared_ptr<Type> current_return_type_ = nullptr;
     Symbol *current_function_symbol_ = nullptr;
     int loop_depth_ = 0;
