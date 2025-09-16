@@ -81,7 +81,7 @@ void define_builtin_functions(SymbolTable &symbol_table) {
 
     // print(s: &str) -> ()
     std::vector<std::shared_ptr<Type>> print_param_types = {
-        std::make_shared<ReferenceType>(std::make_shared<PrimitiveType>(TypeKind::STRING))};
+        std::make_shared<ReferenceType>(std::make_shared<PrimitiveType>(TypeKind::STR))};
     auto print_return_type = std::make_shared<UnitType>();
     auto print_type = std::make_shared<FunctionType>(print_return_type, print_param_types);
 
@@ -91,7 +91,7 @@ void define_builtin_functions(SymbolTable &symbol_table) {
 
     // println(s: &str) -> ()
     std::vector<std::shared_ptr<Type>> println_param_types = {
-        std::make_shared<ReferenceType>(std::make_shared<PrimitiveType>(TypeKind::STRING))};
+        std::make_shared<ReferenceType>(std::make_shared<PrimitiveType>(TypeKind::STR))};
     auto println_return_type = std::make_shared<UnitType>();
     auto println_type = std::make_shared<FunctionType>(println_return_type, println_param_types);
 
@@ -147,6 +147,16 @@ void define_builtin_functions(SymbolTable &symbol_table) {
     exit_symbol->is_builtin = true;
     symbol_table.define("exit", exit_symbol);
 }
+
+bool is_concrete_integer(TypeKind kind) {
+    return kind == TypeKind::I32 || kind == TypeKind::U32 || kind == TypeKind::ISIZE ||
+           kind == TypeKind::USIZE;
+}
+
+bool is_any_integer_type(TypeKind kind) {
+    return is_concrete_integer(kind) || kind == TypeKind::ANY_INTEGER;
+}
+
 void Semantic(std::shared_ptr<Program> &ast, ErrorReporter &error_reporter) {
 
     NameResolutionVisitor name_resolver(error_reporter);

@@ -23,6 +23,7 @@ enum class TypeKind {
     ISIZE,
     USIZE,
     ANY_INTEGER,
+    STR,
     STRING,
     RSTRING,
     CSTRING,
@@ -43,6 +44,8 @@ struct Type {
     virtual std::string to_string() const = 0;
     virtual bool equals(const Type *other) const = 0;
 };
+bool is_concrete_integer(TypeKind kind);
+bool is_any_integer_type(TypeKind kind);
 
 struct PrimitiveType : public Type {
     PrimitiveType(TypeKind primitive_kind) { this->kind = primitive_kind; }
@@ -61,6 +64,8 @@ struct PrimitiveType : public Type {
             return "anyint";
         case TypeKind::BOOL:
             return "bool";
+        case TypeKind::STR:
+            return "str";
         case TypeKind::STRING:
             return "string";
         case TypeKind::RSTRING:
@@ -76,7 +81,22 @@ struct PrimitiveType : public Type {
         }
     }
 
-    bool equals(const Type *other) const override { return kind == other->kind; }
+    bool equals(const Type *other) const override {
+        if (dynamic_cast<const PrimitiveType *>(other) == nullptr) {
+            return false;
+        }
+
+        TypeKind other_kind = other->kind;
+        if (this->kind == TypeKind::ANY_INTEGER) {
+            return is_concrete_integer(other_kind) || other_kind == TypeKind::ANY_INTEGER;
+        }
+
+        if (other_kind == TypeKind::ANY_INTEGER) {
+            return is_concrete_integer(this->kind);
+        }
+
+        return this->kind == other_kind;
+    }
 };
 
 struct ArrayType : public Type {

@@ -28,9 +28,13 @@ void TypeResolver::visit(TypeNameNode *node) {
         resolved_type_ = std::make_shared<PrimitiveType>(TypeKind::BOOL);
     } else if (node->name.lexeme == "char") {
         resolved_type_ = std::make_shared<PrimitiveType>(TypeKind::CHAR);
-    } else if (node->name.lexeme == "string") {
+    } else if (node->name.lexeme == "String") {
         resolved_type_ = std::make_shared<PrimitiveType>(TypeKind::STRING);
-    } else {
+    } else if (node->name.lexeme == "str") {
+        resolved_type_ = std::make_shared<PrimitiveType>(TypeKind::STR);
+    }
+
+    else {
         auto symbol = symbol_table_.lookup(node->name.lexeme);
         if (symbol && symbol->kind == Symbol::TYPE) {
             resolved_type_ = symbol->type;
@@ -89,6 +93,8 @@ void TypeResolver::visit(PathTypeNode *node) {
             resolved_type_ = std::make_shared<PrimitiveType>(TypeKind::CHAR);
         } else if (name == "string") {
             resolved_type_ = std::make_shared<PrimitiveType>(TypeKind::STRING);
+        } else if (name == "str") {
+            resolved_type_ = std::make_shared<PrimitiveType>(TypeKind::STR);
         } else {
             auto symbol = symbol_table_.lookup(name);
             if (symbol && symbol->kind == Symbol::TYPE) {
@@ -125,10 +131,7 @@ void TypeResolver::visit(ReferenceTypeNode *node) {
         return;
     }
 
-    resolved_type_ = std::make_shared<ReferenceType>(
-        resolved_inner_type,
-        node->is_mutable
-    );
+    resolved_type_ = std::make_shared<ReferenceType>(resolved_inner_type, node->is_mutable);
 }
 
 void TypeResolver::visit(SliceTypeNode *node) { resolved_type_ = nullptr; }

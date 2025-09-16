@@ -1,4 +1,4 @@
-fn exit(code: &String) {
+fn exit(code: &str) {
     println(code);
 }
 

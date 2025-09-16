@@ -32,9 +32,11 @@ std::shared_ptr<Symbol> TypeCheckVisitor::visit(LiteralExpr *node) {
         node->type = std::make_shared<PrimitiveType>(TypeKind::BOOL);
         break;
 
-    case TokenType::STRING:
-        node->type = std::make_shared<PrimitiveType>(TypeKind::STRING);
+    case TokenType::STRING: {
+        auto str_primitive_type = std::make_shared<PrimitiveType>(TypeKind::STR);
+        node->type = std::make_shared<ReferenceType>(str_primitive_type, false);
         break;
+    }
 
     case TokenType::CHAR:
         node->type = std::make_shared<PrimitiveType>(TypeKind::CHAR);
@@ -81,21 +83,101 @@ std::shared_ptr<Symbol> TypeCheckVisitor::visit(BinaryExpr *node) {
 
     auto left_type = node->left->type;
     auto right_type = node->right->type;
-    if (left_type && right_type && right_type->kind == TypeKind::ANY_INTEGER &&
-        (left_type->kind == TypeKind::I32 || left_type->kind == TypeKind::U32 ||
-         left_type->kind == TypeKind::ISIZE || left_type->kind == TypeKind::USIZE)) {
-        node->type = left_type;
-    } else if (left_type && right_type && left_type->kind == TypeKind::ANY_INTEGER &&
-               (right_type->kind == TypeKind::I32 || right_type->kind == TypeKind::U32 ||
-                right_type->kind == TypeKind::ISIZE || right_type->kind == TypeKind::USIZE)) {
-        node->type = right_type;
-    } else if (left_type && right_type && left_type->equals(right_type.get())) {
-        node->type = left_type;
-    } else {
-        error_reporter_.report_error("Type mismatch in binary expression.");
+
+    if (!left_type || !right_type) {
+        return nullptr;
     }
 
-    return nullptr; // TODO: Implement proper type checking
+    switch (node->op.type) {
+    case TokenType::PLUS:
+    case TokenType::MINUS:
+    case TokenType::STAR:
+    case TokenType::SLASH:
+    case TokenType::PERCENT: {
+
+        bool left_is_int = is_any_integer_type(left_type->kind);
+        bool right_is_int = is_any_integer_type(right_type->kind);
+
+        if (left_is_int && right_is_int) {
+            if (is_concrete_integer(left_type->kind)) {
+                node->type = left_type;
+            } else if (is_concrete_integer(right_type->kind)) {
+                node->type = right_type;
+            } else {
+                node->type = std::make_shared<PrimitiveType>(TypeKind::ANY_INTEGER);
+            }
+        } else {
+            error_reporter_.report_error("Arithmetic operations can only be performed on integers.",
+                                         node->op.line);
+        }
+        break;
+    }
+
+    case TokenType::EQUAL_EQUAL:
+    case TokenType::BANG_EQUAL: {
+        bool is_valid = false;
+
+        if (is_any_integer_type(left_type->kind) && is_any_integer_type(right_type->kind)) {
+            is_valid = true;
+        }
+
+        else if (left_type->kind == TypeKind::BOOL && right_type->kind == TypeKind::BOOL) {
+            is_valid = true;
+        }
+
+        else if (left_type->kind == TypeKind::REFERENCE &&
+                 right_type->kind == TypeKind::REFERENCE) {
+
+            if (left_type->equals(right_type.get())) {
+                is_valid = true;
+            }
+        }
+
+        if (is_valid) {
+            node->type = std::make_shared<PrimitiveType>(TypeKind::BOOL);
+        } else {
+            error_reporter_.report_error(
+                "Invalid operands for equality operator. Operands must be of the same compatible "
+                "type (integers, booleans, or references).",
+                node->op.line);
+        }
+        break;
+    }
+
+    case TokenType::LESS:
+    case TokenType::LESS_EQUAL:
+    case TokenType::GREATER:
+    case TokenType::GREATER_EQUAL: {
+
+        bool left_is_int = is_any_integer_type(left_type->kind);
+        bool right_is_int = is_any_integer_type(right_type->kind);
+
+        if (left_is_int && right_is_int) {
+            node->type = std::make_shared<PrimitiveType>(TypeKind::BOOL);
+        } else {
+            error_reporter_.report_error(
+                "Comparison operations are only supported for integers for now.", node->op.line);
+        }
+        break;
+    }
+
+    case TokenType::AMPERSAND_AMPERSAND:
+    case TokenType::PIPE_PIPE: {
+        if (left_type->kind == TypeKind::BOOL && right_type->kind == TypeKind::BOOL) {
+            node->type = std::make_shared<PrimitiveType>(TypeKind::BOOL);
+        } else {
+            error_reporter_.report_error("Logical operations can only be performed on booleans.",
+                                         node->op.line);
+        }
+        break;
+    }
+
+    default:
+        error_reporter_.report_error("Unsupported binary operator.", node->op.line);
+        break;
+    }
+
+    return nullptr;
 }
 
 // in TypeCheckVisitor
@@ -266,19 +348,13 @@ void TypeCheckVisitor::visit(LetStmt *node) {
     if (auto id_pattern = dynamic_cast<IdentifierPattern *>(node->pattern.get())) {
         if (id_pattern->resolved_symbol) {
             std::shared_ptr<Type> declared_type = id_pattern->resolved_symbol->type;
-            if (initializer_type->kind == TypeKind::ANY_INTEGER && declared_type &&
-                (declared_type->kind == TypeKind::I32 || declared_type->kind == TypeKind::U32 ||
-                 declared_type->kind == TypeKind::ISIZE ||
-                 declared_type->kind == TypeKind::USIZE)) {
-                id_pattern->resolved_symbol->type = declared_type;
-                return;
-            }
 
             if (!declared_type->equals(initializer_type.get())) {
                 error_reporter_.report_error("Mismatched types. Expected '" +
                                              declared_type->to_string() + "' but found '" +
                                              initializer_type->to_string() + "'.");
-            }
+            } else
+                id_pattern->resolved_symbol->type = declared_type;
         }
     }
 }
@@ -404,12 +480,14 @@ std::shared_ptr<Symbol> TypeCheckVisitor::visit(StructInitializerExpr *node) {
 }
 
 std::shared_ptr<Symbol> TypeCheckVisitor::visit(UnitExpr *node) {
-    // Unit expressions have unit type
-    return nullptr; // TODO: Implement proper type checking
+    node->type = std::make_shared<UnitType>();
+    return nullptr;
 }
 
 std::shared_ptr<Symbol> TypeCheckVisitor::visit(GroupingExpr *node) {
-    return node->expression->accept(this);
+    node->expression->accept(this);
+    node->type = node->expression->type;
+    return nullptr;
 }
 
 std::shared_ptr<Symbol> TypeCheckVisitor::visit(TupleExpr *node) {
