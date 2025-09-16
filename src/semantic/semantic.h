@@ -291,6 +291,7 @@ class ConstEvaluator : public ExprVisitor<std::optional<long long>> {
     std::optional<long long> visit(VariableExpr *node) override;
     std::optional<long long> visit(BinaryExpr *node) override;
     std::optional<long long> visit(UnaryExpr *node) override;
+    std::optional<long long> visit(GroupingExpr *node) override;
 
     // Default implementations for non-constant expressions
     std::optional<long long> visit(ArrayLiteralExpr *node) override { return std::nullopt; }
@@ -307,7 +308,6 @@ class ConstEvaluator : public ExprVisitor<std::optional<long long>> {
     std::optional<long long> visit(UnderscoreExpr *node) override { return std::nullopt; }
     std::optional<long long> visit(StructInitializerExpr *node) override { return std::nullopt; }
     std::optional<long long> visit(UnitExpr *node) override { return std::nullopt; }
-    std::optional<long long> visit(GroupingExpr *node) override { return std::nullopt; }
     std::optional<long long> visit(TupleExpr *node) override { return std::nullopt; }
     std::optional<long long> visit(AsExpr *node) override { return std::nullopt; }
     std::optional<long long> visit(MatchExpr *node) override { return std::nullopt; }
@@ -407,7 +407,7 @@ class TypeCheckVisitor : public ExprVisitor<std::shared_ptr<Symbol>>,
                          public TypeVisitor,
                          public PatternVisitor {
   public:
-    TypeCheckVisitor(ErrorReporter &error_reporter);
+    TypeCheckVisitor(SymbolTable &symbol_table, ErrorReporter &error_reporter);
 
     // Expression visitors
     std::shared_ptr<Symbol> visit(LiteralExpr *node) override;
@@ -475,6 +475,7 @@ class TypeCheckVisitor : public ExprVisitor<std::shared_ptr<Symbol>>,
 
   private:
     ErrorReporter &error_reporter_;
+    SymbolTable &symbol_table_;
     std::shared_ptr<Type> current_return_type_ = nullptr;
     Symbol *current_function_symbol_ = nullptr;
     int loop_depth_ = 0;

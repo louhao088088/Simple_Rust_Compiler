@@ -52,6 +52,28 @@ void TypeResolver::visit(ArrayTypeNode *node) {
         return;
     }
 
+    if (auto *var_expr = dynamic_cast<VariableExpr *>(node->size.get())) {
+        auto symbol = symbol_table_.lookup(var_expr->name.lexeme);
+        if (symbol && symbol->type) {
+            if (symbol->type->kind != TypeKind::USIZE) {
+                error_reporter_.report_error(
+                    "Array size must be of type 'usize', but found type '" +
+                        symbol->type->to_string() + "'.",
+                    var_expr->name.line);
+                resolved_type_ = nullptr;
+                return;
+            }
+        }
+    } else if (auto *lit_expr = dynamic_cast<LiteralExpr *>(node->size.get())) {
+    } else {
+
+        error_reporter_.report_error(
+            "Only variables and integer literals are supported as array sizes for now.");
+        // TO DO
+        resolved_type_ = nullptr;
+        return;
+    }
+
     ConstEvaluator const_evaluator(symbol_table_, error_reporter_);
     auto size_opt = const_evaluator.evaluate(node->size.get());
 

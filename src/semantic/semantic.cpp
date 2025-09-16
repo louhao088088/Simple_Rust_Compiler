@@ -38,7 +38,19 @@ std::optional<long long> ConstEvaluator::visit(LiteralExpr *node) {
     return std::nullopt;
 }
 
-std::optional<long long> ConstEvaluator::visit(VariableExpr *node) { return std::nullopt; }
+std::optional<long long> ConstEvaluator::visit(VariableExpr *node) {
+    std::shared_ptr<Symbol> symbol = node->resolved_symbol;
+
+    if (!symbol) {
+        symbol = symbol_table_.lookup(node->name.lexeme);
+    }
+
+    if (symbol && symbol->kind == Symbol::CONSTANT && symbol->const_decl_node) {
+        return this->evaluate(symbol->const_decl_node->value.get());
+    }
+    
+    return std::nullopt;
+}
 
 std::optional<long long> ConstEvaluator::visit(BinaryExpr *node) {
     auto left_val = evaluate(node->left.get());
@@ -52,8 +64,26 @@ std::optional<long long> ConstEvaluator::visit(BinaryExpr *node) {
             return *left_val - *right_val;
         case TokenType::STAR:
             return *left_val * *right_val;
-        case TokenType::SLASH:
+        case TokenType::SLASH: {
+            if (*right_val == 0) {
+                error_reporter_.report_error("Division by zero in constant expression.",
+                                             node->op.line);
+                return std::nullopt;
+            }
             return *left_val / *right_val;
+        }
+        case TokenType::EQUAL_EQUAL:
+            return (*left_val == *right_val) ? 1 : 0;
+        case TokenType::BANG_EQUAL:
+            return (*left_val != *right_val) ? 1 : 0;
+        case TokenType::LESS:
+            return (*left_val < *right_val) ? 1 : 0;
+        case TokenType::LESS_EQUAL:
+            return (*left_val <= *right_val) ? 1 : 0;
+        case TokenType::GREATER:
+            return (*left_val > *right_val) ? 1 : 0;
+        case TokenType::GREATER_EQUAL:
+            return (*left_val >= *right_val) ? 1 : 0;
         default:
             return std::nullopt;
         }
@@ -75,6 +105,10 @@ std::optional<long long> ConstEvaluator::visit(UnaryExpr *node) {
         }
     }
     return std::nullopt;
+}
+
+std::optional<long long> ConstEvaluator::visit(GroupingExpr *node) {
+    return evaluate(node->expression.get());
 }
 
 void define_builtin_functions(SymbolTable &symbol_table) {
@@ -173,9 +207,7 @@ void Semantic(std::shared_ptr<Program> &ast, ErrorReporter &error_reporter) {
         return;
     }
 
-    global_symbol_table_name.exit_scope();
-
-    TypeCheckVisitor type_checker(error_reporter);
+    TypeCheckVisitor type_checker(global_symbol_table_name, error_reporter);
 
     for (auto &item : ast->items) {
         item->accept(&type_checker);
@@ -184,4 +216,6 @@ void Semantic(std::shared_ptr<Program> &ast, ErrorReporter &error_reporter) {
         std::cerr << "Type checking completed with errors." << std::endl;
         return;
     }
+
+    global_symbol_table_name.exit_scope();
 }

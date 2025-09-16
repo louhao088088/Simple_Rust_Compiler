@@ -2,8 +2,8 @@
 
 // TypeCheckVisitor implementation
 
-TypeCheckVisitor::TypeCheckVisitor(ErrorReporter &error_reporter)
-    : error_reporter_(error_reporter) {}
+TypeCheckVisitor::TypeCheckVisitor(SymbolTable &symbol_table, ErrorReporter &error_reporter)
+    : symbol_table_(symbol_table), error_reporter_(error_reporter) {}
 
 std::shared_ptr<Symbol> TypeCheckVisitor::visit(LiteralExpr *node) {
     const TokenType token_type = node->literal.type;
@@ -50,18 +50,73 @@ std::shared_ptr<Symbol> TypeCheckVisitor::visit(LiteralExpr *node) {
 }
 
 std::shared_ptr<Symbol> TypeCheckVisitor::visit(ArrayLiteralExpr *node) {
+    if (node->elements.empty()) {
+        error_reporter_.report_error("Cannot infer type of empty array literal.");
+        return nullptr;
+    }
 
     for (auto &element : node->elements) {
         element->accept(this);
     }
-    return nullptr; // TODO: Implement proper type checking
+
+    std::shared_ptr<Type> array_element_type = node->elements[0]->type;
+
+    // Find a basic element type.
+    if (array_element_type->kind == TypeKind::ANY_INTEGER) {
+        for (const auto &element : node->elements) {
+            if (is_concrete_integer(element->type->kind)) {
+                array_element_type = element->type;
+                break;
+            }
+        }
+    }
+
+    // Check all elements are of the same type.
+    for (const auto &element : node->elements) {
+        if (!element->type || !array_element_type->equals(element->type.get())) {
+            error_reporter_.report_error(
+                "Mismatched types in array literal. Expected element of type '" +
+                array_element_type->to_string() + "' but found '" +
+                (element->type ? element->type->to_string() : "unknown") + "'.");
+            return nullptr;
+        }
+    }
+
+    size_t array_size = node->elements.size();
+
+    node->type = std::make_shared<ArrayType>(array_element_type, array_size);
+
+    return nullptr;
 }
 
 std::shared_ptr<Symbol> TypeCheckVisitor::visit(ArrayInitializerExpr *node) {
     node->value->accept(this);
-    node->size->accept(this);
-    // TODO: Type check and infer array type
-    return nullptr; // TODO: Implement proper type checking
+    std::shared_ptr<Type> element_type = node->value->type;
+
+    if (!element_type) {
+        return nullptr;
+    }
+
+    ConstEvaluator const_evaluator(symbol_table_, error_reporter_);
+
+    std::optional<long long> size_opt = const_evaluator.evaluate(node->size.get());
+
+    if (!size_opt) {
+        error_reporter_.report_error("Array size must be a compile-time constant expression.");
+        return nullptr;
+    }
+
+    long long evaluated_size = *size_opt;
+    if (evaluated_size < 0) {
+        error_reporter_.report_error("Array size cannot be negative.");
+        return nullptr;
+    }
+
+    size_t array_size = static_cast<size_t>(evaluated_size);
+
+    node->type = std::make_shared<ArrayType>(element_type, array_size);
+
+    return nullptr;
 }
 
 std::shared_ptr<Symbol> TypeCheckVisitor::visit(VariableExpr *node) {
