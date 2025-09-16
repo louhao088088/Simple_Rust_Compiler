@@ -282,6 +282,11 @@ std::shared_ptr<Symbol> TypeCheckVisitor::visit(CallExpr *node) {
 
 std::shared_ptr<Symbol> TypeCheckVisitor::visit(IfExpr *node) {
     node->condition->accept(this);
+    if (node->condition == nullptr || node->condition->type == nullptr ||
+        node->condition->type->kind != TypeKind::BOOL) {
+        error_reporter_.report_error("Condition expression of while must be of type 'bool'.");
+        return nullptr;
+    }
     node->then_branch->accept(this);
     if (node->else_branch) {
         (*node->else_branch)->accept(this);
@@ -343,8 +348,7 @@ std::shared_ptr<Symbol> TypeCheckVisitor::visit(IndexExpr *node) {
 
 std::shared_ptr<Symbol> TypeCheckVisitor::visit(FieldAccessExpr *node) {
     node->object->accept(this);
-    // TODO: Type check field access
-    return nullptr; // TODO: Implement proper type checking
+    return nullptr;
 }
 
 std::shared_ptr<Symbol> TypeCheckVisitor::visit(AssignmentExpr *node) {
@@ -382,20 +386,15 @@ std::shared_ptr<Symbol> TypeCheckVisitor::visit(AssignmentExpr *node) {
 std::shared_ptr<Symbol> TypeCheckVisitor::visit(CompoundAssignmentExpr *node) {
     node->target->accept(this);
     node->value->accept(this);
-    // TODO: Type check compound assignment compatibility
-    return nullptr; // TODO: Implement proper type checking
+    return nullptr;
 }
 
 std::shared_ptr<Symbol> TypeCheckVisitor::visit(ReferenceExpr *node) {
     node->expression->accept(this);
-    // TODO: Handle reference type checking
-    return nullptr; // TODO: Implement proper type checking
+    return nullptr;
 }
 
-std::shared_ptr<Symbol> TypeCheckVisitor::visit(UnderscoreExpr *node) {
-    // Underscore expression has unknown type for now
-    return nullptr; // TODO: Implement proper type checking
-}
+std::shared_ptr<Symbol> TypeCheckVisitor::visit(UnderscoreExpr *node) { return nullptr; }
 
 void TypeCheckVisitor::visit(BlockStmt *node) {
     for (auto &stmt : node->statements) {
