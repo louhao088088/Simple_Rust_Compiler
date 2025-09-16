@@ -98,25 +98,50 @@ std::shared_ptr<Symbol> TypeCheckVisitor::visit(BinaryExpr *node) {
     return nullptr; // TODO: Implement proper type checking
 }
 
+// in TypeCheckVisitor
 std::shared_ptr<Symbol> TypeCheckVisitor::visit(CallExpr *node) {
 
     node->callee->accept(this);
     for (auto &arg : node->arguments) {
         arg->accept(this);
     }
-    // TO DO: Type check function call
+
+    if (node->callee->type->kind != TypeKind::FUNCTION) {
+        error_reporter_.report_error("This expression is not callable.");
+        return nullptr;
+    }
+
+    auto fn_type = std::dynamic_pointer_cast<FunctionType>(node->callee->type);
+
+    if (node->arguments.size() != fn_type->param_types.size()) {
+        error_reporter_.report_error("Expected " + std::to_string(fn_type->param_types.size()) +
+                                     " arguments, but found " +
+                                     std::to_string(node->arguments.size()) + ".");
+        return nullptr;
+    }
+
+    for (size_t i = 0; i < node->arguments.size(); ++i) {
+        auto &arg_type = node->arguments[i]->type;
+        auto &param_type = fn_type->param_types[i];
+        if (arg_type && !arg_type->equals(param_type.get())) {
+            error_reporter_.report_error("Mismatched types. Expected argument type '" +
+                                         param_type->to_string() + "' but found '" +
+                                         arg_type->to_string() + "'.");
+        }
+    }
+
+    node->type = fn_type->return_type;
 
     if (node->callee->resolved_symbol) {
         auto callee_symbol = node->callee->resolved_symbol;
         if (callee_symbol->name == "exit" && callee_symbol->is_builtin) {
-            if (!current_function_symbol_ || current_function_symbol_->name != "main") {
-                error_reporter_.report_error("Built-in function 'exit' can only be called directly "
-                                             "within the 'main' function.");
+            if (current_function_symbol_ && current_function_symbol_->name != "main") {
+                error_reporter_.report_error(
+                    "'exit' can only be called within the 'main' function.");
             }
         }
     }
 
-    // TO DO
     return nullptr;
 }
 
@@ -261,7 +286,22 @@ void TypeCheckVisitor::visit(LetStmt *node) {
 void TypeCheckVisitor::visit(ReturnStmt *node) {
     if (node->value) {
         (*node->value)->accept(this);
-        // TODO: Check return type compatibility
+        auto actual_return_type = (*node->value)->type;
+
+        if (actual_return_type && !actual_return_type->equals(current_return_type_.get())) {
+            error_reporter_.report_error("Mismatched return type. Expected '" +
+                                             current_return_type_->to_string() + "' but found '" +
+                                             actual_return_type->to_string() + "'.",
+                                         node->keyword.line);
+        }
+    } else {
+        auto implicit_unit_type = std::make_shared<UnitType>();
+        if (!implicit_unit_type->equals(current_return_type_.get())) {
+            error_reporter_.report_error("This function should return a value of type '" +
+                                             current_return_type_->to_string() +
+                                             "', but the return statement is empty.",
+                                         node->keyword.line);
+        }
     }
 }
 
@@ -301,6 +341,14 @@ void TypeCheckVisitor::visit(FnDecl *node) {
     Symbol *previous_function = current_function_symbol_;
     current_function_symbol_ = node->resolved_symbol.get();
 
+    std::shared_ptr<Type> previous_return_type = current_return_type_;
+    if (node->resolved_symbol && node->resolved_symbol->type->kind == TypeKind::FUNCTION) {
+        auto fn_type = std::dynamic_pointer_cast<FunctionType>(node->resolved_symbol->type);
+        current_return_type_ = fn_type->return_type;
+    } else {
+        current_return_type_ = std::make_shared<UnitType>();
+    }
+
     if (node->body) {
         (*node->body)->accept(this);
     }
@@ -312,16 +360,15 @@ void TypeCheckVisitor::visit(FnDecl *node) {
     }
 
     current_function_symbol_ = previous_function;
+    current_return_type_ = previous_return_type;
 }
 
-// Pattern visitors for TypeCheckVisitor (simplified implementations)
+// Pattern visitors for TypeCheckVisitor
 void TypeCheckVisitor::visit(IdentifierPattern *node) {
     // Pattern type checking would go here
 }
 
-void TypeCheckVisitor::visit(WildcardPattern *node) {
-    // No type checking needed for wildcard
-}
+void TypeCheckVisitor::visit(WildcardPattern *node) {}
 
 void TypeCheckVisitor::visit(LiteralPattern *node) {
     // Type check literal pattern
@@ -453,5 +500,36 @@ void TypeCheckVisitor::visit(ImplBlock *node) {
     node->target_type->accept(this);
     for (auto &item : node->implemented_items) {
         item->accept(this);
+    }
+}
+
+void TypeCheckVisitor::check_main_for_early_exit(BlockStmt *body) {
+    if (!body || body->statements.empty()) {
+        return;
+    }
+
+    size_t statements_to_check = body->statements.size() - 1;
+
+    for (size_t i = 0; i < statements_to_check; ++i) {
+        auto &stmt = body->statements[i];
+
+        auto *expr_stmt = dynamic_cast<ExprStmt *>(stmt.get());
+        if (!expr_stmt) {
+            continue;
+        }
+
+        auto *call_expr = dynamic_cast<CallExpr *>(expr_stmt->expression.get());
+        if (!call_expr) {
+            continue;
+        }
+
+        if (call_expr->callee->resolved_symbol) {
+            const auto &callee_symbol = call_expr->callee->resolved_symbol;
+
+            if (callee_symbol->name == "exit" && callee_symbol->is_builtin) {
+                error_reporter_.report_error(
+                    "Built-in function 'exit' must be the final statement in 'main'.");
+            }
+        }
     }
 }

@@ -164,19 +164,51 @@ void NameResolutionVisitor::visit(TupleTypeNode *node) {
 }
 
 void NameResolutionVisitor::visit(FnDecl *node) {
-    auto fn_symbol = std::make_shared<Symbol>(node->name.lexeme, Symbol::FUNCTION);
-    symbol_table_.define(node->name.lexeme, fn_symbol);
+    std::vector<std::shared_ptr<Type>> param_types;
+    for (const auto &param : node->params) {
+        if (param->type) {
+            auto param_type = type_resolver_.resolve(param->type.get());
+            if (param_type) {
+                param_types.push_back(param_type);
+            } else {
+                error_reporter_.report_error("Could not resolve type for parameter.");
+            }
+        } else {
+            error_reporter_.report_error("Function parameters must have a type annotation.");
+        }
+    }
+
+    std::shared_ptr<Type> return_type;
+    if (node->return_type) {
+        return_type = type_resolver_.resolve((*node->return_type).get());
+    } else {
+        return_type = std::make_shared<UnitType>();
+    }
+
+    auto function_type = std::make_shared<FunctionType>(return_type, param_types);
+
+    auto fn_symbol = std::make_shared<Symbol>(node->name.lexeme, Symbol::FUNCTION, function_type);
+    if (!symbol_table_.define(node->name.lexeme, fn_symbol)) {
+        error_reporter_.report_error("Function '" + node->name.lexeme + "' is already defined.",
+                                     node->name.line);
+    }
     node->resolved_symbol = fn_symbol;
 
     if (node->body) {
         symbol_table_.enter_scope();
-        for (const auto &param : node->params) {
-            // Handle FnParam manually since it's not an Expr
+
+        for (size_t i = 0; i < node->params.size(); ++i) {
+            const auto &param = node->params[i];
+
+            std::shared_ptr<Type> type_for_this_param = param_types[i];
+
+            current_let_type_ = type_for_this_param;
             param->pattern->accept(this);
-            if (param->type)
-                param->type->accept(this);
+            current_let_type_ = nullptr;
         }
+
         (*node->body)->accept(this);
+
         symbol_table_.exit_scope();
     }
 }

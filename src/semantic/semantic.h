@@ -455,9 +455,11 @@ class TypeCheckVisitor : public ExprVisitor<std::shared_ptr<Symbol>>,
 
   private:
     ErrorReporter &error_reporter_;
-    std::shared_ptr<Type> current_return_type_;
+    std::shared_ptr<Type> current_return_type_ = nullptr;
     Symbol *current_function_symbol_ = nullptr;
     int loop_depth_ = 0;
+
+    void check_main_for_early_exit(BlockStmt *body);
 };
 
 void Semantic(std::shared_ptr<Program> &ast, ErrorReporter &error_reporter);
