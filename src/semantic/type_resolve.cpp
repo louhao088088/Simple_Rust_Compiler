@@ -8,9 +8,12 @@ TypeResolver::TypeResolver(NameResolutionVisitor &resolver, SymbolTable &symbols
 std::shared_ptr<Type> TypeResolver::resolve(TypeNode *node) {
     if (!node)
         return nullptr;
-
+    if (node->resolved_type)
+        return node->resolved_type;
     resolved_type_ = nullptr;
     node->accept(this);
+    node->resolved_type = resolved_type_;
+    
     return resolved_type_;
 }
 

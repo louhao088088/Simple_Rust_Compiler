@@ -38,6 +38,7 @@ struct Item : public Node {
 
 struct TypeNode : public Node {
     std::shared_ptr<Symbol> resolved_symbol;
+    std::shared_ptr<Type> resolved_type;
     virtual void accept(TypeVisitor *visitor) = 0;
 };
 

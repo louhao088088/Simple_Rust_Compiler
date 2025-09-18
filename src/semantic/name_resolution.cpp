@@ -129,9 +129,9 @@ void NameResolutionVisitor::visit(LetStmt *node) {
         (*node->initializer)->accept(this);
     }
 
-    current_let_type_ = var_type;
+    current_type_ = var_type;
     node->pattern->accept(this);
-    current_let_type_ = nullptr;
+    current_type_ = nullptr;
 }
 
 void NameResolutionVisitor::visit(ReturnStmt *node) {
@@ -202,9 +202,9 @@ void NameResolutionVisitor::visit(FnDecl *node) {
 
             std::shared_ptr<Type> type_for_this_param = param_types[i];
 
-            current_let_type_ = type_for_this_param;
+            current_type_ = type_for_this_param;
             param->pattern->accept(this);
-            current_let_type_ = nullptr;
+            current_type_ = nullptr;
         }
 
         (*node->body)->accept(this);
@@ -216,7 +216,7 @@ void NameResolutionVisitor::visit(FnDecl *node) {
 // Pattern visitors
 void NameResolutionVisitor::visit(IdentifierPattern *node) {
     auto var_symbol =
-        std::make_shared<Symbol>(node->name.lexeme, Symbol::VARIABLE, current_let_type_);
+        std::make_shared<Symbol>(node->name.lexeme, Symbol::VARIABLE, current_type_);
     var_symbol->is_mutable = node->is_mutable;
     if (!symbol_table_.define(node->name.lexeme, var_symbol)) {
         error_reporter_.report_error("Variable '" + node->name.lexeme +
@@ -270,7 +270,15 @@ std::shared_ptr<Symbol> NameResolutionVisitor::visit(TupleExpr *node) {
 
 std::shared_ptr<Symbol> NameResolutionVisitor::visit(AsExpr *node) {
     node->expression->accept(this);
-    node->target_type->accept(this);
+    std::shared_ptr<Type> var_type = nullptr;
+    if (node->target_type) {
+        var_type = type_resolver_.resolve(node->target_type.get());
+        if (!var_type) {
+            error_reporter_.report_error("Cannot resolve As expression for variable.");
+        }
+    } else {
+        error_reporter_.report_error("As expression must have a type annotation.");
+    }
     return nullptr;
 }
 

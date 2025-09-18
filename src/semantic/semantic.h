@@ -397,7 +397,7 @@ class NameResolutionVisitor : public ExprVisitor<std::shared_ptr<Symbol>>,
     SymbolTable symbol_table_;
     ErrorReporter &error_reporter_;
     TypeResolver type_resolver_;
-    std::shared_ptr<Type> current_let_type_ = nullptr;
+    std::shared_ptr<Type> current_type_ = nullptr;
 };
 
 // Type check visitor
