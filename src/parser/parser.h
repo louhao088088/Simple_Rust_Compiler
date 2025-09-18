@@ -92,10 +92,10 @@ class Parser {
     std::shared_ptr<ContinueStmt> parse_continue_statement();
 
     // Expressions (Pratt Parser)
-    std::shared_ptr<Expr> parse_expression(Precedence precedence,
-                                           bool allow_struct_literal = false);
+    std::shared_ptr<Expr> parse_expression(Precedence precedence);
     std::shared_ptr<IfExpr> parse_if_expression();
     std::shared_ptr<LoopExpr> parse_loop_expression();
+    std::shared_ptr<BlockExpr> parse_block_expression();
     std::shared_ptr<WhileExpr> parse_while_expression();
     std::shared_ptr<MatchArm> parse_match_arm();
     std::shared_ptr<MatchExpr> parse_match_expression();

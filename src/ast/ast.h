@@ -103,10 +103,10 @@ struct CallExpr : public Expr {
 
 struct IfExpr : public Expr {
     std::shared_ptr<Expr> condition;
-    std::shared_ptr<Stmt> then_branch;
-    std::optional<std::shared_ptr<Stmt>> else_branch;
-    IfExpr(std::shared_ptr<Expr> cond, std::shared_ptr<Stmt> then_b,
-           std::optional<std::shared_ptr<Stmt>> else_b)
+    std::shared_ptr<Expr> then_branch;
+    std::optional<std::shared_ptr<Expr>> else_branch;
+    IfExpr(std::shared_ptr<Expr> cond, std::shared_ptr<Expr> then_b,
+           std::optional<std::shared_ptr<Expr>> else_b)
         : condition(std::move(cond)), then_branch(std::move(then_b)),
           else_branch(std::move(else_b)) {}
     void print(std::ostream &os, int indent = 0) const override;

@@ -479,6 +479,7 @@ class TypeCheckVisitor : public ExprVisitor<std::shared_ptr<Symbol>>,
     std::shared_ptr<Type> current_return_type_ = nullptr;
     Symbol *current_function_symbol_ = nullptr;
     int loop_depth_ = 0;
+    std::vector<std::shared_ptr<Type>> breakable_expr_type_stack_;
 
     void check_main_for_early_exit(BlockStmt *body);
 };

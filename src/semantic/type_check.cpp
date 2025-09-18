@@ -284,22 +284,28 @@ std::shared_ptr<Symbol> TypeCheckVisitor::visit(IfExpr *node) {
     node->condition->accept(this);
     if (node->condition == nullptr || node->condition->type == nullptr ||
         node->condition->type->kind != TypeKind::BOOL) {
-        error_reporter_.report_error("Condition expression of while must be of type 'bool'.");
+        error_reporter_.report_error("Condition expression of if must be of type 'bool'.");
         return nullptr;
     }
     node->then_branch->accept(this);
     if (node->else_branch) {
         (*node->else_branch)->accept(this);
     }
-    // TODO: Type check if expression
-    return nullptr; // TODO: Implement proper type checking
+
+    return nullptr;
 }
 
 std::shared_ptr<Symbol> TypeCheckVisitor::visit(LoopExpr *node) {
     loop_depth_++;
+    breakable_expr_type_stack_.push_back(nullptr);
     node->body->accept(this);
     loop_depth_--;
-    node->type = std::make_shared<UnitType>();
+    if (breakable_expr_type_stack_.back() != nullptr) {
+        node->type = breakable_expr_type_stack_.back();
+    } else {
+        node->type = std::make_shared<UnitType>();
+    }
+    breakable_expr_type_stack_.pop_back();
     return nullptr;
 }
 
@@ -312,9 +318,18 @@ std::shared_ptr<Symbol> TypeCheckVisitor::visit(WhileExpr *node) {
         return nullptr;
     }
     loop_depth_++;
+
+    breakable_expr_type_stack_.push_back(nullptr);
     node->body->accept(this);
+
     loop_depth_--;
-    node->type = std::make_shared<UnitType>();
+
+    if (breakable_expr_type_stack_.back() != nullptr) {
+        node->type = breakable_expr_type_stack_.back();
+    } else {
+        node->type = std::make_shared<UnitType>();
+    }
+    breakable_expr_type_stack_.pop_back();
     return nullptr;
 }
 
@@ -459,8 +474,27 @@ void TypeCheckVisitor::visit(BreakStmt *node) {
         error_reporter_.report_error("'break' can only be used inside a loop.");
         return;
     }
+    if (breakable_expr_type_stack_.empty()) {
+        error_reporter_.report_error("Internal error: breakable expression type stack is empty.");
+        return;
+    }
+    auto &expected_type = breakable_expr_type_stack_.back();
     if (node->value) {
         (*node->value)->accept(this);
+        if (expected_type == nullptr) {
+            expected_type = (*node->value)->type;
+        } else if ((*node->value)->type && !expected_type->equals((*node->value)->type.get())) {
+            error_reporter_.report_error("Mismatched types in 'break' expression. Expected type '" +
+                                         expected_type->to_string() + "' but found '" +
+                                         (*node->value)->type->to_string() + "'.");
+        }
+    } else {
+        if (expected_type == nullptr) {
+            expected_type = std::make_shared<UnitType>();
+        } else if (!expected_type->equals(std::make_shared<UnitType>().get())) {
+            error_reporter_.report_error("Mismatched types in 'break' expression. Expected type '" +
+                                         expected_type->to_string() + "' but found '()'.");
+        }
     }
 }
 
@@ -573,7 +607,24 @@ std::shared_ptr<Symbol> TypeCheckVisitor::visit(TupleExpr *node) {
 std::shared_ptr<Symbol> TypeCheckVisitor::visit(AsExpr *node) {
     node->expression->accept(this);
     node->target_type->accept(this);
-    return nullptr; // TODO: Implement proper type checking
+    if (node->target_type->resolved_symbol && node->target_type->resolved_symbol->type) {
+        if (node->expression->type->kind != TypeKind::ANY_INTEGER &&
+            node->expression->type->kind != TypeKind::CHAR &&
+            node->expression->type->kind != TypeKind::BOOL &&
+            !is_concrete_integer(node->expression->type->kind)) {
+            error_reporter_.report_error("The expression's type is not supported: " +
+                                         node->expression->type->to_string() + ".");
+            return nullptr;
+        }
+        if (!is_concrete_integer(node->target_type->resolved_symbol->type->kind)) {
+            error_reporter_.report_error("The target type is not supported: " +
+                                         node->target_type->resolved_symbol->type->to_string() +
+                                         ".");
+            return nullptr;
+        }
+        node->type = node->target_type->resolved_symbol->type;
+    }
+    return nullptr;
 }
 
 std::shared_ptr<Symbol> TypeCheckVisitor::visit(MatchExpr *node) {

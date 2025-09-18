@@ -307,6 +307,11 @@ Parser::Parser(const std::vector<Token> &tokens, ErrorReporter &error_reporter)
         auto right = std::make_shared<VariableExpr>(right_token);
         return std::make_shared<PathExpr>(std::move(left), op, std::move(right));
     });
+
+    register_infix(TokenType::LEFT_BRACE, Precedence::CALL, [this](std::shared_ptr<Expr> left) {
+        current_--;
+        return parse_struct_initializer(std::move(left));
+    });
 }
 
 // Main parsing loop
@@ -808,7 +813,7 @@ std::shared_ptr<LetStmt> Parser::parse_let_statement() {
     }
     std::optional<std::shared_ptr<Expr>> initializer;
     if (match({TokenType::EQUAL})) {
-        initializer = parse_expression(Precedence::NONE, true);
+        initializer = parse_expression(Precedence::NONE);
     }
 
     consume(TokenType::SEMICOLON, "Expect ';' after let statement.");
@@ -859,7 +864,7 @@ Precedence Parser::get_precedence(TokenType type) {
     return Precedence::NONE;
 }
 
-std::shared_ptr<Expr> Parser::parse_expression(Precedence precedence, bool allow_struct_literal) {
+std::shared_ptr<Expr> Parser::parse_expression(Precedence precedence) {
     advance();
     TokenType prefix_type = previous().type;
     if (prefix_parsers_.find(prefix_type) == prefix_parsers_.end()) {
@@ -868,18 +873,6 @@ std::shared_ptr<Expr> Parser::parse_expression(Precedence precedence, bool allow
     }
 
     auto left = prefix_parsers_[prefix_type]();
-
-    if (peek().type == TokenType::LEFT_BRACE) {
-        bool is_valid_struct_path = dynamic_cast<VariableExpr *>(left.get()) != nullptr ||
-                                    dynamic_cast<FieldAccessExpr *>(left.get()) != nullptr;
-
-        if (is_valid_struct_path &&
-            (allow_struct_literal || previous().type == TokenType::SELF_TYPE)) {
-            if (Precedence::CALL > precedence) {
-                left = parse_struct_initializer(std::move(left));
-            }
-        }
-    }
 
     while (precedence < get_precedence(peek().type)) {
         advance();
@@ -893,17 +886,25 @@ std::shared_ptr<Expr> Parser::parse_expression(Precedence precedence, bool allow
     return left;
 }
 
+std::shared_ptr<BlockExpr> Parser::parse_block_expression() {
+    auto block_stmt = parse_block_statement();
+
+    return std::make_shared<BlockExpr>(std::move(block_stmt));
+}
+
 std::shared_ptr<IfExpr> Parser::parse_if_expression() {
-    auto condition = parse_expression(Precedence::NONE, 0);
-    auto then_branch = parse_block_statement();
-    std::optional<std::shared_ptr<Stmt>> else_branch;
+
+    consume(TokenType::LEFT_PAREN, "Expected '(' after 'if'.");
+    auto condition = parse_expression(Precedence::NONE);
+    consume(TokenType::RIGHT_PAREN, "Expected ')' after if condition.");
+
+    auto then_branch = parse_block_expression();
+
+    std::optional<std::shared_ptr<Expr>> else_branch;
     if (match({TokenType::ELSE})) {
-        if (peek().type == TokenType::IF) {
-            else_branch = parse_statement();
-        } else {
-            else_branch = parse_block_statement();
-        }
+        else_branch = parse_expression(Precedence::NONE);
     }
+
     return std::make_shared<IfExpr>(std::move(condition), std::move(then_branch),
                                     std::move(else_branch));
 }
@@ -914,8 +915,14 @@ std::shared_ptr<LoopExpr> Parser::parse_loop_expression() {
 }
 
 std::shared_ptr<WhileExpr> Parser::parse_while_expression() {
-    auto condition = parse_expression(Precedence::NONE, 0);
+    consume(TokenType::LEFT_PAREN, "Expected '(' after 'while'.");
+
+    auto condition = parse_expression(Precedence::NONE);
+
+    consume(TokenType::RIGHT_PAREN, "Expected ')' after while condition.");
+
     auto body = parse_block_statement();
+
     return std::make_shared<WhileExpr>(std::move(condition), std::move(body));
 }
 
@@ -935,7 +942,7 @@ std::shared_ptr<MatchArm> Parser::parse_match_arm() {
 }
 
 std::shared_ptr<MatchExpr> Parser::parse_match_expression() {
-    auto scrutinee = parse_expression(Precedence::NONE, 0);
+    auto scrutinee = parse_expression(Precedence::NONE);
 
     consume(TokenType::LEFT_BRACE, "Expect '{' after match scrutinee.");
 
