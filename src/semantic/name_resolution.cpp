@@ -528,3 +528,206 @@ void NameResolutionVisitor::visit(ImplBlock *node) {
 
     symbol_table_.exit_scope();
 }
+
+void NameResolutionVisitor::declare_pass(Item *item) {
+    if (auto *decl = dynamic_cast<StructDecl *>(item)) {
+        declare_struct(decl);
+    } else if (auto *decl = dynamic_cast<FnDecl *>(item)) {
+        declare_function(decl);
+    } else if (auto *decl = dynamic_cast<ConstDecl *>(item)) {
+        decl->accept(this);
+    }
+}
+
+void NameResolutionVisitor::declare_struct(StructDecl *node) {
+    auto struct_symbol = std::make_shared<Symbol>(node->name.lexeme, Symbol::TYPE);
+    auto struct_type =
+        std::make_shared<StructType>(node->name.lexeme, std::weak_ptr<Symbol>(struct_symbol));
+    struct_symbol->type = struct_type;
+
+    if (!symbol_table_.define(node->name.lexeme, struct_symbol)) {
+        error_reporter_.report_error("Type '" + node->name.lexeme + "' is already defined.",
+                                     node->name.line);
+        return;
+    }
+    node->resolved_symbol = struct_symbol;
+
+    switch (node->kind) {
+    case StructKind::Normal: {
+        for (const auto &field_node : node->fields) {
+            std::shared_ptr<Type> field_type = type_resolver_.resolve(field_node->type.get());
+            if (!field_type) {
+                error_reporter_.report_error("Unknown type for field '" + field_node->name.lexeme +
+                                                 "'.",
+                                             field_node->name.line);
+                continue;
+            }
+            auto field_symbol =
+                std::make_shared<Symbol>(field_node->name.lexeme, Symbol::VARIABLE, field_type);
+
+            if (!struct_symbol->members->define(field_node->name.lexeme, field_symbol)) {
+                error_reporter_.report_error("Field '" + field_node->name.lexeme +
+                                                 "' is already defined in struct '" +
+                                                 node->name.lexeme + "'.",
+                                             field_node->name.line);
+            }
+
+            struct_type->fields[field_node->name.lexeme] = field_type;
+        }
+        break;
+    }
+
+    case StructKind::Unit: {
+        break;
+    }
+
+    case StructKind::Tuple: {
+
+        for (const auto &field_node : node->fields) {
+            std::shared_ptr<Type> field_type = type_resolver_.resolve(field_node->type.get());
+            if (!field_type) {
+                error_reporter_.report_error("Unknown type for tuple field.",
+                                             field_node->name.line);
+                continue;
+            }
+
+            struct_type->fields[std::to_string(struct_type->fields.size())] = field_type;
+        }
+        break;
+    }
+    }
+}
+
+void NameResolutionVisitor::declare_function(FnDecl *node) {
+    std::vector<std::shared_ptr<Type>> param_types;
+    for (const auto &param : node->params) {
+        if (param->type) {
+            auto param_type = type_resolver_.resolve(param->type.get());
+            if (param_type) {
+                param_types.push_back(param_type);
+            } else {
+                error_reporter_.report_error("Could not resolve type for parameter.");
+            }
+        } else {
+            error_reporter_.report_error("Function parameters must have a type annotation.");
+        }
+    }
+
+    std::shared_ptr<Type> return_type;
+    if (node->return_type) {
+        return_type = type_resolver_.resolve((*node->return_type).get());
+    } else {
+        return_type = std::make_shared<UnitType>();
+    }
+
+    auto function_type = std::make_shared<FunctionType>(return_type, param_types);
+
+    auto fn_symbol = std::make_shared<Symbol>(node->name.lexeme, Symbol::FUNCTION, function_type);
+    if (!symbol_table_.define(node->name.lexeme, fn_symbol)) {
+        error_reporter_.report_error("Function '" + node->name.lexeme + "' is already defined.",
+                                     node->name.line);
+    }
+    node->resolved_symbol = fn_symbol;
+}
+
+void NameResolutionVisitor::define_pass(Item *item) {
+    if (auto *decl = dynamic_cast<ImplBlock *>(item)) {
+        define_impl_block(decl);
+    } else if (auto *decl = dynamic_cast<FnDecl *>(item)) {
+        define_function_body(decl);
+    }
+}
+
+void NameResolutionVisitor::define_impl_block(ImplBlock *node) {
+    auto target_type_node = node->target_type.get();
+    auto target_type = type_resolver_.resolve(target_type_node);
+    if (!target_type || target_type->kind != TypeKind::STRUCT) {
+        error_reporter_.report_error("Target of an impl must be a struct.");
+        return;
+    }
+
+    auto struct_type = std::static_pointer_cast<StructType>(target_type);
+    auto struct_symbol = struct_type->symbol.lock();
+    if (!struct_symbol) {
+        error_reporter_.report_error("Internal error: struct type has no associated symbol.");
+        return;
+    }
+
+    // 2. 为 impl 块中的所有方法【声明】符号
+    for (auto &item : node->implemented_items) {
+        if (auto *fn_decl = dynamic_cast<FnDecl *>(item.get())) {
+            // 为方法创建符号，逻辑和 declare_function 几乎一样
+            auto method_symbol = std::make_shared<Symbol>(fn_decl->name.lexeme, Symbol::FUNCTION);
+            std::vector<std::shared_ptr<Type>> param_types;
+            for (const auto &param : fn_decl->params) {
+                if (param->type) {
+                    auto param_type = type_resolver_.resolve(param->type.get());
+                    if (param_type) {
+                        param_types.push_back(param_type);
+                    } else {
+                        error_reporter_.report_error("Could not resolve type for parameter.");
+                    }
+                } else {
+                    error_reporter_.report_error(
+                        "Function parameters must have a type annotation.");
+                }
+            }
+            // 关键：把方法符号定义到 struct 的成员符号表里！
+            if (!struct_symbol->members->define(fn_decl->name.lexeme, method_symbol)) {
+                error_reporter_.report_error("Method '" + fn_decl->name.lexeme +
+                                             "' already defined for this struct.");
+            }
+        }
+    }
+
+    // 3. 在所有方法都声明后，再深入它们的方法体进行名称解析
+    for (auto &item : node->implemented_items) {
+        if (auto *fn_decl = dynamic_cast<FnDecl *>(item.get())) {
+            define_function_body(fn_decl);
+        }
+    }
+}
+
+// 函数体的处理逻辑
+void NameResolutionVisitor::define_function_body(FnDecl *node) {
+    std::vector<std::shared_ptr<Type>> param_types;
+    for (const auto &param : node->params) {
+        if (param->type) {
+            auto param_type = type_resolver_.resolve(param->type.get());
+            if (param_type) {
+                param_types.push_back(param_type);
+            } else {
+                error_reporter_.report_error("Could not resolve type for parameter.");
+            }
+        } else {
+            error_reporter_.report_error("Function parameters must have a type annotation.");
+        }
+    }
+    if (node->body) {
+        symbol_table_.enter_scope();
+
+        for (size_t i = 0; i < node->params.size(); ++i) {
+            const auto &param = node->params[i];
+
+            std::shared_ptr<Type> type_for_this_param = param_types[i];
+
+            current_type_ = type_for_this_param;
+            param->pattern->accept(this);
+            current_type_ = nullptr;
+        }
+
+        (*node->body)->accept(this);
+
+        symbol_table_.exit_scope();
+    }
+}
+
+void NameResolutionVisitor::resolve(Program *ast) {
+    for (auto &item : ast->items) {
+        declare_pass(item.get());
+    }
+
+    for (auto &item : ast->items) {
+        define_pass(item.get());
+    }
+}

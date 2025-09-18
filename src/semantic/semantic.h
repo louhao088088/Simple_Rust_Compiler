@@ -329,6 +329,8 @@ class NameResolutionVisitor : public ExprVisitor<std::shared_ptr<Symbol>>,
     NameResolutionVisitor(ErrorReporter &error_reporter);
     SymbolTable &get_global_symbol_table() { return symbol_table_; }
 
+    void resolve(Program *ast);
+
     // Expression visitors
     std::shared_ptr<Symbol> visit(LiteralExpr *node) override;
     std::shared_ptr<Symbol> visit(ArrayLiteralExpr *node) override;
@@ -399,6 +401,14 @@ class NameResolutionVisitor : public ExprVisitor<std::shared_ptr<Symbol>>,
     ErrorReporter &error_reporter_;
     TypeResolver type_resolver_;
     std::shared_ptr<Type> current_type_ = nullptr;
+    void declare_pass(Item *item);
+    void define_pass(Item *item);
+
+    void declare_function(FnDecl *node);
+    void define_function_body(FnDecl *node);
+
+    void declare_struct(StructDecl *node);
+    void define_impl_block(ImplBlock *node);
 };
 
 // Type check visitor

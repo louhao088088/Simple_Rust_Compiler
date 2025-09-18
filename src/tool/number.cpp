@@ -10,8 +10,8 @@ Number number_of_tokens(string token, ErrorReporter &error_reporter) {
             if (!(token[i] >= '0' && token[i] <= '9') || !(token[i] >= 'a' && token[i] <= 'f') ||
                 !(token[i] >= 'A' && token[i] <= 'F')) {
                 if ((token[i] == 'i' || token[i] == 'u') &&
-                    ((token.length() == i + 2 && token[i + 1] == '3' && token[i + 2] == '2') ||
-                     (token.length() == i + 4 && token[i + 1] == 's' && token[i + 2] == 'i' &&
+                    ((token.length() == i + 3 && token[i + 1] == '3' && token[i + 2] == '2') ||
+                     (token.length() == i + 5 && token[i + 1] == 's' && token[i + 2] == 'i' &&
                       token[i + 3] == 'z' && token[i + 4] == 'e'))) {
                     if (token[i] == 'i') {
                         if (num > 2147483647) {
@@ -54,8 +54,8 @@ Number number_of_tokens(string token, ErrorReporter &error_reporter) {
 
             if (token[i] != '0' && token[i] != '1') {
                 if ((token[i] == 'i' || token[i] == 'u') &&
-                    ((token.length() == i + 2 && token[i + 1] == '3' && token[i + 2] == '2') ||
-                     (token.length() == i + 4 && token[i + 1] == 's' && token[i + 2] == 'i' &&
+                    ((token.length() == i + 3 && token[i + 1] == '3' && token[i + 2] == '2') ||
+                     (token.length() == i + 5 && token[i + 1] == 's' && token[i + 2] == 'i' &&
                       token[i + 3] == 'z' && token[i + 4] == 'e'))) {
                     if (token[i] == 'i') {
                         if (num > 2147483647) {
@@ -95,8 +95,8 @@ Number number_of_tokens(string token, ErrorReporter &error_reporter) {
 
             if (!(token[i] >= '0' && token[i] <= '7')) {
                 if ((token[i] == 'i' || token[i] == 'u') &&
-                    ((token.length() == i + 2 && token[i + 1] == '3' && token[i + 2] == '2') ||
-                     (token.length() == i + 4 && token[i + 1] == 's' && token[i + 2] == 'i' &&
+                    ((token.length() == i + 3 && token[i + 1] == '3' && token[i + 2] == '2') ||
+                     (token.length() == i + 5 && token[i + 1] == 's' && token[i + 2] == 'i' &&
                       token[i + 3] == 'z' && token[i + 4] == 'e'))) {
                     if (token[i] == 'i') {
                         if (num > 2147483647) {
@@ -139,8 +139,8 @@ Number number_of_tokens(string token, ErrorReporter &error_reporter) {
 
             if (!(token[i] >= '0' && token[i] <= '9')) {
                 if ((token[i] == 'i' || token[i] == 'u') &&
-                    ((token.length() == i + 2 && token[i + 1] == '3' && token[i + 2] == '2') ||
-                     (token.length() == i + 4 && token[i + 1] == 's' && token[i + 2] == 'i' &&
+                    ((token.length() == i + 3 && token[i + 1] == '3' && token[i + 2] == '2') ||
+                     (token.length() == i + 5 && token[i + 1] == 's' && token[i + 2] == 'i' &&
                       token[i + 3] == 'z' && token[i + 4] == 'e'))) {
                     if (token[i] == 'i') {
                         if (num > 2147483647) {

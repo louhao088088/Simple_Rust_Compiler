@@ -48,7 +48,7 @@ std::optional<long long> ConstEvaluator::visit(VariableExpr *node) {
     if (symbol && symbol->kind == Symbol::CONSTANT && symbol->const_decl_node) {
         return this->evaluate(symbol->const_decl_node->value.get());
     }
-    
+
     return std::nullopt;
 }
 
@@ -199,9 +199,9 @@ void Semantic(std::shared_ptr<Program> &ast, ErrorReporter &error_reporter) {
     define_builtin_functions(global_symbol_table_name);
 
     global_symbol_table_name.enter_scope();
-    for (auto &item : ast->items) {
-        item->accept(&name_resolver);
-    }
+
+    name_resolver.resolve(ast.get());
+
     if (error_reporter.has_errors()) {
         std::cerr << "Name resolution completed with errors." << std::endl;
         return;

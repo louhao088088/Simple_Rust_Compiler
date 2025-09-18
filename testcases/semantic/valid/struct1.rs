@@ -9,7 +9,7 @@ fn main() {
         name: 12,
         age: 30,
         height: 2,
-    })
-    .age == 12
+    }
+    .age == 12)
     {}
 }
