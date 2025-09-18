@@ -38,7 +38,7 @@ struct Item : public Node {
 
 struct TypeNode : public Node {
     std::shared_ptr<Symbol> resolved_symbol;
-    std::shared_ptr<Type> resolved_type;
+     std::shared_ptr<Type> resolved_type;
     virtual void accept(TypeVisitor *visitor) = 0;
 };
 
@@ -532,6 +532,17 @@ struct IdentifierPattern : public Pattern {
     std::shared_ptr<Symbol> resolved_symbol;
 
     IdentifierPattern(Token n, bool is_mut) : name(std::move(n)), is_mutable(is_mut) {}
+    void print(std::ostream &os, int indent = 0) const override;
+    void accept(PatternVisitor *visitor) override;
+};
+
+struct ReferencePattern : public Pattern {
+    bool is_mutable;
+    std::shared_ptr<Pattern> pattern;
+
+    ReferencePattern(bool is_mut, std::shared_ptr<Pattern> pat)
+        : is_mutable(is_mut), pattern(std::move(pat)) {}
+
     void print(std::ostream &os, int indent = 0) const override;
     void accept(PatternVisitor *visitor) override;
 };

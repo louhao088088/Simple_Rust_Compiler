@@ -393,6 +393,11 @@ std::shared_ptr<TypeNode> Parser::parse_type() {
 // pattern
 
 std::shared_ptr<Pattern> Parser::parse_pattern() {
+    if (match({TokenType::AMPERSAND})) {
+        bool is_mutable = match({TokenType::MUT});
+        auto pattern = parse_pattern();
+        return std::make_shared<ReferencePattern>(is_mutable, std::move(pattern));
+    }
     if (match({TokenType::LEFT_PAREN})) {
         std::vector<std::shared_ptr<Pattern>> elements;
         if (!check(TokenType::RIGHT_PAREN)) {

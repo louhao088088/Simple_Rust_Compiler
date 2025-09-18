@@ -215,8 +215,7 @@ void NameResolutionVisitor::visit(FnDecl *node) {
 
 // Pattern visitors
 void NameResolutionVisitor::visit(IdentifierPattern *node) {
-    auto var_symbol =
-        std::make_shared<Symbol>(node->name.lexeme, Symbol::VARIABLE, current_type_);
+    auto var_symbol = std::make_shared<Symbol>(node->name.lexeme, Symbol::VARIABLE, current_type_);
     var_symbol->is_mutable = node->is_mutable;
     if (!symbol_table_.define(node->name.lexeme, var_symbol)) {
         error_reporter_.report_error("Variable '" + node->name.lexeme +
@@ -246,6 +245,28 @@ void NameResolutionVisitor::visit(SlicePattern *node) {
 void NameResolutionVisitor::visit(StructPattern *node) {}
 
 void NameResolutionVisitor::visit(RestPattern *node) {}
+
+void NameResolutionVisitor::visit(ReferencePattern *node) {
+    auto *current_ref_type = dynamic_cast<ReferenceType *>(current_type_.get());
+    if (!current_ref_type) {
+        error_reporter_.report_error(
+            "Pattern mismatch: expected a reference type, but the value is not a reference.");
+        return;
+    }
+
+    if (node->is_mutable && !current_ref_type->is_mutable) {
+        error_reporter_.report_error("Cannot bind immutable reference to a mutable pattern.");
+    }
+
+    auto inner_type = current_ref_type->referenced_type;
+
+    auto original_type = current_type_;
+    current_type_ = inner_type;
+
+    node->pattern->accept(this);
+
+    current_type_ = original_type;
+}
 
 std::shared_ptr<Symbol> NameResolutionVisitor::visit(StructInitializerExpr *node) {
     node->name->accept(this);

@@ -619,6 +619,16 @@ void SlicePattern::print(std::ostream &os, int indent) const {
     }
 }
 
+void ReferencePattern::print(std::ostream &os, int indent) const {
+    print_indent(os, indent);
+    os << "ReferencePattern\n";
+    print_indent(os, indent + 1);
+    os << "Mutability: " << (is_mutable ? "true" : "false") << "\n";
+    print_indent(os, indent + 1);
+    os << "Pattern:\n";
+    pattern->print(os, indent + 2);
+}
+
 void FnParam::print(std::ostream &os, int indent) const {}
 
 void Field::print(std::ostream &os, int indent) const {}
@@ -666,5 +676,6 @@ void TuplePattern::accept(PatternVisitor *visitor) { visitor->visit(this); }
 void SlicePattern::accept(PatternVisitor *visitor) { visitor->visit(this); }
 void StructPattern::accept(PatternVisitor *visitor) { visitor->visit(this); }
 void RestPattern::accept(PatternVisitor *visitor) { visitor->visit(this); }
+void ReferencePattern::accept(PatternVisitor *visitor) { visitor->visit(this); }
 
 // Other accept methods

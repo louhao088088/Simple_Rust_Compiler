@@ -551,31 +551,19 @@ void TypeCheckVisitor::visit(IdentifierPattern *node) {
     // Pattern type checking would go here
 }
 
+void TypeCheckVisitor::visit(ReferencePattern *node) {}
+
 void TypeCheckVisitor::visit(WildcardPattern *node) {}
 
-void TypeCheckVisitor::visit(LiteralPattern *node) {
-    // Type check literal pattern
-}
+void TypeCheckVisitor::visit(LiteralPattern *node) {}
 
-void TypeCheckVisitor::visit(TuplePattern *node) {
-    for (auto &element : node->elements) {
-        element->accept(this);
-    }
-}
+void TypeCheckVisitor::visit(TuplePattern *node) {}
 
-void TypeCheckVisitor::visit(SlicePattern *node) {
-    for (auto &element : node->elements) {
-        element->accept(this);
-    }
-}
+void TypeCheckVisitor::visit(SlicePattern *node) {}
 
-void TypeCheckVisitor::visit(StructPattern *node) {
-    // TODO: Handle struct pattern type checking
-}
+void TypeCheckVisitor::visit(StructPattern *node) {}
 
-void TypeCheckVisitor::visit(RestPattern *node) {
-    // No specific type checking for rest patterns
-}
+void TypeCheckVisitor::visit(RestPattern *node) {}
 
 // Missing expression visitors for TypeCheckVisitor
 std::shared_ptr<Symbol> TypeCheckVisitor::visit(StructInitializerExpr *node) {

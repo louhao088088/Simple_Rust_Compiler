@@ -83,6 +83,7 @@ struct TuplePattern;
 struct SlicePattern;
 struct StructPattern;
 struct RestPattern;
+struct ReferencePattern;
 
 // Other forward declarations
 struct MatchArm;
@@ -180,4 +181,5 @@ class PatternVisitor {
     virtual void visit(SlicePattern *node) = 0;
     virtual void visit(StructPattern *node) = 0;
     virtual void visit(RestPattern *node) = 0;
+    virtual void visit(ReferencePattern *node) = 0;
 };

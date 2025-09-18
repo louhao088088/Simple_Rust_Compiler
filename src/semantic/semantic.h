@@ -392,6 +392,7 @@ class NameResolutionVisitor : public ExprVisitor<std::shared_ptr<Symbol>>,
     void visit(SlicePattern *node) override;
     void visit(StructPattern *node) override;
     void visit(RestPattern *node) override;
+    void visit(ReferencePattern *node) override;
 
   private:
     SymbolTable symbol_table_;
@@ -472,6 +473,7 @@ class TypeCheckVisitor : public ExprVisitor<std::shared_ptr<Symbol>>,
     void visit(SlicePattern *node) override;
     void visit(StructPattern *node) override;
     void visit(RestPattern *node) override;
+    void visit(ReferencePattern *node) override;
 
   private:
     SymbolTable &symbol_table_;
