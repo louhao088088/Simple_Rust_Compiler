@@ -251,6 +251,7 @@ struct BlockExpr : public Expr {
 // Statements
 
 struct BlockStmt : public Stmt {
+    std::shared_ptr<Type> type; 
     std::vector<std::shared_ptr<Stmt>> statements;
     std::optional<std::shared_ptr<Expr>> final_expr;
     void print(std::ostream &os, int indent = 0) const override;
