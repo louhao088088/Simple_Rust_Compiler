@@ -205,6 +205,8 @@ void Semantic(std::shared_ptr<Program> &ast, ErrorReporter &error_reporter) {
     if (error_reporter.has_errors()) {
         std::cerr << "Name resolution completed with errors." << std::endl;
         return;
+    } else {
+        std::cerr << "Name resolution completed successfully." << std::endl;
     }
 
     TypeCheckVisitor type_checker(global_symbol_table_name, error_reporter);

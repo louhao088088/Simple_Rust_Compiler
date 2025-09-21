@@ -147,7 +147,12 @@ std::shared_ptr<Symbol> TypeCheckVisitor::visit(BinaryExpr *node) {
     case TokenType::MINUS:
     case TokenType::STAR:
     case TokenType::SLASH:
-    case TokenType::PERCENT: {
+    case TokenType::PERCENT:
+    case TokenType::CARET:
+    case TokenType::LESS_LESS:
+    case TokenType::GREATER_GREATER:
+    case TokenType::AMPERSAND:
+    case TokenType::PIPE: {
 
         bool left_is_int = is_any_integer_type(left_type->kind);
         bool right_is_int = is_any_integer_type(right_type->kind);
