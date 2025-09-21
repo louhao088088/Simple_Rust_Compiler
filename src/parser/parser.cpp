@@ -803,10 +803,19 @@ std::shared_ptr<BlockStmt> Parser::parse_block_statement() {
                 block->statements.pop_back();
             }
         }
+        for (size_t i = 0; i + 1 < block->statements.size(); i++) {
+            if (auto *last_stmt = dynamic_cast<ExprStmt *>(block->statements[i].get())) {
+                if (!last_stmt->has_semicolon) {
+
+                    report_error(
+                        peek(), "Only the final expression in a block can be without a semicolon.");
+                    break;
+                }
+            }
+        }
     }
     return block;
 }
-
 std::shared_ptr<LetStmt> Parser::parse_let_statement() {
     consume(TokenType::LET, "Expect 'let'.");
 
@@ -857,6 +866,15 @@ std::shared_ptr<ExprStmt> Parser::parse_expression_statement() {
     if (match({TokenType::SEMICOLON})) {
         return std::make_shared<ExprStmt>(std::move(expr), true);
     } else {
+        if (auto *if_expr = dynamic_cast<IfExpr *>(expr.get())) {
+            return std::make_shared<ExprStmt>(std::move(expr), true);
+        } else if (auto *match_expr = dynamic_cast<MatchExpr *>(expr.get())) {
+            return std::make_shared<ExprStmt>(std::move(expr), true);
+        } else if (auto *loop_expr = dynamic_cast<LoopExpr *>(expr.get())) {
+            return std::make_shared<ExprStmt>(std::move(expr), true);
+        } else if (auto *while_expr = dynamic_cast<WhileExpr *>(expr.get())) {
+            return std::make_shared<ExprStmt>(std::move(expr), true);
+        }
         return std::make_shared<ExprStmt>(std::move(expr), false);
     }
     return std::make_shared<ExprStmt>(std::move(expr), true);

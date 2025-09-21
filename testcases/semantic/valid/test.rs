@@ -1,16 +1,15 @@
 /*
 Test Package: Semantic-1
-Test Target: basic
+Test Target: if
 Author: Wenxin Zheng
 Time: 2025-08-08
 Verdict: Success
-Comment: basic test, matrix multiplication with type alias and trace calculation
+Comment: if statement test, if expression as value assignment
 */
 
-const N: usize = 3;
-fn mul(a: &[[i32; N]; N])  {
-    let d : i32 = a[0][0];
-}
 fn main() {
-   
+    let a: i32 = 4;
+    let b: i32 = if (a > 3) { a * 2 } else { a / 2 };
+    let _: i32 = b;
+    exit(0);
 }

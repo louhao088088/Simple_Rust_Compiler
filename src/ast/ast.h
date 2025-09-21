@@ -7,11 +7,8 @@
 #include <memory>
 #include <type_traits>
 
-// Forward declarations
 class Symbol;
 class Type;
-
-// Base classes with specialized accept methods
 
 struct Node {
     virtual ~Node() = default;
@@ -19,11 +16,9 @@ struct Node {
 };
 
 struct Expr : public Node {
-    // Semantic analysis annotations
     std::shared_ptr<Type> type;
     std::shared_ptr<Symbol> resolved_symbol;
 
-    // Template accept method for different visitor return types
     template <typename R> R accept(ExprVisitor<R> *visitor);
 };
 
@@ -106,6 +101,7 @@ struct IfExpr : public Expr {
     std::shared_ptr<Expr> condition;
     std::shared_ptr<Expr> then_branch;
     std::optional<std::shared_ptr<Expr>> else_branch;
+    bool is_expression_statement = false;
     IfExpr(std::shared_ptr<Expr> cond, std::shared_ptr<Expr> then_b,
            std::optional<std::shared_ptr<Expr>> else_b)
         : condition(std::move(cond)), then_branch(std::move(then_b)),
