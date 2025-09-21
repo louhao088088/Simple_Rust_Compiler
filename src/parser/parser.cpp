@@ -760,6 +760,9 @@ std::shared_ptr<Stmt> Parser::parse_statement() {
         return parse_let_statement();
     if (peek().type == TokenType::RETURN)
         return parse_return_statement();
+    if (peek().type == TokenType::FN) {
+        return std::make_shared<ItemStmt>(parse_fn_declaration());
+    }
     if (peek().type == TokenType::STRUCT) {
         return std::make_shared<ItemStmt>(parse_struct_declaration());
     }
@@ -841,7 +844,11 @@ std::shared_ptr<ReturnStmt> Parser::parse_return_statement() {
     if (!check(TokenType::SEMICOLON)) {
         value = parse_expression(Precedence::NONE);
     }
-    consume(TokenType::SEMICOLON, "Expect ';' after return value.");
+    if (peek().type == TokenType::SEMICOLON) {
+        consume(TokenType::SEMICOLON, "Expect ';' after return statement.");
+    } else if (!is_at_end() && peek().type != TokenType::RIGHT_BRACE) {
+        report_error(peek(), "Expect ';' after return statement.");
+    }
     return std::make_shared<ReturnStmt>(keyword, std::move(value));
 }
 

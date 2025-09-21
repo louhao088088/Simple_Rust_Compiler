@@ -33,7 +33,7 @@ struct Item : public Node {
 
 struct TypeNode : public Node {
     std::shared_ptr<Symbol> resolved_symbol;
-     std::shared_ptr<Type> resolved_type;
+    std::shared_ptr<Type> resolved_type;
     virtual void accept(TypeVisitor *visitor) = 0;
 };
 
@@ -247,7 +247,7 @@ struct BlockExpr : public Expr {
 // Statements
 
 struct BlockStmt : public Stmt {
-    std::shared_ptr<Type> type; 
+    std::shared_ptr<Type> type;
     std::vector<std::shared_ptr<Stmt>> statements;
     std::optional<std::shared_ptr<Expr>> final_expr;
     void print(std::ostream &os, int indent = 0) const override;

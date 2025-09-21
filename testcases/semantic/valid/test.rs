@@ -1,15 +1,28 @@
 /*
 Test Package: Semantic-1
-Test Target: if
-Author: Wenxin Zheng
-Time: 2025-08-08
-Verdict: Success
-Comment: if statement test, if expression as value assignment
+Test Target: return
+Author: Ruitian Wang
+Time: 2025-08-27
+Verdict: Pass
+Comment: Valid nested return statements in different scopes
 */
 
+// Valid: nested return statements in different scopes
+fn outer() -> i32 {
+    fn inner(x: i32) -> i32 {
+        if (x > 0) {
+            return x * 2;
+        }
+        return 0;
+    }
+    let result: i32 = inner(5);
+    if (result > 5) {
+        return result
+    }
+    return 1
+}
+
 fn main() {
-    let a: i32 = 4;
-    let b: i32 = if (a > 3) { a * 2 } else { a / 2 };
-    let _: i32 = b;
+    let result: i32 = outer();
     exit(0);
 }

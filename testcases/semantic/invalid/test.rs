@@ -1,5 +1,12 @@
-fn main() {
-    42  // Missing semicolon - LL(1) can detect this as unexpected token
-    printInt(1);
-    exit(0);
+/*
+Test Package: Semantic-1
+Test Target: return
+Author: Bohan Zhang
+Time: 2025-08-24
+Verdict: Fail
+Comment: exit function test, the main function should not return any type but `()`
+*/
+
+fn main() -> i32 {
+    exit(-1);
 }

@@ -190,6 +190,12 @@ std::shared_ptr<Symbol> TypeCheckVisitor::visit(BinaryExpr *node) {
             if (left_type->equals(right_type.get())) {
                 is_valid = true;
             }
+        } else if (left_type->kind == TypeKind::UNIT && right_type->kind == TypeKind::UNIT) {
+            is_valid = true;
+        } else if (left_type->kind == TypeKind::CHAR && right_type->kind == TypeKind::CHAR) {
+            is_valid = true;
+        } else if (left_type->kind == TypeKind::STR && right_type->kind == TypeKind::STR) {
+            is_valid = true;
         }
 
         if (is_valid) {
@@ -563,7 +569,12 @@ void TypeCheckVisitor::visit(FnDecl *node) {
     if (node->body) {
         (*node->body)->accept(this);
     }
-
+    if (current_function_symbol_ && current_function_symbol_->name == "main") {
+        if (node->return_type && (*node->return_type)->resolved_type &&
+            (*node->return_type)->resolved_type->kind != TypeKind::UNIT) {
+            error_reporter_.report_error("The 'main' function must have a return type of '()'.");
+        }
+    }
     if (current_function_symbol_ && current_function_symbol_->name == "main") {
         if (node->body) {
             check_main_for_early_exit((*node->body).get());
