@@ -135,7 +135,9 @@ struct Token {
     std::string lexeme;
     int line;
     int column;
-
+    Token() : type(TokenType::UNKNOWN), lexeme(), line(0), column(0) {} // 新增
+    Token(TokenType type, std::string lexeme, int line = 0, int column = 0)
+        : type(type), lexeme(std::move(lexeme)), line(line), column(column) {}
     void print() const;
 };
 

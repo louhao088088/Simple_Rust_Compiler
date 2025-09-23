@@ -315,15 +315,7 @@ std::shared_ptr<Symbol> NameResolutionVisitor::visit(MatchExpr *node) {
     return nullptr;
 }
 
-std::optional<std::string> get_name_from_expr(Expr *expr) {
-    if (!expr) {
-        return std::nullopt;
-    }
-    if (auto *var_expr = dynamic_cast<VariableExpr *>(expr)) {
-        return var_expr->name.lexeme;
-    }
-    return std::nullopt;
-}
+
 
 std::string get_full_path_string(Expr *expr) {
     if (!expr)

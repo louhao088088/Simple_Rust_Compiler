@@ -13,38 +13,22 @@ std::shared_ptr<Type> TypeResolver::resolve(TypeNode *node) {
     resolved_type_ = nullptr;
     node->accept(this);
     node->resolved_type = resolved_type_;
-    
+
     return resolved_type_;
 }
 
 void TypeResolver::visit(TypeNameNode *node) {
     // Handle primitive types
-    if (node->name.lexeme == "i32") {
-        resolved_type_ = std::make_shared<PrimitiveType>(TypeKind::I32);
-    } else if (node->name.lexeme == "u32") {
-        resolved_type_ = std::make_shared<PrimitiveType>(TypeKind::U32);
-    } else if (node->name.lexeme == "isize") {
-        resolved_type_ = std::make_shared<PrimitiveType>(TypeKind::ISIZE);
-    } else if (node->name.lexeme == "usize") {
-        resolved_type_ = std::make_shared<PrimitiveType>(TypeKind::USIZE);
-    } else if (node->name.lexeme == "bool") {
-        resolved_type_ = std::make_shared<PrimitiveType>(TypeKind::BOOL);
-    } else if (node->name.lexeme == "char") {
-        resolved_type_ = std::make_shared<PrimitiveType>(TypeKind::CHAR);
-    } else if (node->name.lexeme == "String") {
-        resolved_type_ = std::make_shared<PrimitiveType>(TypeKind::STRING);
-    } else if (node->name.lexeme == "str") {
-        resolved_type_ = std::make_shared<PrimitiveType>(TypeKind::STR);
-    }
 
-    else {
-        auto symbol = symbol_table_.lookup(node->name.lexeme);
-        if (symbol && symbol->kind == Symbol::TYPE) {
-            resolved_type_ = symbol->type;
-            node->resolved_symbol = symbol;
-        } else {
-            resolved_type_ = nullptr;
-        }
+    auto symbol = symbol_table_.lookup(node->name.lexeme);
+
+    if (symbol && symbol->kind == Symbol::TYPE) {
+        resolved_type_ = symbol->type;
+        node->resolved_symbol = symbol;
+    } else {
+        error_reporter_.report_error("Unknown type name '" + node->name.lexeme + "'.",
+                                     node->name.line);
+        resolved_type_ = nullptr;
     }
 }
 
@@ -102,32 +86,15 @@ void TypeResolver::visit(PathTypeNode *node) {
     if (auto *var_expr = dynamic_cast<VariableExpr *>(node->path.get())) {
         const auto &name = var_expr->name.lexeme;
 
-        if (name == "i32") {
-            resolved_type_ = std::make_shared<PrimitiveType>(TypeKind::I32);
-        } else if (name == "u32") {
-            resolved_type_ = std::make_shared<PrimitiveType>(TypeKind::U32);
-        } else if (name == "isize") {
-            resolved_type_ = std::make_shared<PrimitiveType>(TypeKind::ISIZE);
-        } else if (name == "usize") {
-            resolved_type_ = std::make_shared<PrimitiveType>(TypeKind::USIZE);
-        } else if (name == "anyint") {
-            resolved_type_ = std::make_shared<PrimitiveType>(TypeKind::ANY_INTEGER);
-        } else if (name == "bool") {
-            resolved_type_ = std::make_shared<PrimitiveType>(TypeKind::BOOL);
-        } else if (name == "char") {
-            resolved_type_ = std::make_shared<PrimitiveType>(TypeKind::CHAR);
-        } else if (name == "string") {
-            resolved_type_ = std::make_shared<PrimitiveType>(TypeKind::STRING);
-        } else if (name == "str") {
-            resolved_type_ = std::make_shared<PrimitiveType>(TypeKind::STR);
+        auto symbol = symbol_table_.lookup(var_expr->name.lexeme);
+
+        if (symbol && symbol->kind == Symbol::TYPE) {
+
+            resolved_type_ = symbol->type;
+            node->resolved_symbol = symbol;
         } else {
-            auto symbol = symbol_table_.lookup(name);
-            if (symbol && symbol->kind == Symbol::TYPE) {
-                resolved_type_ = symbol->type;
-                node->resolved_symbol = symbol;
-            } else {
-                resolved_type_ = nullptr;
-            }
+            error_reporter_.report_error("Unknown type name '" + var_expr->name.lexeme + "'.");
+            resolved_type_ = nullptr;
         }
     } else if (auto *path_expr = dynamic_cast<PathExpr *>(node->path.get())) {
 

@@ -37,9 +37,11 @@ enum class TypeKind {
     REFERENCE,
     UNKNOWN,
 };
+class SymbolTable;
 
 struct Type {
     TypeKind kind;
+    std::shared_ptr<SymbolTable> members = std::make_shared<SymbolTable>();
     virtual ~Type() = default;
     virtual std::string to_string() const = 0;
     virtual bool equals(const Type *other) const = 0;
@@ -497,3 +499,7 @@ class TypeCheckVisitor : public ExprVisitor<std::shared_ptr<Symbol>>,
 };
 
 void Semantic(std::shared_ptr<Program> &ast, ErrorReporter &error_reporter);
+
+
+
+std::optional<std::string> get_name_from_expr(Expr *expr);

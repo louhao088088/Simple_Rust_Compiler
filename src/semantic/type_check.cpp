@@ -252,27 +252,69 @@ std::shared_ptr<Symbol> TypeCheckVisitor::visit(CallExpr *node) {
         arg->accept(this);
     }
 
+    if (!node->callee->type) {
+        return nullptr;
+    }
+
     if (node->callee->type->kind != TypeKind::FUNCTION) {
         error_reporter_.report_error("This expression is not callable.");
         return nullptr;
     }
-
     auto fn_type = std::dynamic_pointer_cast<FunctionType>(node->callee->type);
 
-    if (node->arguments.size() != fn_type->param_types.size()) {
-        error_reporter_.report_error("Expected " + std::to_string(fn_type->param_types.size()) +
-                                     " arguments, but found " +
-                                     std::to_string(node->arguments.size()) + ".");
-        return nullptr;
-    }
+    bool is_method_call = (dynamic_cast<FieldAccessExpr *>(node->callee.get()) != nullptr);
 
-    for (size_t i = 0; i < node->arguments.size(); ++i) {
-        auto &arg_type = node->arguments[i]->type;
-        auto &param_type = fn_type->param_types[i];
-        if (arg_type && !arg_type->equals(param_type.get())) {
-            error_reporter_.report_error("Mismatched types. Expected argument type '" +
-                                         param_type->to_string() + "' but found '" +
-                                         arg_type->to_string() + "'.");
+    if (is_method_call) {
+
+        if (fn_type->param_types.size() != node->arguments.size() + 1) {
+            error_reporter_.report_error("Incorrect number of arguments for method. Expected " +
+                                         std::to_string(fn_type->param_types.size() - 1) +
+                                         ", but found " + std::to_string(node->arguments.size()));
+            return nullptr;
+        }
+
+        if (auto *field_access = dynamic_cast<FieldAccessExpr *>(node->callee.get())) {
+            auto object = field_access->object;
+            if (!fn_type->param_types.empty()) {
+                if (auto *self_ref_type =
+                        dynamic_cast<ReferenceType *>(fn_type->param_types[0].get())) {
+                    if (self_ref_type->is_mutable &&
+                        (!object->resolved_symbol || !object->resolved_symbol->is_mutable)) {
+                        error_reporter_.report_error(
+                            "Cannot call mutable method on an immutable value.");
+                    }
+                }
+            }
+        }
+
+        for (size_t i = 0; i < node->arguments.size(); ++i) {
+            auto &arg_type = node->arguments[i]->type;
+
+            auto &param_type = fn_type->param_types[i + 1];
+            if (arg_type && !arg_type->equals(param_type.get())) {
+                error_reporter_.report_error("Mismatched types. Expected argument type '" +
+                                             param_type->to_string() + "' but found '" +
+                                             arg_type->to_string() + "'.");
+            }
+        }
+
+    } else {
+
+        if (fn_type->param_types.size() != node->arguments.size()) {
+            error_reporter_.report_error("Incorrect number of arguments for function. Expected " +
+                                         std::to_string(fn_type->param_types.size()) +
+                                         ", but found " + std::to_string(node->arguments.size()));
+            return nullptr;
+        }
+
+        for (size_t i = 0; i < node->arguments.size(); ++i) {
+            auto &arg_type = node->arguments[i]->type;
+            auto &param_type = fn_type->param_types[i];
+            if (arg_type && !arg_type->equals(param_type.get())) {
+                error_reporter_.report_error("Mismatched types. Expected argument type '" +
+                                             param_type->to_string() + "' but found '" +
+                                             arg_type->to_string() + "'.");
+            }
         }
     }
 
@@ -394,6 +436,42 @@ std::shared_ptr<Symbol> TypeCheckVisitor::visit(IndexExpr *node) {
 
 std::shared_ptr<Symbol> TypeCheckVisitor::visit(FieldAccessExpr *node) {
     node->object->accept(this);
+    auto object_type = node->object->type;
+    if (!object_type)
+        return nullptr;
+
+    std::string method_name = node->field.lexeme;
+
+    auto method_symbol = object_type->members->lookup(method_name);
+
+    if (method_symbol) {
+        node->type = method_symbol->type;
+        node->resolved_symbol = method_symbol;
+        return nullptr;
+    }
+
+    auto base_type = object_type;
+    if (auto ref_type = std::dynamic_pointer_cast<ReferenceType>(object_type)) {
+        base_type = ref_type->referenced_type;
+    }
+    if (base_type->kind == TypeKind::ARRAY && method_name == "len") {
+        auto usize_type = symbol_table_.lookup("usize")->type;
+        std::vector<std::shared_ptr<Type>> len_param_types = {
+            std::make_shared<ReferenceType>(object_type, false)};
+
+        auto len_fn_type = std::make_shared<FunctionType>(usize_type, len_param_types);
+
+        node->type = len_fn_type;
+
+        node->resolved_symbol = std::make_shared<Symbol>("len", Symbol::FUNCTION, len_fn_type);
+        node->resolved_symbol->is_builtin = true;
+
+        return nullptr;
+    }
+
+    error_reporter_.report_error("No method named '" + method_name + "' found for type '" +
+                                     object_type->to_string() + "'.",
+                                 node->field.line);
     return nullptr;
 }
 
@@ -667,8 +745,34 @@ std::shared_ptr<Symbol> TypeCheckVisitor::visit(MatchExpr *node) {
 }
 
 std::shared_ptr<Symbol> TypeCheckVisitor::visit(PathExpr *node) {
-    // TODO: Type check path expressions
-    return nullptr; // TODO: Implement proper type checking
+    node->left->accept(this);
+    auto left_symbol = node->left->resolved_symbol;
+    if (!left_symbol) {
+        error_reporter_.report_error("Undefined symbol in path expression.");
+        return nullptr;
+    }
+
+    if (left_symbol->kind != Symbol::TYPE) {
+        error_reporter_.report_error("Expected a type before `::`, but found a variable.");
+        return nullptr;
+    }
+
+    auto right_name_opt = get_name_from_expr(node->right.get());
+    if (!right_name_opt) {
+        error_reporter_.report_error("Expected an identifier after `::`.");
+        return nullptr;
+    }
+
+    auto assoc_fn_symbol = left_symbol->members->lookup(*right_name_opt);
+    if (!assoc_fn_symbol) {
+        error_reporter_.report_error("No function named '" + *right_name_opt +
+                                     "' associated with type '" + left_symbol->name + "'.");
+        return nullptr;
+    }
+
+    node->type = assoc_fn_symbol->type;
+    node->resolved_symbol = assoc_fn_symbol;
+    return nullptr;
 }
 
 std::shared_ptr<Symbol> TypeCheckVisitor::visit(BlockExpr *node) {
