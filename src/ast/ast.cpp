@@ -256,6 +256,12 @@ void SelfTypeNode::print(std::ostream &os, int indent) const {
     os << "SelfTypeNode\n";
 }
 
+void ReturnExpr::print(std::ostream &os, int indent) const {
+    print_indent(os, indent);
+    os << "ReturnExpr\n";
+    return_stmt->print(os, indent + 1);
+}
+
 // stmt
 void BlockStmt::print(std::ostream &os, int indent) const {
     print_indent(os, indent);

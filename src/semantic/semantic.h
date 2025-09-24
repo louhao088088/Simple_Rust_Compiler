@@ -107,6 +107,10 @@ struct PrimitiveType : public Type {
         }
 
         TypeKind other_kind = other->kind;
+
+        if (this->kind == TypeKind::NEVER || other_kind == TypeKind::NEVER) {
+            return true;
+        }
         if (this->kind == TypeKind::ANY_INTEGER) {
             return is_concrete_integer(other_kind) || other_kind == TypeKind::ANY_INTEGER;
         }

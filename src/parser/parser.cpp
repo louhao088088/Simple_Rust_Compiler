@@ -59,6 +59,7 @@ Parser::Parser(const std::vector<Token> &tokens, ErrorReporter &error_reporter)
     register_prefix(TokenType::WHILE, [this] { return parse_while_expression(); });
     register_prefix(TokenType::LOOP, [this] { return parse_loop_expression(); });
     register_prefix(TokenType::MATCH, [this] { return parse_match_expression(); });
+    register_prefix(TokenType::RETURN, [this] { return parse_return_expression(); });
 
     register_prefix(TokenType::LEFT_PAREN, [this] -> std::shared_ptr<Expr> {
         if (check(TokenType::RIGHT_PAREN)) {
@@ -849,6 +850,10 @@ std::shared_ptr<ReturnStmt> Parser::parse_return_statement() {
     } else if (!is_at_end() && peek().type != TokenType::RIGHT_BRACE) {
         report_error(peek(), "Expect ';' after return statement.");
     }
+
+    if (peek().type == TokenType::SEMICOLON) {
+        puts("a");
+    }
     return std::make_shared<ReturnStmt>(keyword, std::move(value));
 }
 
@@ -914,6 +919,15 @@ std::shared_ptr<Expr> Parser::parse_expression(Precedence precedence) {
     }
 
     return left;
+}
+
+std::shared_ptr<Expr> Parser::parse_return_expression() {
+    Token keyword = previous();
+    std::optional<std::shared_ptr<Expr>> value;
+    if (!check(TokenType::SEMICOLON)) {
+        value = parse_expression(Precedence::NONE);
+    }
+    return std::make_shared<ReturnExpr>(std::make_shared<ReturnStmt>(keyword, std::move(value)));
 }
 
 std::shared_ptr<BlockExpr> Parser::parse_block_expression() {

@@ -416,20 +416,31 @@ std::shared_ptr<Symbol> TypeCheckVisitor::visit(IfExpr *node) {
         (*node->else_branch)->accept(this);
         auto else_type = (*node->else_branch)->type;
 
-        if (then_type && else_type && !then_type->equals(else_type.get())) {
-            error_reporter_.report_error("'if' and 'else' have incompatible types. Expected '" +
-                                         then_type->to_string() + "' but found '" +
-                                         else_type->to_string() + "'.");
-            node->type = nullptr;
+        if (then_type && else_type) {
+            if (then_type->kind == TypeKind::NEVER) {
+                node->type = else_type;
+
+            } else if (else_type->kind == TypeKind::NEVER) {
+                node->type = then_type;
+            } else if (!then_type->equals(else_type.get())) {
+                error_reporter_.report_error("'if' and 'else' have incompatible types. Expected '" +
+                                             then_type->to_string() + "' but found '" +
+                                             else_type->to_string() + "'.");
+                node->type = nullptr;
+            } else {
+                node->type = then_type;
+            }
         } else {
-            node->type = then_type;
+            error_reporter_.report_error("Cannot infer type of 'if' expression.");
         }
     } else {
         auto unit_type = std::make_shared<UnitType>();
-        if (then_type && !then_type->equals(unit_type.get())) {
-            error_reporter_.report_error(
-                "If expression without an 'else' branch must result in type '()', but found '" +
-                then_type->to_string() + "'.");
+        auto never_type = std::make_shared<NeverType>();
+        if (then_type &&
+            (!then_type->equals(unit_type.get()) && !then_type->equals(never_type.get()))) {
+            error_reporter_.report_error("If expression without an 'else' branch must result in "
+                                         "type '()' or '!', but found '" +
+                                         then_type->to_string() + "'.");
         }
         node->type = unit_type;
     }
@@ -606,18 +617,22 @@ void TypeCheckVisitor::visit(BlockStmt *node) {
     }
 
     if (node->final_expr) {
-        (*node->final_expr)->accept(this);
-        node->type = (*node->final_expr)->type;
-    } else {
-        node->type = std::make_shared<UnitType>();
-    }
-
-    if (node->final_expr) {
         node->return_over = (*node->final_expr)->return_over;
     } else if (!node->statements.empty()) {
         node->return_over = node->statements.back()->return_over;
     } else {
         node->return_over = false;
+    }
+
+    if (node->return_over) {
+        node->type = std::make_shared<NeverType>();
+        return;
+    }
+    if (node->final_expr) {
+        (*node->final_expr)->accept(this);
+        node->type = (*node->final_expr)->type;
+    } else {
+        node->type = std::make_shared<UnitType>();
     }
 }
 void TypeCheckVisitor::visit(ExprStmt *node) {

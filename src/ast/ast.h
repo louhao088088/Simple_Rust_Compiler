@@ -250,6 +250,12 @@ struct BlockExpr : public Expr {
     void print(std::ostream &os, int indent = 0) const override;
 };
 
+struct ReturnExpr : public Expr {
+    std::shared_ptr<ReturnStmt> return_stmt;
+    explicit ReturnExpr(std::shared_ptr<ReturnStmt> stmt) : return_stmt(std::move(stmt)) {}
+    void print(std::ostream &os, int indent = 0) const override;
+};
+
 // Statements
 
 struct BlockStmt : public Stmt {
