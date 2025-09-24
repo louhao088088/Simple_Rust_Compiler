@@ -1,16 +1,14 @@
 /*
 Test Package: Semantic-1
-Test Target: type
+Test Target: basic
 Author: Wenxin Zheng
 Time: 2025-08-08
 Verdict: Fail
-Comment: Type error: pointer dereference type mismatch
+Comment: basic test, graph breadth-first search with connectivity check; bfs return type mismatch ([usize; V] vs [i32; V])
 */
 
-// Type error: pointer dereference type mismatch
-fn main() {
-    let x: i32 = 42;
-    let ptr: &i32 = &x;
-    let value: bool = *ptr;
-    exit(0);
+fn bfs() -> bool {
+    100
 }
+
+fn main() {}

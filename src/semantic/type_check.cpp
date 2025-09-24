@@ -434,6 +434,12 @@ std::shared_ptr<Symbol> TypeCheckVisitor::visit(IfExpr *node) {
         node->type = unit_type;
     }
 
+    if (node->else_branch) {
+        node->return_over = node->then_branch->return_over && (*node->else_branch)->return_over;
+    } else {
+        node->return_over = false;
+    }
+
     return nullptr;
 }
 
@@ -549,6 +555,11 @@ std::shared_ptr<Symbol> TypeCheckVisitor::visit(AssignmentExpr *node) {
     node->value->accept(this);
     std::shared_ptr<Symbol> target_symbol = node->target->resolved_symbol;
 
+    if (dynamic_cast<UnderscoreExpr *>(node->target.get())) {
+        node->type = std::make_shared<UnitType>();
+        return nullptr;
+    }
+
     if (target_symbol) {
         if (!target_symbol->is_mutable) {
             error_reporter_.report_error("Cannot assign to immutable variable '" +
@@ -600,14 +611,31 @@ void TypeCheckVisitor::visit(BlockStmt *node) {
     } else {
         node->type = std::make_shared<UnitType>();
     }
+
+    if (node->final_expr) {
+        node->return_over = (*node->final_expr)->return_over;
+    } else if (!node->statements.empty()) {
+        node->return_over = node->statements.back()->return_over;
+    } else {
+        node->return_over = false;
+    }
 }
-void TypeCheckVisitor::visit(ExprStmt *node) { node->expression->accept(this); }
+void TypeCheckVisitor::visit(ExprStmt *node) {
+    node->expression->accept(this);
+    node->type = node->expression->type;
+    node->return_over = node->expression->return_over;
+}
 
 void TypeCheckVisitor::visit(LetStmt *node) {
     if (!node->initializer) {
         return;
     }
     (*node->initializer)->accept(this);
+    if (dynamic_cast<UnderscoreExpr *>((*node->initializer).get())) {
+        error_reporter_.report_error(
+            "Underscore `_` cannot be used as an initializer for a let binding.");
+        return;
+    }
     std::shared_ptr<Type> initializer_type = (*node->initializer)->type;
 
     if (!initializer_type) {
@@ -629,6 +657,8 @@ void TypeCheckVisitor::visit(LetStmt *node) {
 }
 
 void TypeCheckVisitor::visit(ReturnStmt *node) {
+    node->type = std::make_shared<NeverType>();
+    node->return_over = true;
     if (node->value) {
         (*node->value)->accept(this);
         auto actual_return_type = (*node->value)->type;
@@ -715,6 +745,15 @@ void TypeCheckVisitor::visit(FnDecl *node) {
 
     if (node->body) {
         (*node->body)->accept(this);
+
+        auto actual_body_type = (*node->body)->type;
+
+        if (current_return_type_ && actual_body_type &&
+            !current_return_type_->equals(actual_body_type.get()) && !(*node->body)->return_over) {
+            error_reporter_.report_error("Mismatched return type in function body. Expected '" +
+                                         current_return_type_->to_string() + "' but found '" +
+                                         actual_body_type->to_string() + "'.");
+        }
     }
     if (current_function_symbol_ && current_function_symbol_->name == "main") {
         if (node->return_type && (*node->return_type)->resolved_type &&
@@ -849,6 +888,7 @@ std::shared_ptr<Symbol> TypeCheckVisitor::visit(BlockExpr *node) {
     if (node->block_stmt) {
         node->block_stmt->accept(this);
         node->type = node->block_stmt->type;
+        node->return_over = node->block_stmt->return_over;
     }
 
     return nullptr;

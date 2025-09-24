@@ -19,10 +19,16 @@ struct Expr : public Node {
     std::shared_ptr<Type> type;
     std::shared_ptr<Symbol> resolved_symbol;
 
+    bool return_over = false;
+
     template <typename R> R accept(ExprVisitor<R> *visitor);
 };
 
 struct Stmt : public Node {
+    std::shared_ptr<Type> type;
+
+    bool return_over = false;
+
     virtual void accept(StmtVisitor *visitor) = 0;
 };
 
@@ -247,7 +253,6 @@ struct BlockExpr : public Expr {
 // Statements
 
 struct BlockStmt : public Stmt {
-    std::shared_ptr<Type> type;
     std::vector<std::shared_ptr<Stmt>> statements;
     std::optional<std::shared_ptr<Expr>> final_expr;
     void print(std::ostream &os, int indent = 0) const override;
@@ -278,6 +283,7 @@ struct LetStmt : public Stmt {
 
 struct ReturnStmt : public Stmt {
     Token keyword;
+
     std::optional<std::shared_ptr<Expr>> value;
     ReturnStmt(Token keyword, std::optional<std::shared_ptr<Expr>> val)
         : keyword(std::move(keyword)), value(std::move(val)) {}

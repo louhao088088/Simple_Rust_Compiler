@@ -35,6 +35,7 @@ enum class TypeKind {
     UNIT,
     FUNCTION,
     REFERENCE,
+    NEVER,
     UNKNOWN,
 };
 class SymbolTable;
@@ -91,6 +92,10 @@ struct PrimitiveType : public Type {
             return "rcstring";
         case TypeKind::CHAR:
             return "char";
+        case TypeKind::UNIT:
+            return "()";
+        case TypeKind::NEVER:
+            return "!";
         default:
             return "unknown";
         }
@@ -159,6 +164,12 @@ struct UnitType : public Type {
     UnitType() { this->kind = TypeKind::UNIT; }
     std::string to_string() const override { return "()"; }
     bool equals(const Type *other) const override { return other->kind == TypeKind::UNIT; }
+};
+
+struct NeverType : public Type {
+    NeverType() { this->kind = TypeKind::NEVER; }
+    std::string to_string() const override { return "!"; }
+    bool equals(const Type *other) const override { return other->kind == TypeKind::NEVER; }
 };
 
 struct FunctionType : public Type {
@@ -433,7 +444,8 @@ class TypeCheckVisitor : public ExprVisitor<std::shared_ptr<Symbol>>,
                          public TypeVisitor,
                          public PatternVisitor {
   public:
-     TypeCheckVisitor(SymbolTable& symbol_table, BuiltinTypes& builtin_types, ErrorReporter &error_reporter);
+    TypeCheckVisitor(SymbolTable &symbol_table, BuiltinTypes &builtin_types,
+                     ErrorReporter &error_reporter);
 
     // Expression visitors
     std::shared_ptr<Symbol> visit(LiteralExpr *node) override;
