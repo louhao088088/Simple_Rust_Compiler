@@ -111,7 +111,7 @@ std::optional<long long> ConstEvaluator::visit(GroupingExpr *node) {
     return evaluate(node->expression.get());
 }
 
-void define_builtin_functions(SymbolTable &symbol_table) {
+void define_builtin_functions(SymbolTable &symbol_table, BuiltinTypes &builtin_types) {
     symbol_table.define("i32",
                         std::make_shared<Symbol>("i32", Symbol::TYPE,
                                                  std::make_shared<PrimitiveType>(TypeKind::I32)));
@@ -218,12 +218,22 @@ void define_builtin_functions(SymbolTable &symbol_table) {
     symbol_table.define("exit", exit_symbol);
 }
 
-void define_builtin_method(SymbolTable &symbol_table) {
+void define_builtin_method(SymbolTable &symbol_table, BuiltinTypes &builtin_types) {
     auto u32_symbol = symbol_table.lookup("u32");
     auto string_symbol = symbol_table.lookup("String");
     auto str_symbol = symbol_table.lookup("str");
     auto usize_symbol = symbol_table.lookup("usize");
     auto anyint_symbol = symbol_table.lookup("anyint");
+
+    builtin_types.u32_type = u32_symbol ? u32_symbol->type : nullptr;
+    builtin_types.isize_type = symbol_table.lookup("isize")->type;
+    builtin_types.i32_type = symbol_table.lookup("i32")->type;
+    builtin_types.usize_type = usize_symbol ? usize_symbol->type : nullptr;
+    builtin_types.string_type = string_symbol ? string_symbol->type : nullptr;
+    builtin_types.str_type = str_symbol ? str_symbol->type : nullptr;
+    builtin_types.bool_type = symbol_table.lookup("bool")->type;
+    builtin_types.any_integer_type = anyint_symbol ? anyint_symbol->type : nullptr;
+    builtin_types.char_type = symbol_table.lookup("char")->type;
 
     if (!u32_symbol || !string_symbol || !str_symbol || !usize_symbol || !anyint_symbol) {
         std::cerr << "FATAL: A required built-in type was not defined." << std::endl;
@@ -392,12 +402,13 @@ bool is_any_integer_type(TypeKind kind) {
 void Semantic(std::shared_ptr<Program> &ast, ErrorReporter &error_reporter) {
 
     NameResolutionVisitor name_resolver(error_reporter);
-    SymbolTable &global_symbol_table_name = name_resolver.get_global_symbol_table();
+    SymbolTable &symbol_table = name_resolver.get_global_symbol_table();
+    BuiltinTypes builtins;
 
-    define_builtin_functions(global_symbol_table_name);
-    define_builtin_method(global_symbol_table_name);
+    define_builtin_functions(symbol_table, builtins);
+    define_builtin_method(symbol_table, builtins);
 
-    global_symbol_table_name.enter_scope();
+    symbol_table.enter_scope();
 
     name_resolver.resolve(ast.get());
 
@@ -408,7 +419,7 @@ void Semantic(std::shared_ptr<Program> &ast, ErrorReporter &error_reporter) {
         std::cerr << "Name resolution completed successfully." << std::endl;
     }
 
-    TypeCheckVisitor type_checker(global_symbol_table_name, error_reporter);
+    TypeCheckVisitor type_checker(symbol_table, builtins, error_reporter);
 
     for (auto &item : ast->items) {
         item->accept(&type_checker);
@@ -418,7 +429,7 @@ void Semantic(std::shared_ptr<Program> &ast, ErrorReporter &error_reporter) {
         return;
     }
 
-    global_symbol_table_name.exit_scope();
+    symbol_table.exit_scope();
 }
 
 std::optional<std::string> get_name_from_expr(Expr *expr) {

@@ -8,7 +8,7 @@ Comment: exit function test, only `i32` can be returned
 */
 
 fn main() {
-    let b: u32 = 3 + 1;
-
-    let c: String = b.to_string();
+    let a: String = 3.to_string();
+    let b: i32 = 3 + 1;
+    exit(b)
 }

@@ -2,8 +2,9 @@
 
 // TypeCheckVisitor implementation
 
-TypeCheckVisitor::TypeCheckVisitor(SymbolTable &symbol_table, ErrorReporter &error_reporter)
-    : symbol_table_(symbol_table), error_reporter_(error_reporter) {}
+TypeCheckVisitor::TypeCheckVisitor(SymbolTable &symbol_table, BuiltinTypes &builtin_types,
+                                   ErrorReporter &error_reporter)
+    : symbol_table_(symbol_table), builtin_types_(builtin_types), error_reporter_(error_reporter) {}
 
 std::shared_ptr<Symbol> TypeCheckVisitor::visit(LiteralExpr *node) {
     const TokenType token_type = node->literal.type;
@@ -15,21 +16,21 @@ std::shared_ptr<Symbol> TypeCheckVisitor::visit(LiteralExpr *node) {
             return nullptr;
         }
         if (num.Type == "i32") {
-            node->type = std::make_shared<PrimitiveType>(TypeKind::I32);
+            node->type = builtin_types_.i32_type;
         } else if (num.Type == "u32") {
-            node->type = std::make_shared<PrimitiveType>(TypeKind::U32);
+            node->type = builtin_types_.u32_type;
         } else if (num.Type == "isize") {
-            node->type = std::make_shared<PrimitiveType>(TypeKind::ISIZE);
+            node->type = builtin_types_.isize_type;
         } else if (num.Type == "usize") {
-            node->type = std::make_shared<PrimitiveType>(TypeKind::USIZE);
+            node->type = builtin_types_.usize_type;
         } else if (num.Type == "anyint") {
-            node->type = std::make_shared<PrimitiveType>(TypeKind::ANY_INTEGER);
+            node->type = builtin_types_.any_integer_type;
         }
         break;
     }
     case TokenType::TRUE:
     case TokenType::FALSE:
-        node->type = std::make_shared<PrimitiveType>(TypeKind::BOOL);
+        node->type = builtin_types_.bool_type;
         break;
 
     case TokenType::STRING: {
@@ -39,7 +40,7 @@ std::shared_ptr<Symbol> TypeCheckVisitor::visit(LiteralExpr *node) {
     }
 
     case TokenType::CHAR:
-        node->type = std::make_shared<PrimitiveType>(TypeKind::CHAR);
+        node->type = builtin_types_.char_type;
         break;
 
     default:
@@ -128,6 +129,61 @@ std::shared_ptr<Symbol> TypeCheckVisitor::visit(VariableExpr *node) {
 
 std::shared_ptr<Symbol> TypeCheckVisitor::visit(UnaryExpr *node) {
     node->right->accept(this);
+    auto operand_type = node->right->type;
+
+    if (!operand_type) {
+        return nullptr;
+    }
+
+    switch (node->op.type) {
+    case TokenType::MINUS:
+        if (is_any_integer_type(operand_type->kind) && operand_type->kind != TypeKind::U32 &&
+            operand_type->kind != TypeKind::USIZE) {
+            node->type = operand_type;
+        } else {
+            error_reporter_.report_error(
+                "Unary '+' and '-' operators can only be applied to integer types.", node->op.line);
+            node->type = nullptr;
+        }
+        break;
+    case TokenType::PLUS:
+        if (is_any_integer_type(operand_type->kind)) {
+            node->type = operand_type;
+        } else {
+            error_reporter_.report_error(
+                "Unary '+' and '-' operators can only be applied to integer types.", node->op.line);
+            node->type = nullptr;
+        }
+        break;
+    case TokenType::BANG:
+        if (operand_type->kind == TypeKind::BOOL) {
+            node->type = builtin_types_.bool_type;
+        } else {
+            error_reporter_.report_error(
+                "Logical NOT operator '!' can only be applied to boolean types.", node->op.line);
+            node->type = nullptr;
+        }
+        break;
+
+    case TokenType::STAR: {
+        if (auto *ref_type = dynamic_cast<ReferenceType *>(operand_type.get())) {
+            node->type = ref_type->referenced_type;
+        } else {
+            error_reporter_.report_error("Cannot dereference a non-reference type. Type '" +
+                                             operand_type->to_string() +
+                                             "' is not a pointer or reference.",
+                                         node->op.line);
+            node->type = nullptr;
+        }
+        break;
+    }
+
+    default:
+        error_reporter_.report_error("Unsupported unary operator.", node->op.line);
+        node->type = nullptr;
+        break;
+    }
+
     return nullptr;
 }
 
@@ -159,6 +215,19 @@ std::shared_ptr<Symbol> TypeCheckVisitor::visit(BinaryExpr *node) {
 
         if (left_is_int && right_is_int) {
             if (is_concrete_integer(left_type->kind)) {
+                if (is_concrete_integer(right_type->kind)) {
+                    if (left_type->equals(right_type.get())) {
+                        node->type = left_type;
+                    } else {
+                        error_reporter_.report_error(
+                            "Mismatched integer types in binary operation. Both operands must be "
+                            "of the same concrete integer type.",
+                            node->op.line);
+                        return nullptr;
+                    }
+                } else {
+                    node->type = left_type;
+                }
                 node->type = left_type;
             } else if (is_concrete_integer(right_type->kind)) {
                 node->type = right_type;
@@ -699,6 +768,7 @@ std::shared_ptr<Symbol> TypeCheckVisitor::visit(UnitExpr *node) {
 std::shared_ptr<Symbol> TypeCheckVisitor::visit(GroupingExpr *node) {
     node->expression->accept(this);
     node->type = node->expression->type;
+
     return nullptr;
 }
 
@@ -811,13 +881,7 @@ void TypeCheckVisitor::visit(ConstDecl *node) {
         node->type->accept(this);
 }
 
-void TypeCheckVisitor::visit(EnumDecl *node) {
-    // for (auto &variant : node->variants) {
-    //  EnumVariant doesn't have accept method, handle manually if needed
-    //  variant->name is just an identifier
-    //  variant->fields would need type checking if present
-    // }
-}
+void TypeCheckVisitor::visit(EnumDecl *node) {}
 
 void TypeCheckVisitor::visit(ModDecl *node) {
     for (auto &item : node->items) {

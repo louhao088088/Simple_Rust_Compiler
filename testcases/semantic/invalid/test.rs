@@ -1,12 +1,16 @@
 /*
 Test Package: Semantic-1
-Test Target: return
-Author: Bohan Zhang
-Time: 2025-08-24
+Test Target: type
+Author: Wenxin Zheng
+Time: 2025-08-08
 Verdict: Fail
-Comment: exit function test, the main function should not return any type but `()`
+Comment: Type error: pointer dereference type mismatch
 */
 
-fn main() -> i32 {
-    exit(-1);
+// Type error: pointer dereference type mismatch
+fn main() {
+    let x: i32 = 42;
+    let ptr: &i32 = &x;
+    let value: bool = *ptr;
+    exit(0);
 }

@@ -39,6 +39,19 @@ enum class TypeKind {
 };
 class SymbolTable;
 
+struct BuiltinTypes {
+    std::shared_ptr<Type> i32_type;
+    std::shared_ptr<Type> u32_type;
+    std::shared_ptr<Type> isize_type;
+    std::shared_ptr<Type> usize_type;
+    std::shared_ptr<Type> string_type;
+    std::shared_ptr<Type> str_type;
+    std::shared_ptr<Type> bool_type;
+    std::shared_ptr<Type> any_integer_type;
+    std::shared_ptr<Type> char_type;
+    std::shared_ptr<Type> unit_type;
+};
+
 struct Type {
     TypeKind kind;
     std::shared_ptr<SymbolTable> members = std::make_shared<SymbolTable>();
@@ -420,7 +433,7 @@ class TypeCheckVisitor : public ExprVisitor<std::shared_ptr<Symbol>>,
                          public TypeVisitor,
                          public PatternVisitor {
   public:
-    TypeCheckVisitor(SymbolTable &symbol_table, ErrorReporter &error_reporter);
+     TypeCheckVisitor(SymbolTable& symbol_table, BuiltinTypes& builtin_types, ErrorReporter &error_reporter);
 
     // Expression visitors
     std::shared_ptr<Symbol> visit(LiteralExpr *node) override;
@@ -490,6 +503,7 @@ class TypeCheckVisitor : public ExprVisitor<std::shared_ptr<Symbol>>,
   private:
     SymbolTable &symbol_table_;
     ErrorReporter &error_reporter_;
+    BuiltinTypes &builtin_types_;
     std::shared_ptr<Type> current_return_type_ = nullptr;
     Symbol *current_function_symbol_ = nullptr;
     int loop_depth_ = 0;
@@ -499,7 +513,5 @@ class TypeCheckVisitor : public ExprVisitor<std::shared_ptr<Symbol>>,
 };
 
 void Semantic(std::shared_ptr<Program> &ast, ErrorReporter &error_reporter);
-
-
 
 std::optional<std::string> get_name_from_expr(Expr *expr);
