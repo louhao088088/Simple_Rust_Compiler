@@ -503,11 +503,17 @@ std::shared_ptr<Symbol> TypeCheckVisitor::visit(IndexExpr *node) {
         return nullptr;
     }
 
-    if (object_type->kind != TypeKind::ARRAY) {
+    auto new_object_type = object_type;
+    if (auto *ref_type = dynamic_cast<ReferenceType *>(object_type.get())) {
+
+        new_object_type = ref_type->referenced_type;
+    }
+
+    if (new_object_type->kind != TypeKind::ARRAY) {
         error_reporter_.report_error("Type '" + object_type->to_string() + "' cannot be indexed.");
         return nullptr;
     }
-    auto array_type = std::dynamic_pointer_cast<ArrayType>(object_type);
+    auto array_type = std::dynamic_pointer_cast<ArrayType>(new_object_type);
 
     if (!is_any_integer_type(index_type->kind)) {
         error_reporter_.report_error("Array index must be an integer.");
@@ -787,9 +793,7 @@ void TypeCheckVisitor::visit(FnDecl *node) {
 }
 
 // Pattern visitors for TypeCheckVisitor
-void TypeCheckVisitor::visit(IdentifierPattern *node) {
-    // Pattern type checking would go here
-}
+void TypeCheckVisitor::visit(IdentifierPattern *node) {}
 
 void TypeCheckVisitor::visit(ReferencePattern *node) {}
 

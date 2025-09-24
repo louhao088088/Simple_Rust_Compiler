@@ -1,25 +1,14 @@
 /*
 Test Package: Semantic-1
-Test Target: return
-Author: Ruitian Wang
-Time: 2025-08-27
-Verdict: Pass
-Comment: Valid return with complex expression
+Test Target: basic
+Author: Wenxin Zheng
+Time: 2025-08-08
+Verdict: Success
+Comment: basic test, matrix multiplication with type alias and trace calculation
 */
 
-// Valid: return with complex expression
-fn calculate(a: i32, b: i32) -> i32 {
-    if (a > b) {
-        return a * b + (a - b);
-    } else if (a == b) {
-        return a * 2;
-    }
-    return (b - a);
+const N: usize = 3;
+fn mul(a: &[[i32; N]; N], b: &[[i32; N]; N]) {
+    let c: i32 = a[0][0];
 }
-
-fn main() {
-    let result1: i32 = calculate(10, 5);
-    let result2: i32 = calculate(3, 3);
-    let result3: i32 = calculate(2, 8);
-    exit(0);
-}
+fn main() {}

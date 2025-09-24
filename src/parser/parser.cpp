@@ -229,6 +229,8 @@ Parser::Parser(const std::vector<Token> &tokens, ErrorReporter &error_reporter)
         std::vector<std::shared_ptr<Expr>> arguments;
         if (!check(TokenType::RIGHT_PAREN)) {
             do {
+                if (peek().type == TokenType::RIGHT_PAREN)
+                    break;
                 arguments.push_back(parse_expression(Precedence::NONE));
             } while (match({TokenType::COMMA}));
         }
@@ -862,6 +864,9 @@ std::shared_ptr<BreakStmt> Parser::parse_break_statement() {
     std::optional<std::shared_ptr<Expr>> value;
     if (!check(TokenType::SEMICOLON) && !is_at_end()) {
         value = parse_expression(Precedence::NONE);
+    }
+    if (peek().type == TokenType::RIGHT_BRACE) {
+        return std::make_shared<BreakStmt>(std::move(value));
     }
     consume(TokenType::SEMICOLON, "Expect ';' after break statement.");
     return std::make_shared<BreakStmt>(std::move(value));
