@@ -22,6 +22,7 @@ struct Expr : public Node {
 
     bool return_over = false;
     bool has_semicolon = false;
+    bool is_mutable_lvalue = false;
 
     template <typename R> R accept(ExprVisitor<R> *visitor);
 };

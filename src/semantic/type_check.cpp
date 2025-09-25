@@ -124,6 +124,14 @@ std::shared_ptr<Symbol> TypeCheckVisitor::visit(VariableExpr *node) {
     if (node->resolved_symbol && node->resolved_symbol->type) {
         node->type = node->resolved_symbol->type;
     }
+    if (node->resolved_symbol && node->resolved_symbol->kind == Symbol::VARIABLE) {
+        bool binding_is_mut = node->resolved_symbol->is_mutable;
+        bool type_is_mut_ref = false;
+        if (auto *ref_type = dynamic_cast<ReferenceType *>(node->type.get())) {
+            type_is_mut_ref = ref_type->is_mutable;
+        }
+        node->is_mutable_lvalue = binding_is_mut || type_is_mut_ref;
+    }
     return nullptr;
 }
 
@@ -543,6 +551,7 @@ std::shared_ptr<Symbol> TypeCheckVisitor::visit(IndexExpr *node) {
     node->type = array_type->element_type;
     node->resolved_symbol = node->object->resolved_symbol;
 
+    node->is_mutable_lvalue = node->object->is_mutable_lvalue;
     return nullptr;
 }
 
@@ -599,30 +608,10 @@ std::shared_ptr<Symbol> TypeCheckVisitor::visit(AssignmentExpr *node) {
     if (!target_symbol) {
         error_reporter_.report_error("Undefined variable in assignment.");
     }
-    if (auto *var_expr = dynamic_cast<VariableExpr *>(node->target.get())) {
 
-        if (!target_symbol->is_mutable) {
-            error_reporter_.report_error("Cannot assign to immutable variable '" +
-                                         target_symbol->name + "'.");
-        }
-    }
-
-    else if (auto *index_expr = dynamic_cast<IndexExpr *>(node->target.get())) {
-        auto object_of_index = index_expr->object;
-
-        bool binding_is_mut =
-            object_of_index->resolved_symbol && object_of_index->resolved_symbol->is_mutable;
-
-        bool type_is_mut_ref = false;
-        if (auto *ref_type = dynamic_cast<ReferenceType *>(object_of_index->type.get())) {
-            if (ref_type->is_mutable) {
-                type_is_mut_ref = true;
-            }
-        }
-
-        if (!binding_is_mut && !type_is_mut_ref) {
-            error_reporter_.report_error("Cannot assign through immutable index expression.");
-        }
+    if (!node->target->is_mutable_lvalue) {
+        error_reporter_.report_error(
+            "Invalid left-hand side of assignment. Target is not mutable.");
     }
 
     if (node->target->type && node->value->type) {
