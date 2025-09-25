@@ -1,5 +1,6 @@
+// type_resolve.cpp
+
 #include "semantic.h"
-// TypeResolver Implementation
 
 TypeResolver::TypeResolver(NameResolutionVisitor &resolver, SymbolTable &symbols,
                            ErrorReporter &reporter)
@@ -18,9 +19,8 @@ std::shared_ptr<Type> TypeResolver::resolve(TypeNode *node) {
 }
 
 void TypeResolver::visit(TypeNameNode *node) {
-    // Handle primitive types
 
-    auto symbol = symbol_table_.lookup(node->name.lexeme);
+    auto symbol = symbol_table_.lookup_type(node->name.lexeme);
 
     if (symbol && symbol->kind == Symbol::TYPE) {
         resolved_type_ = symbol->type;
@@ -40,7 +40,7 @@ void TypeResolver::visit(ArrayTypeNode *node) {
     }
 
     if (auto *var_expr = dynamic_cast<VariableExpr *>(node->size.get())) {
-        auto symbol = symbol_table_.lookup(var_expr->name.lexeme);
+        auto symbol = symbol_table_.lookup_value(var_expr->name.lexeme);
         if (symbol && symbol->type) {
             if (symbol->type->kind != TypeKind::USIZE) {
                 error_reporter_.report_error(
@@ -56,7 +56,6 @@ void TypeResolver::visit(ArrayTypeNode *node) {
 
         error_reporter_.report_error(
             "Only variables and integer literals are supported as array sizes for now.");
-        // TO DO
         resolved_type_ = nullptr;
         return;
     }
@@ -76,17 +75,14 @@ void TypeResolver::visit(ArrayTypeNode *node) {
 
 void TypeResolver::visit(UnitTypeNode *node) { resolved_type_ = std::make_shared<UnitType>(); }
 
-void TypeResolver::visit(TupleTypeNode *node) {
-    // For now, just create a unit type - full tuple support later
-    resolved_type_ = std::make_shared<UnitType>();
-}
+void TypeResolver::visit(TupleTypeNode *node) { resolved_type_ = std::make_shared<UnitType>(); }
 
 void TypeResolver::visit(PathTypeNode *node) {
 
     if (auto *var_expr = dynamic_cast<VariableExpr *>(node->path.get())) {
         const auto &name = var_expr->name.lexeme;
 
-        auto symbol = symbol_table_.lookup(var_expr->name.lexeme);
+        auto symbol = symbol_table_.lookup_type(var_expr->name.lexeme);
 
         if (symbol && symbol->kind == Symbol::TYPE) {
 
@@ -110,11 +106,6 @@ void TypeResolver::visit(PathTypeNode *node) {
     }
 }
 
-void TypeResolver::visit(RawPointerTypeNode *node) {
-    // Placeholder for pointer types
-    resolved_type_ = nullptr;
-}
-
 void TypeResolver::visit(ReferenceTypeNode *node) {
     auto resolved_inner_type = resolve(node->referenced_type.get());
 
@@ -129,3 +120,5 @@ void TypeResolver::visit(ReferenceTypeNode *node) {
 void TypeResolver::visit(SliceTypeNode *node) { resolved_type_ = nullptr; }
 
 void TypeResolver::visit(SelfTypeNode *node) { resolved_type_ = nullptr; }
+
+void TypeResolver::visit(RawPointerTypeNode *node) { resolved_type_ = nullptr; }

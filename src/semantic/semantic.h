@@ -294,17 +294,28 @@ class Symbol {
 
 class SymbolTable {
   public:
+    struct Scope {
+        std::unordered_map<std::string, std::shared_ptr<Symbol>> value_symbols; // fn/let/const
+        std::unordered_map<std::string, std::shared_ptr<Symbol>> type_symbols;  // struct/enum/type
+    };
+
     SymbolTable() { enter_scope(); }
     void enter_scope();
     void exit_scope();
+
+    bool define_value(const std::string &name, std::shared_ptr<Symbol> symbol);
+    std::shared_ptr<Symbol> lookup_value(const std::string &name);
+
+    bool define_type(const std::string &name, std::shared_ptr<Symbol> symbol);
+    std::shared_ptr<Symbol> lookup_type(const std::string &name);
+
     bool define(const std::string &name, std::shared_ptr<Symbol> symbol);
     std::shared_ptr<Symbol> lookup(const std::string &name);
 
   private:
-    std::vector<std::unordered_map<std::string, std::shared_ptr<Symbol>>> scopes_;
+    std::vector<Scope> scopes_;
 };
 
-// Constant evaluator for compile-time constant expressions
 class ConstEvaluator : public ExprVisitor<std::optional<long long>> {
   public:
     ConstEvaluator(SymbolTable &symbol_table, ErrorReporter &error_reporter)
@@ -316,7 +327,6 @@ class ConstEvaluator : public ExprVisitor<std::optional<long long>> {
         return expr->accept(this);
     }
 
-    // Expression visitors that return optional constant value
     std::optional<long long> visit(LiteralExpr *node) override;
     std::optional<long long> visit(VariableExpr *node) override;
     std::optional<long long> visit(BinaryExpr *node) override;
@@ -349,7 +359,6 @@ class ConstEvaluator : public ExprVisitor<std::optional<long long>> {
     ErrorReporter &error_reporter_;
 };
 
-// Name resolution visitor - specialized for returning Symbol
 class NameResolutionVisitor : public ExprVisitor<std::shared_ptr<Symbol>>,
                               public StmtVisitor,
                               public ItemVisitor,

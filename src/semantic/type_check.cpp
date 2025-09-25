@@ -1,6 +1,7 @@
+// type_check.cpp
+
 #include "semantic.h"
 
-// TypeCheckVisitor implementation
 
 TypeCheckVisitor::TypeCheckVisitor(SymbolTable &symbol_table, BuiltinTypes &builtin_types,
                                    ErrorReporter &error_reporter)
@@ -564,7 +565,7 @@ std::shared_ptr<Symbol> TypeCheckVisitor::visit(FieldAccessExpr *node) {
 
     std::string method_name = node->field.lexeme;
 
-    auto method_symbol = object_type->members->lookup(method_name);
+    auto method_symbol = object_type->members->lookup_value(method_name);
 
     if (method_symbol) {
         node->type = method_symbol->type;
@@ -577,7 +578,7 @@ std::shared_ptr<Symbol> TypeCheckVisitor::visit(FieldAccessExpr *node) {
         base_type = ref_type->referenced_type;
     }
     if (base_type->kind == TypeKind::ARRAY && method_name == "len") {
-        auto usize_type = symbol_table_.lookup("usize")->type;
+        auto usize_type = symbol_table_.lookup_type("usize")->type;
         std::vector<std::shared_ptr<Type>> len_param_types = {
             std::make_shared<ReferenceType>(object_type, false)};
 
@@ -963,7 +964,7 @@ std::shared_ptr<Symbol> TypeCheckVisitor::visit(PathExpr *node) {
         return nullptr;
     }
 
-    auto assoc_fn_symbol = left_symbol->members->lookup(*right_name_opt);
+    auto assoc_fn_symbol = left_symbol->members->lookup_value(*right_name_opt);
     if (!assoc_fn_symbol) {
         error_reporter_.report_error("No function named '" + *right_name_opt +
                                      "' associated with type '" + left_symbol->name + "'.");
@@ -1001,7 +1002,6 @@ void TypeCheckVisitor::visit(SelfTypeNode *node) {
     // Self types are handled in context
 }
 
-// Missing item visitors for TypeCheckVisitor
 void TypeCheckVisitor::visit(StructDecl *node) {
     // TODO: Handle struct type checking
 }

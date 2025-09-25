@@ -1,6 +1,7 @@
+// name_resolution.cpp
+
 #include "semantic.h"
 
-// NameResolutionVisitor implementation
 NameResolutionVisitor::NameResolutionVisitor(ErrorReporter &error_reporter)
     : error_reporter_(error_reporter), type_resolver_(*this, symbol_table_, error_reporter_) {
     symbol_table_.enter_scope();
@@ -22,7 +23,7 @@ std::shared_ptr<Symbol> NameResolutionVisitor::visit(ArrayInitializerExpr *node)
 }
 
 std::shared_ptr<Symbol> NameResolutionVisitor::visit(VariableExpr *node) {
-    auto symbol = symbol_table_.lookup(node->name.lexeme);
+    auto symbol = symbol_table_.lookup_value(node->name.lexeme);
     if (!symbol) {
         error_reporter_.report_error("Undefined variable '" + node->name.lexeme + "'",
                                      node->name.line, node->name.column);
@@ -188,7 +189,7 @@ void NameResolutionVisitor::visit(FnDecl *node) {
     auto function_type = std::make_shared<FunctionType>(return_type, param_types);
 
     auto fn_symbol = std::make_shared<Symbol>(node->name.lexeme, Symbol::FUNCTION, function_type);
-    if (!symbol_table_.define(node->name.lexeme, fn_symbol)) {
+    if (!symbol_table_.define_value(node->name.lexeme, fn_symbol)) {
         error_reporter_.report_error("Function '" + node->name.lexeme + "' is already defined.",
                                      node->name.line);
     }
@@ -217,7 +218,7 @@ void NameResolutionVisitor::visit(FnDecl *node) {
 void NameResolutionVisitor::visit(IdentifierPattern *node) {
     auto var_symbol = std::make_shared<Symbol>(node->name.lexeme, Symbol::VARIABLE, current_type_);
     var_symbol->is_mutable = node->is_mutable;
-    if (!symbol_table_.define(node->name.lexeme, var_symbol)) {
+    if (!symbol_table_.define_value(node->name.lexeme, var_symbol)) {
         error_reporter_.report_error("Variable '" + node->name.lexeme +
                                          "' is already defined in this scope.",
                                      node->name.line);
@@ -350,7 +351,7 @@ std::shared_ptr<Symbol> NameResolutionVisitor::visit(PathExpr *node) {
     }
     std::string right_name = *right_name_opt;
 
-    auto final_symbol = left_symbol->members->lookup(right_name);
+    auto final_symbol = left_symbol->members->lookup_value(right_name);
 
     if (!final_symbol) {
         error_reporter_.report_error("name '" + right_name + "' is not found in '" +
@@ -386,7 +387,7 @@ void NameResolutionVisitor::visit(StructDecl *node) {
         std::make_shared<StructType>(node->name.lexeme, std::weak_ptr<Symbol>(struct_symbol));
     struct_symbol->type = struct_type;
 
-    if (!symbol_table_.define(node->name.lexeme, struct_symbol)) {
+    if (!symbol_table_.define_type(node->name.lexeme, struct_symbol)) {
         error_reporter_.report_error("Type '" + node->name.lexeme + "' is already defined.",
                                      node->name.line);
         return;
@@ -406,7 +407,7 @@ void NameResolutionVisitor::visit(StructDecl *node) {
             auto field_symbol =
                 std::make_shared<Symbol>(field_node->name.lexeme, Symbol::VARIABLE, field_type);
 
-            if (!struct_symbol->members->define(field_node->name.lexeme, field_symbol)) {
+            if (!struct_symbol->members->define_value(field_node->name.lexeme, field_symbol)) {
                 error_reporter_.report_error("Field '" + field_node->name.lexeme +
                                                  "' is already defined in struct '" +
                                                  node->name.lexeme + "'.",
@@ -453,7 +454,7 @@ void NameResolutionVisitor::visit(ConstDecl *node) {
 
     const_symbol->const_decl_node = node;
 
-    if (!symbol_table_.define(node->name.lexeme, const_symbol)) {
+    if (!symbol_table_.define_value(node->name.lexeme, const_symbol)) {
         error_reporter_.report_error("Constant '" + node->name.lexeme + "' is already defined.",
                                      node->name.line);
     }
@@ -466,13 +467,12 @@ void NameResolutionVisitor::visit(EnumDecl *node) {
     auto enum_symbol = std::make_shared<Symbol>(node->name.lexeme, Symbol::TYPE);
 
     enum_symbol->members = std::make_unique<SymbolTable>();
-
-    symbol_table_.define(node->name.lexeme, enum_symbol);
+    symbol_table_.define_type(node->name.lexeme, enum_symbol);
     node->resolved_symbol = enum_symbol;
 
     for (const auto &variant : node->variants) {
         auto variant_symbol = std::make_shared<Symbol>(variant->name.lexeme, Symbol::VARIANT);
-        enum_symbol->members->define(variant->name.lexeme, variant_symbol);
+        enum_symbol->members->define_value(variant->name.lexeme, variant_symbol);
     }
 }
 
@@ -480,7 +480,7 @@ void NameResolutionVisitor::visit(ModDecl *node) {
     auto mod_symbol = std::make_shared<Symbol>(node->name.lexeme, Symbol::MODULE);
     mod_symbol->members = std::make_unique<SymbolTable>();
 
-    if (!symbol_table_.define(node->name.lexeme, mod_symbol)) {
+    if (!symbol_table_.define_value(node->name.lexeme, mod_symbol)) {
         error_reporter_.report_error("Module '" + node->name.lexeme + "' is already defined.",
                                      node->name.line);
     }
@@ -509,7 +509,7 @@ void NameResolutionVisitor::visit(ImplBlock *node) {
     if (target_type_symbol) {
         auto self_symbol = std::make_shared<Symbol>("Self", Symbol::TYPE);
         self_symbol->aliased_symbol = target_type_symbol;
-        symbol_table_.define("Self", self_symbol);
+        symbol_table_.define_type("Self", self_symbol);
     }
 
     for (auto &item : node->implemented_items) {
@@ -520,7 +520,7 @@ void NameResolutionVisitor::visit(ImplBlock *node) {
 }
 
 void NameResolutionVisitor::declare_struct(StructDecl *node) {
-    if (symbol_table_.lookup(node->name.lexeme)) {
+    if (symbol_table_.lookup_type(node->name.lexeme)) {
         error_reporter_.report_error("Type '" + node->name.lexeme + "' is already defined.",
                                      node->name.line);
         return;
@@ -532,7 +532,7 @@ void NameResolutionVisitor::declare_struct(StructDecl *node) {
         std::make_shared<StructType>(node->name.lexeme, std::weak_ptr<Symbol>(struct_symbol));
 
     struct_symbol->type = struct_type;
-    symbol_table_.define(node->name.lexeme, struct_symbol);
+    symbol_table_.define_type(node->name.lexeme, struct_symbol);
     node->resolved_symbol = struct_symbol;
 
     struct_symbol->members->enter_scope();
@@ -548,7 +548,7 @@ void NameResolutionVisitor::declare_struct(StructDecl *node) {
         struct_type->fields[field_node->name.lexeme] = field_type;
         auto field_symbol =
             std::make_shared<Symbol>(field_node->name.lexeme, Symbol::VARIABLE, field_type);
-        struct_symbol->members->define(field_node->name.lexeme, field_symbol);
+        struct_symbol->members->define_value(field_node->name.lexeme, field_symbol);
     }
     struct_symbol->members->exit_scope();
 }
@@ -578,7 +578,7 @@ void NameResolutionVisitor::declare_function(FnDecl *node) {
     auto function_type = std::make_shared<FunctionType>(return_type, param_types);
 
     auto fn_symbol = std::make_shared<Symbol>(node->name.lexeme, Symbol::FUNCTION, function_type);
-    if (!symbol_table_.define(node->name.lexeme, fn_symbol)) {
+    if (!symbol_table_.define_value(node->name.lexeme, fn_symbol)) {
         error_reporter_.report_error("Function '" + node->name.lexeme + "' is already defined.",
                                      node->name.line);
     }
@@ -627,7 +627,7 @@ void NameResolutionVisitor::define_impl_block(ImplBlock *node) {
                 }
             }
 
-            if (!struct_symbol->members->define(fn_decl->name.lexeme, method_symbol)) {
+            if (!struct_symbol->members->define_value(fn_decl->name.lexeme, method_symbol)) {
                 error_reporter_.report_error("Method '" + fn_decl->name.lexeme +
                                              "' already defined for this struct.");
             }
