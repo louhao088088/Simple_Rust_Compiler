@@ -802,11 +802,13 @@ std::shared_ptr<BlockStmt> Parser::parse_block_statement() {
     }
 
     consume(TokenType::RIGHT_BRACE, "Expect '}' to end a block.");
+    block->has_semicolon = 1;
     if (!block->statements.empty()) {
         if (auto *last_stmt = dynamic_cast<ExprStmt *>(block->statements.back().get())) {
             if (!last_stmt->has_semicolon) {
                 block->final_expr = std::move(last_stmt->expression);
                 block->statements.pop_back();
+                block->has_semicolon = 0;
             }
         }
         for (size_t i = 0; i + 1 < block->statements.size(); i++) {
@@ -884,7 +886,7 @@ std::shared_ptr<ExprStmt> Parser::parse_expression_statement() {
         return std::make_shared<ExprStmt>(std::move(expr), true);
     } else {
         if (auto *if_expr = dynamic_cast<IfExpr *>(expr.get())) {
-            return std::make_shared<ExprStmt>(std::move(expr), true);
+            return std::make_shared<ExprStmt>(std::move(expr), if_expr->has_semicolon);
         } else if (auto *match_expr = dynamic_cast<MatchExpr *>(expr.get())) {
             return std::make_shared<ExprStmt>(std::move(expr), true);
         } else if (auto *loop_expr = dynamic_cast<LoopExpr *>(expr.get())) {
@@ -946,16 +948,18 @@ std::shared_ptr<IfExpr> Parser::parse_if_expression() {
     consume(TokenType::LEFT_PAREN, "Expected '(' after 'if'.");
     auto condition = parse_expression(Precedence::NONE);
     consume(TokenType::RIGHT_PAREN, "Expected ')' after if condition.");
+    bool has_semicolon = false;
 
     auto then_branch = parse_block_expression();
-
+    has_semicolon = then_branch->block_stmt->has_semicolon;
     std::optional<std::shared_ptr<Expr>> else_branch;
     if (match({TokenType::ELSE})) {
         else_branch = parse_expression(Precedence::NONE);
+        has_semicolon |= else_branch && else_branch.value()->has_semicolon;
     }
 
     return std::make_shared<IfExpr>(std::move(condition), std::move(then_branch),
-                                    std::move(else_branch));
+                                    std::move(else_branch), has_semicolon);
 }
 
 std::shared_ptr<LoopExpr> Parser::parse_loop_expression() {

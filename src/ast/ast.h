@@ -16,10 +16,12 @@ struct Node {
 };
 
 struct Expr : public Node {
+
     std::shared_ptr<Type> type;
     std::shared_ptr<Symbol> resolved_symbol;
 
     bool return_over = false;
+    bool has_semicolon = false;
 
     template <typename R> R accept(ExprVisitor<R> *visitor);
 };
@@ -107,11 +109,13 @@ struct IfExpr : public Expr {
     std::shared_ptr<Expr> condition;
     std::shared_ptr<Expr> then_branch;
     std::optional<std::shared_ptr<Expr>> else_branch;
-    bool is_expression_statement = false;
+
     IfExpr(std::shared_ptr<Expr> cond, std::shared_ptr<Expr> then_b,
-           std::optional<std::shared_ptr<Expr>> else_b)
+           std::optional<std::shared_ptr<Expr>> else_b, bool has_semi = false)
         : condition(std::move(cond)), then_branch(std::move(then_b)),
-          else_branch(std::move(else_b)) {}
+          else_branch(std::move(else_b)) {
+        this->has_semicolon = has_semi;
+    }
     void print(std::ostream &os, int indent = 0) const override;
 };
 
@@ -259,6 +263,8 @@ struct ReturnExpr : public Expr {
 // Statements
 
 struct BlockStmt : public Stmt {
+    bool has_semicolon = false;
+
     std::vector<std::shared_ptr<Stmt>> statements;
     std::optional<std::shared_ptr<Expr>> final_expr;
     void print(std::ostream &os, int indent = 0) const override;
