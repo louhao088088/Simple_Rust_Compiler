@@ -176,6 +176,7 @@ std::shared_ptr<Symbol> TypeCheckVisitor::visit(UnaryExpr *node) {
     case TokenType::STAR: {
         if (auto *ref_type = dynamic_cast<ReferenceType *>(operand_type.get())) {
             node->type = ref_type->referenced_type;
+            node->is_mutable_lvalue = ref_type->is_mutable;
         } else {
             error_reporter_.report_error("Cannot dereference a non-reference type. Type '" +
                                              operand_type->to_string() +
@@ -620,7 +621,7 @@ std::shared_ptr<Symbol> TypeCheckVisitor::visit(AssignmentExpr *node) {
              node->target->type->kind == TypeKind::U32 ||
              node->target->type->kind == TypeKind::ISIZE ||
              node->target->type->kind == TypeKind::USIZE)) {
-            // Nothing happens.
+
         } else if (!node->target->type->equals(node->value->type.get())) {
             error_reporter_.report_error(
                 "Type mismatch in assignment. Cannot assign value of type '" +
@@ -635,56 +636,49 @@ std::shared_ptr<Symbol> TypeCheckVisitor::visit(AssignmentExpr *node) {
 std::shared_ptr<Symbol> TypeCheckVisitor::visit(CompoundAssignmentExpr *node) {
     node->target->accept(this);
     node->value->accept(this);
-    if (dynamic_cast<UnderscoreExpr *>(node->target.get())) {
-        node->type = std::make_shared<UnitType>();
+    auto target_type = node->target->type;
+    auto value_type = node->value->type;
+
+    if (!target_type || !value_type) {
         return nullptr;
     }
-    std::shared_ptr<Symbol> target_symbol = node->target->resolved_symbol;
 
-    if (!target_symbol) {
-        error_reporter_.report_error("Undefined variable in assignment.");
-    }
-    if (auto *var_expr = dynamic_cast<VariableExpr *>(node->target.get())) {
-
-        if (!target_symbol->is_mutable) {
-            error_reporter_.report_error("Cannot assign to immutable variable '" +
-                                         target_symbol->name + "'.");
-        }
+    if (!node->target->is_mutable_lvalue) {
+        error_reporter_.report_error(
+            "Invalid left-hand side of assignment. Target is not mutable.");
     }
 
-    else if (auto *index_expr = dynamic_cast<IndexExpr *>(node->target.get())) {
-        auto object_of_index = index_expr->object;
-
-        bool binding_is_mut =
-            object_of_index->resolved_symbol && object_of_index->resolved_symbol->is_mutable;
-
-        bool type_is_mut_ref = false;
-        if (auto *ref_type = dynamic_cast<ReferenceType *>(object_of_index->type.get())) {
-            if (ref_type->is_mutable) {
-                type_is_mut_ref = true;
-            }
+    bool operation_is_valid = false;
+    switch (node->op.type) {
+    case TokenType::PLUS_EQUAL:
+    case TokenType::MINUS_EQUAL:
+    case TokenType::STAR_EQUAL:
+    case TokenType::SLASH_EQUAL:
+    case TokenType::PERCENT_EQUAL:
+    case TokenType::CARET_EQUAL:
+    case TokenType::LESS_LESS_EQUAL:
+    case TokenType::GREATER_GREATER_EQUAL:
+    case TokenType::AMPERSAND_EQUAL:
+    case TokenType::PIPE_EQUAL: {
+        if (is_any_integer_type(target_type->kind) && is_any_integer_type(value_type->kind)) {
+            operation_is_valid = true;
         }
-
-        if (!binding_is_mut && !type_is_mut_ref) {
-            error_reporter_.report_error("Cannot assign through immutable index expression.");
-        }
+        break;
+    }
+    default:
+        operation_is_valid = false;
+        break;
     }
 
-    if (node->target->type && node->value->type) {
-        if (node->value->type->kind == TypeKind::ANY_INTEGER &&
-            (node->target->type->kind == TypeKind::I32 ||
-             node->target->type->kind == TypeKind::U32 ||
-             node->target->type->kind == TypeKind::ISIZE ||
-             node->target->type->kind == TypeKind::USIZE)) {
-            // Nothing happens.
-        } else if (!node->target->type->equals(node->value->type.get())) {
-            error_reporter_.report_error(
-                "Type mismatch in assignment. Cannot assign value of type '" +
-                node->value->type->to_string() + "' to variable of type '" +
-                node->target->type->to_string() + "'.");
-        }
+    if (!operation_is_valid) {
+        error_reporter_.report_error(
+            "Cannot apply compound assignment operator '" + node->op.lexeme + "' to types '" +
+                target_type->to_string() + "' and '" + value_type->to_string() + "'.",
+            node->op.line);
     }
+
     node->type = std::make_shared<UnitType>();
+
     return nullptr;
 }
 
