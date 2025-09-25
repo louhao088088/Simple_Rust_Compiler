@@ -313,6 +313,26 @@ std::shared_ptr<Symbol> TypeCheckVisitor::visit(BinaryExpr *node) {
 
     return nullptr;
 }
+bool is_compatible(Type *arg_type, Type *param_type) {
+    if (!arg_type || !param_type)
+        return false;
+
+    if (arg_type->equals(param_type)) {
+        return true;
+    }
+
+    if (auto *param_ref = dynamic_cast<const ReferenceType *>(param_type)) {
+        if (auto *arg_ref = dynamic_cast<const ReferenceType *>(arg_type)) {
+            if (is_compatible(arg_ref->referenced_type.get(), param_ref->referenced_type.get())) {
+                if (!param_ref->is_mutable || arg_ref->is_mutable) {
+                    return true;
+                }
+            }
+        }
+    }
+
+    return false;
+}
 
 std::shared_ptr<Symbol> TypeCheckVisitor::visit(CallExpr *node) {
 
@@ -360,7 +380,7 @@ std::shared_ptr<Symbol> TypeCheckVisitor::visit(CallExpr *node) {
             auto &arg_type = node->arguments[i]->type;
 
             auto &param_type = fn_type->param_types[i + 1];
-            if (arg_type && !arg_type->equals(param_type.get())) {
+            if (arg_type && !is_compatible(arg_type.get(), param_type.get())) {
                 error_reporter_.report_error("Mismatched types. Expected argument type '" +
                                              param_type->to_string() + "' but found '" +
                                              arg_type->to_string() + "'.");
@@ -379,7 +399,7 @@ std::shared_ptr<Symbol> TypeCheckVisitor::visit(CallExpr *node) {
         for (size_t i = 0; i < node->arguments.size(); ++i) {
             auto &arg_type = node->arguments[i]->type;
             auto &param_type = fn_type->param_types[i];
-            if (arg_type && !arg_type->equals(param_type.get())) {
+            if (arg_type && !is_compatible(arg_type.get(), param_type.get())) {
                 error_reporter_.report_error("Mismatched types. Expected argument type '" +
                                              param_type->to_string() + "' but found '" +
                                              arg_type->to_string() + "'.");
@@ -576,14 +596,33 @@ std::shared_ptr<Symbol> TypeCheckVisitor::visit(AssignmentExpr *node) {
         node->type = std::make_shared<UnitType>();
         return nullptr;
     }
+    if (!target_symbol) {
+        error_reporter_.report_error("Undefined variable in assignment.");
+    }
+    if (auto *var_expr = dynamic_cast<VariableExpr *>(node->target.get())) {
 
-    if (target_symbol) {
         if (!target_symbol->is_mutable) {
             error_reporter_.report_error("Cannot assign to immutable variable '" +
                                          target_symbol->name + "'.");
         }
-    } else {
-        error_reporter_.report_error("Undefined variable in assignment.");
+    }
+
+    else if (auto *index_expr = dynamic_cast<IndexExpr *>(node->target.get())) {
+        auto object_of_index = index_expr->object;
+
+        bool binding_is_mut =
+            object_of_index->resolved_symbol && object_of_index->resolved_symbol->is_mutable;
+
+        bool type_is_mut_ref = false;
+        if (auto *ref_type = dynamic_cast<ReferenceType *>(object_of_index->type.get())) {
+            if (ref_type->is_mutable) {
+                type_is_mut_ref = true;
+            }
+        }
+
+        if (!binding_is_mut && !type_is_mut_ref) {
+            error_reporter_.report_error("Cannot assign through immutable index expression.");
+        }
     }
 
     if (node->target->type && node->value->type) {
@@ -607,6 +646,56 @@ std::shared_ptr<Symbol> TypeCheckVisitor::visit(AssignmentExpr *node) {
 std::shared_ptr<Symbol> TypeCheckVisitor::visit(CompoundAssignmentExpr *node) {
     node->target->accept(this);
     node->value->accept(this);
+    if (dynamic_cast<UnderscoreExpr *>(node->target.get())) {
+        node->type = std::make_shared<UnitType>();
+        return nullptr;
+    }
+    std::shared_ptr<Symbol> target_symbol = node->target->resolved_symbol;
+
+    if (!target_symbol) {
+        error_reporter_.report_error("Undefined variable in assignment.");
+    }
+    if (auto *var_expr = dynamic_cast<VariableExpr *>(node->target.get())) {
+
+        if (!target_symbol->is_mutable) {
+            error_reporter_.report_error("Cannot assign to immutable variable '" +
+                                         target_symbol->name + "'.");
+        }
+    }
+
+    else if (auto *index_expr = dynamic_cast<IndexExpr *>(node->target.get())) {
+        auto object_of_index = index_expr->object;
+
+        bool binding_is_mut =
+            object_of_index->resolved_symbol && object_of_index->resolved_symbol->is_mutable;
+
+        bool type_is_mut_ref = false;
+        if (auto *ref_type = dynamic_cast<ReferenceType *>(object_of_index->type.get())) {
+            if (ref_type->is_mutable) {
+                type_is_mut_ref = true;
+            }
+        }
+
+        if (!binding_is_mut && !type_is_mut_ref) {
+            error_reporter_.report_error("Cannot assign through immutable index expression.");
+        }
+    }
+
+    if (node->target->type && node->value->type) {
+        if (node->value->type->kind == TypeKind::ANY_INTEGER &&
+            (node->target->type->kind == TypeKind::I32 ||
+             node->target->type->kind == TypeKind::U32 ||
+             node->target->type->kind == TypeKind::ISIZE ||
+             node->target->type->kind == TypeKind::USIZE)) {
+            // Nothing happens.
+        } else if (!node->target->type->equals(node->value->type.get())) {
+            error_reporter_.report_error(
+                "Type mismatch in assignment. Cannot assign value of type '" +
+                node->value->type->to_string() + "' to variable of type '" +
+                node->target->type->to_string() + "'.");
+        }
+    }
+    node->type = std::make_shared<UnitType>();
     return nullptr;
 }
 

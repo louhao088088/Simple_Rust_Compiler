@@ -3,12 +3,11 @@ Test Package: Semantic-1
 Test Target: basic
 Author: Wenxin Zheng
 Time: 2025-08-08
-Verdict: Success
-Comment: basic test, matrix multiplication with type alias and trace calculation
+Verdict: Pass
+Comment: basic test, quicksort implementation using array type
 */
 
-const N: usize = 3;
-fn mul(a: &[[i32; N]; N], b: &[[i32; N]; N]) {
-    let c: i32 = a[0][0];
-}
+fn quicksort(arr: &mut [i32; SIZE], l: usize, r: usize) {}
 fn main() {}
+
+const SIZE: usize = 20;

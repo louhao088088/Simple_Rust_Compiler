@@ -4,11 +4,10 @@ Test Target: basic
 Author: Wenxin Zheng
 Time: 2025-08-08
 Verdict: Fail
-Comment: basic test, graph breadth-first search with connectivity check; bfs return type mismatch ([usize; V] vs [i32; V])
+Comment: basic test, variable shadowing and mutability error
 */
 
-fn bfs() -> bool {
-    100
+fn main() {
+    let index2: usize = 1;
+    index2 += 1;
 }
-
-fn main() {}

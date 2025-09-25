@@ -315,8 +315,6 @@ std::shared_ptr<Symbol> NameResolutionVisitor::visit(MatchExpr *node) {
     return nullptr;
 }
 
-
-
 std::string get_full_path_string(Expr *expr) {
     if (!expr)
         return "";
@@ -526,8 +524,6 @@ void NameResolutionVisitor::declare_pass(Item *item) {
         declare_struct(decl);
     } else if (auto *decl = dynamic_cast<FnDecl *>(item)) {
         declare_function(decl);
-    } else if (auto *decl = dynamic_cast<ConstDecl *>(item)) {
-        decl->accept(this);
     }
 }
 
@@ -645,10 +641,9 @@ void NameResolutionVisitor::define_impl_block(ImplBlock *node) {
         return;
     }
 
-    // 2. 为 impl 块中的所有方法【声明】符号
     for (auto &item : node->implemented_items) {
         if (auto *fn_decl = dynamic_cast<FnDecl *>(item.get())) {
-            // 为方法创建符号，逻辑和 declare_function 几乎一样
+
             auto method_symbol = std::make_shared<Symbol>(fn_decl->name.lexeme, Symbol::FUNCTION);
             std::vector<std::shared_ptr<Type>> param_types;
             for (const auto &param : fn_decl->params) {
@@ -664,7 +659,7 @@ void NameResolutionVisitor::define_impl_block(ImplBlock *node) {
                         "Function parameters must have a type annotation.");
                 }
             }
-            // 关键：把方法符号定义到 struct 的成员符号表里！
+
             if (!struct_symbol->members->define(fn_decl->name.lexeme, method_symbol)) {
                 error_reporter_.report_error("Method '" + fn_decl->name.lexeme +
                                              "' already defined for this struct.");
@@ -672,7 +667,6 @@ void NameResolutionVisitor::define_impl_block(ImplBlock *node) {
         }
     }
 
-    // 3. 在所有方法都声明后，再深入它们的方法体进行名称解析
     for (auto &item : node->implemented_items) {
         if (auto *fn_decl = dynamic_cast<FnDecl *>(item.get())) {
             define_function_body(fn_decl);
@@ -680,7 +674,6 @@ void NameResolutionVisitor::define_impl_block(ImplBlock *node) {
     }
 }
 
-// 函数体的处理逻辑
 void NameResolutionVisitor::define_function_body(FnDecl *node) {
     std::vector<std::shared_ptr<Type>> param_types;
     for (const auto &param : node->params) {
@@ -715,6 +708,12 @@ void NameResolutionVisitor::define_function_body(FnDecl *node) {
 }
 
 void NameResolutionVisitor::resolve(Program *ast) {
+    for (auto &item : ast->items) {
+        if (auto *decl = dynamic_cast<ConstDecl *>(item.get())) {
+            decl->accept(this);
+        }
+    }
+
     for (auto &item : ast->items) {
         declare_pass(item.get());
     }
