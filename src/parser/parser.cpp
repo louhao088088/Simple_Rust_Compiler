@@ -7,7 +7,6 @@
 using std::string;
 using std::vector;
 
-// Constructor: set up all parsing rules
 Parser::Parser(const std::vector<Token> &tokens, ErrorReporter &error_reporter)
     : tokens_(tokens), error_reporter_(error_reporter) {
     // Register Pratt parser rules
@@ -719,7 +718,7 @@ std::shared_ptr<TraitDecl> Parser::parse_trait_declaration() {
             items.push_back(parse_fn_declaration());
         } else {
             report_error(peek(), "Expect associated function, type, or const in trait body.");
-            advance(); // Skip the invalid token to continue parsing
+            advance();
         }
     }
 
@@ -748,7 +747,7 @@ std::shared_ptr<ImplBlock> Parser::parse_impl_block() {
             items.push_back(parse_fn_declaration());
         } else {
             report_error(peek(), "Expect associated function, type, or const in impl body.");
-            advance(); // Skip the invalid token to continue parsing
+            advance();
         }
     }
 

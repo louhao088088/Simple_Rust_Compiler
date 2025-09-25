@@ -21,6 +21,22 @@ bool SymbolTable::define_value(const std::string &name, std::shared_ptr<Symbol> 
     return true;
 }
 
+bool SymbolTable::define_variable(const std::string &name, std::shared_ptr<Symbol> symbol,
+                                  bool allow_shadow) {
+    if (scopes_.empty())
+        return false;
+    auto &scope = scopes_.back();
+    auto it = scope.value_symbols.find(name);
+    if (it != scope.value_symbols.end()) {
+        if (!allow_shadow) {
+            return false; // report duplicate
+        }
+        // Shadowing: overwrite existing binding (Rust allows shadowing even in same block)
+    }
+    scope.value_symbols[name] = symbol;
+    return true;
+}
+
 bool SymbolTable::define_type(const std::string &name, std::shared_ptr<Symbol> symbol) {
     if (scopes_.empty())
         return false;

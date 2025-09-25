@@ -304,8 +304,9 @@ class SymbolTable {
     void exit_scope();
 
     bool define_value(const std::string &name, std::shared_ptr<Symbol> symbol);
+    bool define_variable(const std::string &name, std::shared_ptr<Symbol> symbol,
+                         bool allow_shadow);
     std::shared_ptr<Symbol> lookup_value(const std::string &name);
-
     bool define_type(const std::string &name, std::shared_ptr<Symbol> symbol);
     std::shared_ptr<Symbol> lookup_type(const std::string &name);
 

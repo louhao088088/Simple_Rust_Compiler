@@ -200,11 +200,21 @@ void NameResolutionVisitor::visit(FnDecl *node) {
 
         for (size_t i = 0; i < node->params.size(); ++i) {
             const auto &param = node->params[i];
-
             std::shared_ptr<Type> type_for_this_param = param_types[i];
-
             current_type_ = type_for_this_param;
-            param->pattern->accept(this);
+            if (auto ident = dynamic_cast<IdentifierPattern *>(param->pattern.get())) {
+                auto param_symbol =
+                    std::make_shared<Symbol>(ident->name.lexeme, Symbol::VARIABLE, current_type_);
+                param_symbol->is_mutable = ident->is_mutable;
+                if (!symbol_table_.define_value(ident->name.lexeme, param_symbol)) {
+                    error_reporter_.report_error("Parameter '" + ident->name.lexeme +
+                                                     "' is already defined.",
+                                                 ident->name.line);
+                }
+                ident->resolved_symbol = param_symbol;
+            } else {
+                param->pattern->accept(this); 
+            }
             current_type_ = nullptr;
         }
 
@@ -218,12 +228,7 @@ void NameResolutionVisitor::visit(FnDecl *node) {
 void NameResolutionVisitor::visit(IdentifierPattern *node) {
     auto var_symbol = std::make_shared<Symbol>(node->name.lexeme, Symbol::VARIABLE, current_type_);
     var_symbol->is_mutable = node->is_mutable;
-    if (!symbol_table_.define_value(node->name.lexeme, var_symbol)) {
-        error_reporter_.report_error("Variable '" + node->name.lexeme +
-                                         "' is already defined in this scope.",
-                                     node->name.line);
-    }
-
+    symbol_table_.define_variable(node->name.lexeme, var_symbol, true);
     node->resolved_symbol = var_symbol;
 }
 
