@@ -431,7 +431,6 @@ class NameResolutionVisitor : public ExprVisitor<std::shared_ptr<Symbol>>,
     ErrorReporter &error_reporter_;
     TypeResolver type_resolver_;
     std::shared_ptr<Type> current_type_ = nullptr;
-    void declare_pass(Item *item);
     void define_pass(Item *item);
 
     void declare_function(FnDecl *node);

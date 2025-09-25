@@ -802,6 +802,7 @@ std::shared_ptr<BlockStmt> Parser::parse_block_statement() {
     }
 
     consume(TokenType::RIGHT_BRACE, "Expect '}' to end a block.");
+
     block->has_semicolon = 1;
     if (!block->statements.empty()) {
         if (auto *last_stmt = dynamic_cast<ExprStmt *>(block->statements.back().get())) {
@@ -917,6 +918,11 @@ std::shared_ptr<Expr> Parser::parse_expression(Precedence precedence) {
     auto left = prefix_parsers_[prefix_type]();
 
     while (precedence < get_precedence(peek().type)) {
+        if (auto *if_expr = dynamic_cast<IfExpr *>(left.get())) {
+            if (!if_expr->else_branch || if_expr->has_semicolon) {
+                break;
+            }
+        }
         advance();
         TokenType infix_type = previous().type;
         if (infix_parsers_.find(infix_type) == infix_parsers_.end()) {

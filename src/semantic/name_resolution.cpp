@@ -519,71 +519,38 @@ void NameResolutionVisitor::visit(ImplBlock *node) {
     symbol_table_.exit_scope();
 }
 
-void NameResolutionVisitor::declare_pass(Item *item) {
-    if (auto *decl = dynamic_cast<StructDecl *>(item)) {
-        declare_struct(decl);
-    } else if (auto *decl = dynamic_cast<FnDecl *>(item)) {
-        declare_function(decl);
-    }
-}
-
 void NameResolutionVisitor::declare_struct(StructDecl *node) {
-    auto struct_symbol = std::make_shared<Symbol>(node->name.lexeme, Symbol::TYPE);
-    auto struct_type =
-        std::make_shared<StructType>(node->name.lexeme, std::weak_ptr<Symbol>(struct_symbol));
-    struct_symbol->type = struct_type;
-
-    if (!symbol_table_.define(node->name.lexeme, struct_symbol)) {
+    if (symbol_table_.lookup(node->name.lexeme)) {
         error_reporter_.report_error("Type '" + node->name.lexeme + "' is already defined.",
                                      node->name.line);
         return;
     }
+
+    auto struct_symbol = std::make_shared<Symbol>(node->name.lexeme, Symbol::TYPE);
+
+    auto struct_type =
+        std::make_shared<StructType>(node->name.lexeme, std::weak_ptr<Symbol>(struct_symbol));
+
+    struct_symbol->type = struct_type;
+    symbol_table_.define(node->name.lexeme, struct_symbol);
     node->resolved_symbol = struct_symbol;
 
-    switch (node->kind) {
-    case StructKind::Normal: {
-        for (const auto &field_node : node->fields) {
-            std::shared_ptr<Type> field_type = type_resolver_.resolve(field_node->type.get());
-            if (!field_type) {
-                error_reporter_.report_error("Unknown type for field '" + field_node->name.lexeme +
-                                                 "'.",
-                                             field_node->name.line);
-                continue;
-            }
-            auto field_symbol =
-                std::make_shared<Symbol>(field_node->name.lexeme, Symbol::VARIABLE, field_type);
+    struct_symbol->members->enter_scope();
+    for (const auto &field_node : node->fields) {
 
-            if (!struct_symbol->members->define(field_node->name.lexeme, field_symbol)) {
-                error_reporter_.report_error("Field '" + field_node->name.lexeme +
-                                                 "' is already defined in struct '" +
-                                                 node->name.lexeme + "'.",
-                                             field_node->name.line);
-            }
-
-            struct_type->fields[field_node->name.lexeme] = field_type;
+        auto field_type = type_resolver_.resolve(field_node->type.get());
+        if (!field_type) {
+            error_reporter_.report_error(
+                "Unknown type for field '" + field_node->name.lexeme + "'.", field_node->name.line);
+            continue;
         }
-        break;
-    }
 
-    case StructKind::Unit: {
-        break;
+        struct_type->fields[field_node->name.lexeme] = field_type;
+        auto field_symbol =
+            std::make_shared<Symbol>(field_node->name.lexeme, Symbol::VARIABLE, field_type);
+        struct_symbol->members->define(field_node->name.lexeme, field_symbol);
     }
-
-    case StructKind::Tuple: {
-
-        for (const auto &field_node : node->fields) {
-            std::shared_ptr<Type> field_type = type_resolver_.resolve(field_node->type.get());
-            if (!field_type) {
-                error_reporter_.report_error("Unknown type for tuple field.",
-                                             field_node->name.line);
-                continue;
-            }
-
-            struct_type->fields[std::to_string(struct_type->fields.size())] = field_type;
-        }
-        break;
-    }
-    }
+    struct_symbol->members->exit_scope();
 }
 
 void NameResolutionVisitor::declare_function(FnDecl *node) {
@@ -715,7 +682,15 @@ void NameResolutionVisitor::resolve(Program *ast) {
     }
 
     for (auto &item : ast->items) {
-        declare_pass(item.get());
+        if (auto *decl = dynamic_cast<StructDecl *>(item.get())) {
+            declare_struct(decl);
+        }
+    }
+
+    for (auto &item : ast->items) {
+        if (auto *decl = dynamic_cast<FnDecl *>(item.get())) {
+            declare_function(decl);
+        }
     }
 
     for (auto &item : ast->items) {
