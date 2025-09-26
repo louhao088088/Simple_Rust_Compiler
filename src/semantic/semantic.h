@@ -8,6 +8,7 @@
 
 #include <iostream>
 #include <optional>
+#include <set>
 #include <string>
 #include <unordered_map>
 #include <vector>
@@ -447,6 +448,7 @@ class NameResolutionVisitor : public ExprVisitor<std::shared_ptr<Symbol>>,
     void define_function_body(FnDecl *node);
 
     void declare_struct(StructDecl *node);
+    void define_struct_body(StructDecl *node);
     void define_impl_block(ImplBlock *node);
 };
 

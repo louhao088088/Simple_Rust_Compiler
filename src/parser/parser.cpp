@@ -512,50 +512,63 @@ std::shared_ptr<FnDecl> Parser::parse_fn_declaration() {
     std::optional<std::shared_ptr<TypeNode>> return_type;
 
     if (!check(TokenType::RIGHT_PAREN)) {
-        do {
-            std::shared_ptr<Pattern> pattern;
-            std::shared_ptr<TypeNode> type;
 
-            if (peek().type == TokenType::AMPERSAND && peekNext().type == TokenType::SELF) {
-                advance();
-                bool is_mutable = match({TokenType::MUT});
-                Token self_token = consume(TokenType::SELF, "Expect 'self' after '&' in receiver.");
+        if (peek().type == TokenType::AMPERSAND &&
+            (peekNext().type == TokenType::MUT || peekNext().type == TokenType::SELF)) {
+            advance();
+            bool is_mutable = match({TokenType::MUT});
+            Token self_token = consume(TokenType::SELF, "Expect 'self' after '&'.");
 
-                pattern = std::make_shared<IdentifierPattern>(self_token, false);
-                auto self_type_token = Token{TokenType::SELF_TYPE, "Self", 0, 0};
-                auto self_type_node =
-                    std::make_shared<PathTypeNode>(std::make_shared<VariableExpr>(self_type_token));
-                type = std::make_shared<ReferenceTypeNode>(is_mutable, std::move(self_type_node));
-            } else if (peek().type == TokenType::SELF && peekNext().type != TokenType::COLON) {
-                Token self_token = consume(TokenType::SELF, "Expect 'self' parameter.");
-                pattern = std::make_shared<IdentifierPattern>(self_token, false);
-                auto self_type_token = Token{TokenType::SELF_TYPE, "Self", 0, 0};
-                type =
-                    std::make_shared<PathTypeNode>(std::make_shared<VariableExpr>(self_type_token));
-            } else {
-                pattern = parse_pattern();
-                consume(TokenType::COLON, "Expect ':' after parameter pattern.");
-                type = parse_type();
-            }
-
+            auto pattern = std::make_shared<IdentifierPattern>(self_token, false);
+            auto self_type_token =
+                Token{TokenType::SELF_TYPE, "Self", self_token.line, self_token.column};
+            auto self_type_node =
+                std::make_shared<PathTypeNode>(std::make_shared<VariableExpr>(self_type_token));
+            auto type = std::make_shared<ReferenceTypeNode>(is_mutable, std::move(self_type_node));
             params.push_back(std::make_shared<FnParam>(std::move(pattern), std::move(type)));
 
-        } while (match({TokenType::COMMA}));
+        } else if (peek().type == TokenType::SELF && peekNext().type != TokenType::COLON) {
+            Token self_token = consume(TokenType::SELF, "Expect 'self' parameter.");
+
+            auto pattern = std::make_shared<IdentifierPattern>(self_token, false);
+            auto self_type_token =
+                Token{TokenType::SELF_TYPE, "Self", self_token.line, self_token.column};
+            auto type =
+                std::make_shared<PathTypeNode>(std::make_shared<VariableExpr>(self_type_token));
+            params.push_back(std::make_shared<FnParam>(std::move(pattern), std::move(type)));
+        }
+
+        if (!params.empty() && !check(TokenType::RIGHT_PAREN)) {
+            consume(TokenType::COMMA, "Expect ',' after self parameter.");
+        }
+
+        if (!check(TokenType::RIGHT_PAREN)) {
+            do {
+                auto pattern = parse_pattern();
+                consume(TokenType::COLON, "Expect ':' after parameter pattern.");
+                auto type = parse_type();
+                params.push_back(std::make_shared<FnParam>(std::move(pattern), std::move(type)));
+            } while (match({TokenType::COMMA}));
+        }
     }
 
     consume(TokenType::RIGHT_PAREN, "Expect ')' after parameters.");
+
     if (check(TokenType::ARROW)) {
         advance();
         return_type = parse_type();
     }
+
     std::optional<std::shared_ptr<BlockStmt>> body;
     if (peek().type == TokenType::LEFT_BRACE) {
         body = parse_block_statement();
     } else if (match({TokenType::SEMICOLON})) {
+        body = std::nullopt;
     } else {
-        report_error(peek(), "Expect function body `{` or semicolon `;` after function signature.");
+        report_error(peek(), "Expect function body `{` or semicolon `;`.");
         return nullptr;
     }
+
     return std::make_shared<FnDecl>(name, std::move(params), std::move(return_type),
                                     std::move(body));
 }

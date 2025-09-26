@@ -2,7 +2,6 @@
 
 #include "semantic.h"
 
-
 TypeCheckVisitor::TypeCheckVisitor(SymbolTable &symbol_table, BuiltinTypes &builtin_types,
                                    ErrorReporter &error_reporter)
     : symbol_table_(symbol_table), builtin_types_(builtin_types), error_reporter_(error_reporter) {}
@@ -563,36 +562,62 @@ std::shared_ptr<Symbol> TypeCheckVisitor::visit(FieldAccessExpr *node) {
     if (!object_type)
         return nullptr;
 
+    auto effective_type = object_type;
+    if (auto *ref_type = dynamic_cast<ReferenceType *>(object_type.get())) {
+        effective_type = ref_type->referenced_type;
+    }
+
     std::string method_name = node->field.lexeme;
 
-    auto method_symbol = object_type->members->lookup_value(method_name);
+    auto method_symbol = effective_type->members->lookup_value(method_name);
 
     if (method_symbol) {
-        node->type = method_symbol->type;
-        node->resolved_symbol = method_symbol;
+
+        switch (method_symbol->kind) {
+        case Symbol::VARIABLE: {
+            node->type = method_symbol->type;
+            node->is_mutable_lvalue = node->object->is_mutable_lvalue;
+            break;
+        }
+
+        case Symbol::FUNCTION: {
+            node->type = method_symbol->type;
+            node->is_mutable_lvalue = false;
+            break;
+        }
+
+        default:
+            error_reporter_.report_error("Member '" + method_name + "' is not a field or method.",
+                                         node->field.line);
+            break;
+        }
+
         return nullptr;
     }
 
-    auto base_type = object_type;
-    if (auto ref_type = std::dynamic_pointer_cast<ReferenceType>(object_type)) {
-        base_type = ref_type->referenced_type;
-    }
-    if (base_type->kind == TypeKind::ARRAY && method_name == "len") {
-        auto usize_type = symbol_table_.lookup_type("usize")->type;
+    if (effective_type->kind == TypeKind::ARRAY && method_name == "len") {
+
+        auto usize_symbol = symbol_table_.lookup_type("usize");
+        if (!usize_symbol) {
+
+            error_reporter_.report_error("FATAL: Built-in type 'usize' not found.",
+                                         node->field.line);
+            return nullptr;
+        }
+        auto usize_type = usize_symbol->type;
+
         std::vector<std::shared_ptr<Type>> len_param_types = {
             std::make_shared<ReferenceType>(object_type, false)};
 
         auto len_fn_type = std::make_shared<FunctionType>(usize_type, len_param_types);
-
         node->type = len_fn_type;
-
         node->resolved_symbol = std::make_shared<Symbol>("len", Symbol::FUNCTION, len_fn_type);
         node->resolved_symbol->is_builtin = true;
 
         return nullptr;
     }
 
-    error_reporter_.report_error("No method named '" + method_name + "' found for type '" +
+    error_reporter_.report_error("No field or method named '" + method_name + "' found for type '" +
                                      object_type->to_string() + "'.",
                                  node->field.line);
     return nullptr;
@@ -884,11 +909,55 @@ void TypeCheckVisitor::visit(RestPattern *node) {}
 
 // Missing expression visitors for TypeCheckVisitor
 std::shared_ptr<Symbol> TypeCheckVisitor::visit(StructInitializerExpr *node) {
-    node->name->accept(this);
-    for (auto &field : node->fields) {
-        field->value->accept(this);
+    auto struct_symbol = node->resolved_symbol;
+    if (!struct_symbol || !struct_symbol->type || struct_symbol->type->kind != TypeKind::STRUCT) {
+        error_reporter_.report_error("Undefined struct type in struct initializer.");
+        return nullptr;
     }
-    return nullptr; // TODO: Implement proper type checking
+    auto struct_type = std::static_pointer_cast<StructType>(struct_symbol->type);
+
+    std::set<std::string> provided_fields;
+    for (const auto &field_init : node->fields) {
+        provided_fields.insert(field_init->name.lexeme);
+    }
+
+    for (const auto &pair : struct_type->fields) {
+        const std::string &expected_field_name = pair.first;
+        if (provided_fields.find(expected_field_name) == provided_fields.end()) {
+            error_reporter_.report_error("Missing field '" + expected_field_name +
+                                         "' in initializer for struct '" + struct_type->name +
+                                         "'.");
+        }
+    }
+
+    for (const auto &field_name : provided_fields) {
+        if (struct_type->fields.find(field_name) == struct_type->fields.end()) {
+            error_reporter_.report_error("Struct '" + struct_type->name + "' has no field named '" +
+                                         field_name + "'.");
+        }
+    }
+
+    if (provided_fields.size() != struct_type->fields.size()) {
+        return nullptr;
+    }
+
+    for (const auto &field_init : node->fields) {
+        field_init->value->accept(this);
+        auto actual_value_type = field_init->value->type;
+
+        auto expected_field_type = struct_type->fields[field_init->name.lexeme];
+
+        if (actual_value_type && expected_field_type &&
+            !is_compatible(actual_value_type.get(), expected_field_type.get())) {
+            error_reporter_.report_error("Mismatched types for field '" + field_init->name.lexeme +
+                                         "'. Expected type '" + expected_field_type->to_string() +
+                                         "' but found '" + actual_value_type->to_string() + "'.");
+        }
+    }
+
+    node->type = struct_type;
+
+    return nullptr;
 }
 
 std::shared_ptr<Symbol> TypeCheckVisitor::visit(UnitExpr *node) {

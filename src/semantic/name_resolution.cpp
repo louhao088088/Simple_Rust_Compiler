@@ -213,7 +213,7 @@ void NameResolutionVisitor::visit(FnDecl *node) {
                 }
                 ident->resolved_symbol = param_symbol;
             } else {
-                param->pattern->accept(this); 
+                param->pattern->accept(this);
             }
             current_type_ = nullptr;
         }
@@ -275,10 +275,32 @@ void NameResolutionVisitor::visit(ReferencePattern *node) {
 }
 
 std::shared_ptr<Symbol> NameResolutionVisitor::visit(StructInitializerExpr *node) {
-    node->name->accept(this);
+
+    auto type_name_opt = get_name_from_expr(node->name.get());
+    if (!type_name_opt) {
+        error_reporter_.report_error("Struct initializer failed by name.");
+        return nullptr;
+    }
+    std::string type_name = *type_name_opt;
+
+    auto struct_symbol = symbol_table_.lookup_type(type_name);
+
+    if (!struct_symbol) {
+        error_reporter_.report_error("Unknown type '" + type_name + "'.");
+        return nullptr;
+    }
+    if (struct_symbol->kind != Symbol::TYPE || !struct_symbol->type ||
+        struct_symbol->type->kind != TypeKind::STRUCT) {
+        error_reporter_.report_error("'" + type_name + "' is not a struct type.");
+        return nullptr;
+    }
+
+    node->resolved_symbol = struct_symbol;
+
     for (auto &field : node->fields) {
         field->value->accept(this);
     }
+
     return nullptr;
 }
 
@@ -386,65 +408,31 @@ void NameResolutionVisitor::visit(SliceTypeNode *node) { node->element_type->acc
 void NameResolutionVisitor::visit(SelfTypeNode *node) {}
 
 void NameResolutionVisitor::visit(StructDecl *node) {
-
+    if (symbol_table_.lookup_type(node->name.lexeme)) {
+        error_reporter_.report_error("Type '" + node->name.lexeme + "' is already defined.",
+                                     node->name.line);
+        return;
+    }
     auto struct_symbol = std::make_shared<Symbol>(node->name.lexeme, Symbol::TYPE);
     auto struct_type =
         std::make_shared<StructType>(node->name.lexeme, std::weak_ptr<Symbol>(struct_symbol));
     struct_symbol->type = struct_type;
 
-    if (!symbol_table_.define_type(node->name.lexeme, struct_symbol)) {
-        error_reporter_.report_error("Type '" + node->name.lexeme + "' is already defined.",
-                                     node->name.line);
-        return;
-    }
+    symbol_table_.define_type(node->name.lexeme, struct_symbol);
     node->resolved_symbol = struct_symbol;
 
-    switch (node->kind) {
-    case StructKind::Normal: {
-        for (const auto &field_node : node->fields) {
-            std::shared_ptr<Type> field_type = type_resolver_.resolve(field_node->type.get());
-            if (!field_type) {
-                error_reporter_.report_error("Unknown type for field '" + field_node->name.lexeme +
-                                                 "'.",
-                                             field_node->name.line);
-                continue;
-            }
-            auto field_symbol =
-                std::make_shared<Symbol>(field_node->name.lexeme, Symbol::VARIABLE, field_type);
-
-            if (!struct_symbol->members->define_value(field_node->name.lexeme, field_symbol)) {
-                error_reporter_.report_error("Field '" + field_node->name.lexeme +
-                                                 "' is already defined in struct '" +
-                                                 node->name.lexeme + "'.",
-                                             field_node->name.line);
-            }
-
-            struct_type->fields[field_node->name.lexeme] = field_type;
+    for (const auto &field_node : node->fields) {
+        auto field_type = type_resolver_.resolve(field_node->type.get());
+        if (!field_type) {
+            error_reporter_.report_error("Unknown field type.", field_node->name.line);
+            continue;
         }
-        break;
-    }
-
-    case StructKind::Unit: {
-        break;
-    }
-
-    case StructKind::Tuple: {
-
-        for (const auto &field_node : node->fields) {
-            std::shared_ptr<Type> field_type = type_resolver_.resolve(field_node->type.get());
-            if (!field_type) {
-                error_reporter_.report_error("Unknown type for tuple field.",
-                                             field_node->name.line);
-                continue;
-            }
-
-            struct_type->fields[std::to_string(struct_type->fields.size())] = field_type;
-        }
-        break;
-    }
+        struct_type->fields[field_node->name.lexeme] = field_type;
+        auto field_symbol =
+            std::make_shared<Symbol>(field_node->name.lexeme, Symbol::VARIABLE, field_type);
+        struct_symbol->members->define_value(field_node->name.lexeme, field_symbol);
     }
 }
-
 void NameResolutionVisitor::visit(ConstDecl *node) {
     auto const_type = type_resolver_.resolve(node->type.get());
 
@@ -532,30 +520,12 @@ void NameResolutionVisitor::declare_struct(StructDecl *node) {
     }
 
     auto struct_symbol = std::make_shared<Symbol>(node->name.lexeme, Symbol::TYPE);
-
     auto struct_type =
         std::make_shared<StructType>(node->name.lexeme, std::weak_ptr<Symbol>(struct_symbol));
-
     struct_symbol->type = struct_type;
+
     symbol_table_.define_type(node->name.lexeme, struct_symbol);
     node->resolved_symbol = struct_symbol;
-
-    struct_symbol->members->enter_scope();
-    for (const auto &field_node : node->fields) {
-
-        auto field_type = type_resolver_.resolve(field_node->type.get());
-        if (!field_type) {
-            error_reporter_.report_error(
-                "Unknown type for field '" + field_node->name.lexeme + "'.", field_node->name.line);
-            continue;
-        }
-
-        struct_type->fields[field_node->name.lexeme] = field_type;
-        auto field_symbol =
-            std::make_shared<Symbol>(field_node->name.lexeme, Symbol::VARIABLE, field_type);
-        struct_symbol->members->define_value(field_node->name.lexeme, field_symbol);
-    }
-    struct_symbol->members->exit_scope();
 }
 
 void NameResolutionVisitor::declare_function(FnDecl *node) {
@@ -591,50 +561,50 @@ void NameResolutionVisitor::declare_function(FnDecl *node) {
 }
 
 void NameResolutionVisitor::define_pass(Item *item) {
-    if (auto *decl = dynamic_cast<ImplBlock *>(item)) {
-        define_impl_block(decl);
-    } else if (auto *decl = dynamic_cast<FnDecl *>(item)) {
+    if (auto *decl = dynamic_cast<FnDecl *>(item)) {
         define_function_body(decl);
+    } else if (auto *decl = dynamic_cast<StructDecl *>(item)) {
+        define_struct_body(decl);
     }
 }
 
 void NameResolutionVisitor::define_impl_block(ImplBlock *node) {
-    auto target_type_node = node->target_type.get();
-    auto target_type = type_resolver_.resolve(target_type_node);
+    auto target_type = type_resolver_.resolve(node->target_type.get());
     if (!target_type || target_type->kind != TypeKind::STRUCT) {
-        error_reporter_.report_error("Target of an impl must be a struct.");
+        error_reporter_.report_error("Impl block target type must be a struct.");
         return;
     }
 
     auto struct_type = std::static_pointer_cast<StructType>(target_type);
     auto struct_symbol = struct_type->symbol.lock();
     if (!struct_symbol) {
-        error_reporter_.report_error("Internal error: struct type has no associated symbol.");
+        error_reporter_.report_error("Could not resolve struct type for impl block.");
         return;
     }
+
+    symbol_table_.enter_scope();
+    symbol_table_.define_type("Self", struct_symbol);
 
     for (auto &item : node->implemented_items) {
         if (auto *fn_decl = dynamic_cast<FnDecl *>(item.get())) {
 
-            auto method_symbol = std::make_shared<Symbol>(fn_decl->name.lexeme, Symbol::FUNCTION);
             std::vector<std::shared_ptr<Type>> param_types;
             for (const auto &param : fn_decl->params) {
-                if (param->type) {
-                    auto param_type = type_resolver_.resolve(param->type.get());
-                    if (param_type) {
-                        param_types.push_back(param_type);
-                    } else {
-                        error_reporter_.report_error("Could not resolve type for parameter.");
-                    }
-                } else {
-                    error_reporter_.report_error(
-                        "Function parameters must have a type annotation.");
-                }
+                param_types.push_back(type_resolver_.resolve(param->type.get()));
             }
+            auto return_type = fn_decl->return_type
+                                   ? type_resolver_.resolve((*fn_decl->return_type).get())
+                                   : std::make_shared<UnitType>();
+
+            auto method_type = std::make_shared<FunctionType>(return_type, param_types);
+            auto method_symbol =
+                std::make_shared<Symbol>(fn_decl->name.lexeme, Symbol::FUNCTION, method_type);
+            fn_decl->resolved_symbol = method_symbol;
 
             if (!struct_symbol->members->define_value(fn_decl->name.lexeme, method_symbol)) {
                 error_reporter_.report_error("Method '" + fn_decl->name.lexeme +
-                                             "' already defined for this struct.");
+                                                 "' already defined for this struct.",
+                                             fn_decl->name.line);
             }
         }
     }
@@ -644,6 +614,8 @@ void NameResolutionVisitor::define_impl_block(ImplBlock *node) {
             define_function_body(fn_decl);
         }
     }
+
+    symbol_table_.exit_scope();
 }
 
 void NameResolutionVisitor::define_function_body(FnDecl *node) {
@@ -679,6 +651,26 @@ void NameResolutionVisitor::define_function_body(FnDecl *node) {
     }
 }
 
+void NameResolutionVisitor::define_struct_body(StructDecl *node) {
+
+    auto struct_symbol = node->resolved_symbol;
+    auto struct_type = std::static_pointer_cast<StructType>(struct_symbol->type);
+
+    for (const auto &field_node : node->fields) {
+        auto field_type = type_resolver_.resolve(field_node->type.get());
+        if (!field_type) {
+            error_reporter_.report_error(
+                "Unknown type for field '" + field_node->name.lexeme + "'.", field_node->name.line);
+            continue;
+        }
+
+        struct_type->fields[field_node->name.lexeme] = field_type;
+        auto field_symbol =
+            std::make_shared<Symbol>(field_node->name.lexeme, Symbol::VARIABLE, field_type);
+        struct_type->members->define_value(field_node->name.lexeme, field_symbol);
+    }
+}
+
 void NameResolutionVisitor::resolve(Program *ast) {
     for (auto &item : ast->items) {
         if (auto *decl = dynamic_cast<ConstDecl *>(item.get())) {
@@ -695,6 +687,12 @@ void NameResolutionVisitor::resolve(Program *ast) {
     for (auto &item : ast->items) {
         if (auto *decl = dynamic_cast<FnDecl *>(item.get())) {
             declare_function(decl);
+        }
+    }
+
+    for (auto &item : ast->items) {
+        if (auto *decl = dynamic_cast<ImplBlock *>(item.get())) {
+            define_impl_block(decl);
         }
     }
 
