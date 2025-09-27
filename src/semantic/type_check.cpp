@@ -488,7 +488,8 @@ std::shared_ptr<Symbol> TypeCheckVisitor::visit(LoopExpr *node) {
     if (breakable_expr_type_stack_.back() != nullptr) {
         node->type = breakable_expr_type_stack_.back();
     } else {
-        node->type = std::make_shared<UnitType>();
+
+        node->type = std::make_shared<NeverType>();
     }
     breakable_expr_type_stack_.pop_back();
     return nullptr;
@@ -512,7 +513,7 @@ std::shared_ptr<Symbol> TypeCheckVisitor::visit(WhileExpr *node) {
     if (breakable_expr_type_stack_.back() != nullptr) {
         node->type = breakable_expr_type_stack_.back();
     } else {
-        node->type = std::make_shared<UnitType>();
+        node->type = std::make_shared<NeverType>();
     }
     breakable_expr_type_stack_.pop_back();
     return nullptr;

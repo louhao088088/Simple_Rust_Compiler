@@ -103,15 +103,18 @@ struct PrimitiveType : public Type {
     }
 
     bool equals(const Type *other) const override {
-        if (dynamic_cast<const PrimitiveType *>(other) == nullptr) {
+        if (other == nullptr)
             return false;
-        }
-
         TypeKind other_kind = other->kind;
 
         if (this->kind == TypeKind::NEVER || other_kind == TypeKind::NEVER) {
             return true;
         }
+
+        if (dynamic_cast<const PrimitiveType *>(other) == nullptr) {
+            return false;
+        }
+
         if (this->kind == TypeKind::ANY_INTEGER) {
             return is_concrete_integer(other_kind) || other_kind == TypeKind::ANY_INTEGER;
         }
@@ -168,13 +171,15 @@ struct StructType : public Type {
 struct UnitType : public Type {
     UnitType() { this->kind = TypeKind::UNIT; }
     std::string to_string() const override { return "()"; }
-    bool equals(const Type *other) const override { return other->kind == TypeKind::UNIT; }
+    bool equals(const Type *other) const override {
+        return other->kind == TypeKind::UNIT || other->kind == TypeKind::NEVER;
+    }
 };
 
 struct NeverType : public Type {
     NeverType() { this->kind = TypeKind::NEVER; }
     std::string to_string() const override { return "!"; }
-    bool equals(const Type *other) const override { return other->kind == TypeKind::NEVER; }
+    bool equals(const Type *other) const override { return true; }
 };
 
 struct FunctionType : public Type {
@@ -448,7 +453,7 @@ class NameResolutionVisitor : public ExprVisitor<std::shared_ptr<Symbol>>,
 
     void declare_struct(StructDecl *node);
     void define_struct_body(StructDecl *node);
-    void define_impl_block(ImplBlock *node);
+    void declare_impl_method(ImplBlock *node);
 };
 
 // Type check visitor

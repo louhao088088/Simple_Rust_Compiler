@@ -568,7 +568,7 @@ void NameResolutionVisitor::declare_function(FnDecl *node) {
     node->resolved_symbol = fn_symbol;
 }
 
-void NameResolutionVisitor::define_impl_block(ImplBlock *node) {
+void NameResolutionVisitor::declare_impl_method(ImplBlock *node) {
     auto target_type = type_resolver_.resolve(node->target_type.get());
     if (!target_type || target_type->kind != TypeKind::STRUCT) {
         error_reporter_.report_error("Impl block target type must be a struct.");
@@ -607,12 +607,6 @@ void NameResolutionVisitor::define_impl_block(ImplBlock *node) {
                                                  "' already defined for this struct.",
                                              fn_decl->name.line);
             }
-        }
-    }
-
-    for (auto &item : node->implemented_items) {
-        if (auto *fn_decl = dynamic_cast<FnDecl *>(item.get())) {
-            define_function_body(fn_decl);
         }
     }
     symbol_table_.exit_scope();
@@ -691,20 +685,27 @@ void NameResolutionVisitor::resolve(Program *ast) {
     }
 
     for (auto &item : ast->items) {
+        if (auto *decl = dynamic_cast<ImplBlock *>(item.get())) {
+            declare_impl_method(decl);
+        }
+    }
+
+    for (auto &item : ast->items) {
         if (auto *decl = dynamic_cast<StructDecl *>(item.get())) {
             define_struct_body(decl);
         }
     }
 
     for (auto &item : ast->items) {
-        if (auto *decl = dynamic_cast<ImplBlock *>(item.get())) {
-            define_impl_block(decl);
-        }
-    }
-
-    for (auto &item : ast->items) {
         if (auto *decl = dynamic_cast<FnDecl *>(item.get())) {
             define_function_body(decl);
+        } else if (auto *decl = dynamic_cast<ImplBlock *>(item.get())) {
+            for (auto &item : decl->implemented_items) {
+                if (auto *fn_decl = dynamic_cast<FnDecl *>(item.get())) {
+                    define_function_body(fn_decl);
+                }
+            }
         }
     }
+    
 }

@@ -828,6 +828,13 @@ std::shared_ptr<BlockStmt> Parser::parse_block_statement() {
                 block->final_expr = std::move(last_stmt->expression);
                 block->statements.pop_back();
                 block->has_semicolon = 0;
+            } else if (dynamic_cast<LoopExpr *>(last_stmt->expression.get()) ||
+                       dynamic_cast<WhileExpr *>(last_stmt->expression.get()) ||
+                       dynamic_cast<IfExpr *>(last_stmt->expression.get()) ||
+                       dynamic_cast<MatchExpr *>(last_stmt->expression.get())) {
+                block->final_expr = std::move(last_stmt->expression);
+                block->statements.pop_back();
+                block->has_semicolon = 1;
             }
         }
         for (size_t i = 0; i + 1 < block->statements.size(); i++) {
