@@ -140,6 +140,9 @@ struct ArrayType : public Type {
     }
 
     bool equals(const Type *other) const override {
+        if (other->kind == TypeKind::NEVER) {
+            return true;
+        }
         if (auto *other_array = dynamic_cast<const ArrayType *>(other)) {
             return size == other_array->size &&
                    element_type->equals(other_array->element_type.get());
@@ -161,6 +164,9 @@ struct StructType : public Type {
     std::string to_string() const override { return name; }
 
     bool equals(const Type *other) const override {
+        if (other->kind == TypeKind::NEVER) {
+            return true;
+        }
         if (auto *other_struct = dynamic_cast<const StructType *>(other)) {
             return name == other_struct->name;
         }
@@ -240,6 +246,9 @@ struct ReferenceType : public Type {
     }
 
     bool equals(const Type *other) const override {
+        if (other->kind == TypeKind::NEVER) {
+            return true;
+        }
         if (auto *other_ref = dynamic_cast<const ReferenceType *>(other)) {
 
             return is_mutable == other_ref->is_mutable &&
