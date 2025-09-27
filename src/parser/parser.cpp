@@ -544,6 +544,8 @@ std::shared_ptr<FnDecl> Parser::parse_fn_declaration() {
 
         if (!check(TokenType::RIGHT_PAREN)) {
             do {
+                if (peek().type == TokenType::RIGHT_PAREN)
+                    break;
                 auto pattern = parse_pattern();
                 consume(TokenType::COLON, "Expect ':' after parameter pattern.");
                 auto type = parse_type();
@@ -723,6 +725,10 @@ std::shared_ptr<ModDecl> Parser::parse_mod_declaration() {
 
 std::shared_ptr<TraitDecl> Parser::parse_trait_declaration() {
     consume(TokenType::TRAIT, "Expect 'trait' keyword.");
+
+    error_reporter_.report_error("Trait is not supported now.");
+    return nullptr;
+
     Token name = consume(TokenType::IDENTIFIER, "Expect trait name.");
     consume(TokenType::LEFT_BRACE, "Expect '{' before trait body.");
     std::vector<std::shared_ptr<Item>> items;

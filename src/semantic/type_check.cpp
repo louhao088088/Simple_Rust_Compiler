@@ -374,8 +374,7 @@ std::shared_ptr<Symbol> TypeCheckVisitor::visit(CallExpr *node) {
             if (!fn_type->param_types.empty()) {
                 if (auto *self_ref_type =
                         dynamic_cast<ReferenceType *>(fn_type->param_types[0].get())) {
-                    if (self_ref_type->is_mutable &&
-                        (!object->resolved_symbol || !object->resolved_symbol->is_mutable)) {
+                    if (self_ref_type->is_mutable && (!object->is_mutable_lvalue)) {
                         error_reporter_.report_error(
                             "Cannot call mutable method on an immutable value.");
                     }
@@ -726,6 +725,11 @@ void TypeCheckVisitor::visit(BlockStmt *node) {
     }
     if (node->final_expr) {
         (*node->final_expr)->accept(this);
+        if (auto final_expr = std::dynamic_pointer_cast<UnderscoreExpr>(*node->final_expr)) {
+            error_reporter_.report_error("Underscore `_` cannot be used as a final expression.");
+            node->type = nullptr;
+            return;
+        }
         node->type = (*node->final_expr)->type;
     } else {
         node->type = std::make_shared<UnitType>();

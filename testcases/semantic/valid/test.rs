@@ -1,15 +1,29 @@
-fn main() {
-    let a: Point = Point { x: 3, y: 4 };
-    let b: i32 = a.hello();
+/*
+Test Package: Semantic-1
+Test Target: expr
+Author: Wenxin Zheng
+Time: 2025-08-08
+Verdict: Success
+Comment: Hash table with quadratic probing, collision resolution, and load factor analysis; printInt returns `()`
+*/
+
+struct HashTableEntry {
+    key: i32,
+    value: i32,
 }
 
-struct Point {
-    x: i32,
-    y: i32,
+impl HashTableEntry {
+    fn set(&mut self) {}
 }
 
-impl Point {
-    fn hello(&self) -> i32 {
-        1
+fn hello(table: &mut [HashTableEntry; 13]) -> bool {
+    let entry: &mut HashTableEntry = &mut table[1 as usize];
+
+    if (true) {
+        entry.set();
     }
+
+    return false;
 }
+
+fn main() {}
