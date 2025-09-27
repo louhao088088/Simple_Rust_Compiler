@@ -353,7 +353,7 @@ void define_builtin_method(SymbolTable &symbol_table, BuiltinTypes &builtin_type
     }
     // String methods
     {
-        // len(&self) -> usize implemented on &str above; keep associated methods here
+        // as_str(&self) -> &str
         std::vector<std::shared_ptr<Type>> as_str_params = {
             std::make_shared<ReferenceType>(string_type)};
         auto as_str_ret = std::make_shared<ReferenceType>(str_type);
@@ -362,6 +362,7 @@ void define_builtin_method(SymbolTable &symbol_table, BuiltinTypes &builtin_type
         as_str_symbol->is_builtin = true;
         string_type->members->define_value("as_str", as_str_symbol);
 
+        // as_mut_str(&mut self) -> &mut str
         std::vector<std::shared_ptr<Type>> as_mut_str_params = {
             std::make_shared<ReferenceType>(string_type, true)};
         auto as_mut_str_ret = std::make_shared<ReferenceType>(str_type, true);
@@ -371,7 +372,7 @@ void define_builtin_method(SymbolTable &symbol_table, BuiltinTypes &builtin_type
         as_mut_str_symbol->is_builtin = true;
         string_type->members->define_value("as_mut_str", as_mut_str_symbol);
 
-        // from(&str)
+        // from(&str) -> String
         if (string_symbol) {
             std::vector<std::shared_ptr<Type>> from_params = {
                 std::make_shared<ReferenceType>(str_type)};
@@ -379,24 +380,17 @@ void define_builtin_method(SymbolTable &symbol_table, BuiltinTypes &builtin_type
             auto from_symbol = std::make_shared<Symbol>("from", Symbol::FUNCTION, from_type);
             from_symbol->is_builtin = true;
             string_symbol->members->define_value("from", from_symbol);
-
-            // from(&mut str)
-            from_params = {std::make_shared<ReferenceType>(str_type, true)};
-            from_type = std::make_shared<FunctionType>(string_type, from_params);
-            from_symbol = std::make_shared<Symbol>("from", Symbol::FUNCTION, from_type);
-            from_symbol->is_builtin = true;
-            string_symbol->members->define_value("from", from_symbol);
-
-            // append(&mut self, s: &str) -> ()
-            std::vector<std::shared_ptr<Type>> append_params = {
-                std::make_shared<ReferenceType>(string_type, true),
-                std::make_shared<ReferenceType>(str_type)};
-            auto append_type =
-                std::make_shared<FunctionType>(std::make_shared<UnitType>(), append_params);
-            auto append_symbol = std::make_shared<Symbol>("append", Symbol::FUNCTION, append_type);
-            append_symbol->is_builtin = true;
-            string_symbol->members->define_value("append", append_symbol);
         }
+
+        // append(&mut self, s: &str) -> ()
+        std::vector<std::shared_ptr<Type>> append_params = {
+            std::make_shared<ReferenceType>(string_type, true),
+            std::make_shared<ReferenceType>(str_type)};
+        auto append_type =
+            std::make_shared<FunctionType>(std::make_shared<UnitType>(), append_params);
+        auto append_symbol = std::make_shared<Symbol>("append", Symbol::FUNCTION, append_type);
+        append_symbol->is_builtin = true;
+        string_type->members->define_value("append", append_symbol);
     }
 }
 

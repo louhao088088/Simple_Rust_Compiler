@@ -1009,40 +1009,23 @@ std::shared_ptr<Symbol> TypeCheckVisitor::visit(MatchExpr *node) {
 }
 
 std::shared_ptr<Symbol> TypeCheckVisitor::visit(PathExpr *node) {
-    node->left->accept(this);
-    auto left_symbol = node->left->resolved_symbol;
-    if (!left_symbol) {
-        error_reporter_.report_error("Undefined symbol in path expression.");
+    auto resolved_symbol = node->resolved_symbol;
+
+    if (!resolved_symbol) {
+
+        error_reporter_.report_error(
+            "Internal error: Path expression has no resolved symbol in type checking.");
         return nullptr;
     }
 
-    if (left_symbol->kind != Symbol::TYPE) {
-        error_reporter_.report_error("Expected a type before `::`, but found a variable.");
-        return nullptr;
+    if (resolved_symbol->kind == Symbol::VARIANT || resolved_symbol->kind == Symbol::FUNCTION) {
+        node->type = resolved_symbol->type;
+    } else {
+        error_reporter_.report_error(
+            "Path expression does not resolve to a function or enum variant.");
+        node->type = nullptr;
     }
 
-    if (!left_symbol->type) {
-        error_reporter_.report_error("Internal error: Type symbol '" + left_symbol->name +
-                                     "' has no associated type.");
-        return nullptr;
-    }
-    auto &members_table = left_symbol->type->members;
-
-    auto right_name_opt = get_name_from_expr(node->right.get());
-    if (!right_name_opt) {
-        error_reporter_.report_error("Expected an identifier after `::`.");
-        return nullptr;
-    }
-
-    auto assoc_fn_symbol = members_table->lookup_value(*right_name_opt);
-    if (!assoc_fn_symbol) {
-        error_reporter_.report_error("No function named '" + *right_name_opt +
-                                     "' associated with type '" + left_symbol->name + "'.");
-        return nullptr;
-    }
-
-    node->type = assoc_fn_symbol->type;
-    node->resolved_symbol = assoc_fn_symbol;
     return nullptr;
 }
 

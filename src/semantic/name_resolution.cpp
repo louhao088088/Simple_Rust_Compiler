@@ -365,19 +365,11 @@ std::string get_full_path_string(Expr *expr) {
 }
 
 std::shared_ptr<Symbol> NameResolutionVisitor::visit(PathExpr *node) {
-    auto left_symbol = node->left->accept(this);
 
+    auto left_symbol = node->left->accept(this);
     if (!left_symbol) {
         return nullptr;
     }
-
-    if (!left_symbol->type) {
-        error_reporter_.report_error("'" + left_symbol->name +
-                                     "' is not a type or module, and has no members.");
-        return nullptr;
-    }
-
-    auto &members_table = left_symbol->type->members;
 
     auto right_name_opt = get_name_from_expr(node->right.get());
     if (!right_name_opt) {
@@ -386,7 +378,12 @@ std::shared_ptr<Symbol> NameResolutionVisitor::visit(PathExpr *node) {
     }
     std::string right_name = *right_name_opt;
 
-    auto final_symbol = members_table->lookup_value(right_name);
+    if (!left_symbol->members) {
+        error_reporter_.report_error("'" + left_symbol->name + "' has no members to look up.");
+        return nullptr;
+    }
+
+    auto final_symbol = left_symbol->members->lookup_value(right_name);
 
     if (!final_symbol) {
         error_reporter_.report_error("name '" + right_name + "' is not found in '" +
@@ -481,7 +478,7 @@ void NameResolutionVisitor::visit(EnumDecl *node) {
 
     for (const auto &variant : node->variants) {
         auto variant_symbol = std::make_shared<Symbol>(variant->name.lexeme, Symbol::VARIANT);
-        if (!enum_type->members->define_value(variant->name.lexeme, variant_symbol)) {
+        if (!enum_symbol->members->define_value(variant->name.lexeme, variant_symbol)) {
             error_reporter_.report_error("Enum variant '" + variant->name.lexeme +
                                              "' is already defined.",
                                          variant->name.line);
@@ -569,6 +566,7 @@ void NameResolutionVisitor::declare_impl_method(ImplBlock *node) {
         error_reporter_.report_error("Impl block target type must be a struct.");
         return;
     }
+    auto target_type_symbol = node->target_type->resolved_symbol;
 
     auto struct_type = std::static_pointer_cast<StructType>(target_type);
     auto struct_symbol = struct_type->symbol.lock();
@@ -596,11 +594,29 @@ void NameResolutionVisitor::declare_impl_method(ImplBlock *node) {
             auto method_symbol =
                 std::make_shared<Symbol>(fn_decl->name.lexeme, Symbol::FUNCTION, method_type);
             fn_decl->resolved_symbol = method_symbol;
+            bool is_instance_method = false;
+            if (!fn_decl->params.empty()) {
+                if (auto ident_pattern =
+                        dynamic_cast<IdentifierPattern *>(fn_decl->params[0]->pattern.get())) {
+                    if (ident_pattern->name.lexeme == "self") {
+                        is_instance_method = true;
+                    }
+                }
+            }
 
-            if (!struct_type->members->define_value(fn_decl->name.lexeme, method_symbol)) {
-                error_reporter_.report_error("Method '" + fn_decl->name.lexeme +
-                                                 "' already defined for this struct.",
-                                             fn_decl->name.line);
+            if (is_instance_method) {
+                if (!struct_type->members->define_value(fn_decl->name.lexeme, method_symbol)) {
+                    error_reporter_.report_error("Method '" + fn_decl->name.lexeme +
+                                                     "' already defined for this struct.",
+                                                 fn_decl->name.line);
+                }
+            } else {
+                if (!target_type_symbol->members->define_value(fn_decl->name.lexeme,
+                                                               method_symbol)) {
+                    error_reporter_.report_error("Function '" + fn_decl->name.lexeme +
+                                                     "' already defined for this type.",
+                                                 fn_decl->name.line);
+                }
             }
         }
     }
