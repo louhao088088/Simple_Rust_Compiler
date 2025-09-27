@@ -624,9 +624,6 @@ std::shared_ptr<Symbol> TypeCheckVisitor::visit(AssignmentExpr *node) {
         node->type = std::make_shared<UnitType>();
         return nullptr;
     }
-    if (!target_symbol) {
-        error_reporter_.report_error("Undefined variable in assignment.");
-    }
 
     if (!node->target->is_mutable_lvalue) {
         error_reporter_.report_error(
