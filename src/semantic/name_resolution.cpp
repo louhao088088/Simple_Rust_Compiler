@@ -566,6 +566,7 @@ void NameResolutionVisitor::declare_function(FnDecl *node) {
                                      node->name.line);
     }
     node->resolved_symbol = fn_symbol;
+    node->resolved_symbol->is_main = (node->name.lexeme == "main");
 }
 
 void NameResolutionVisitor::declare_impl_method(ImplBlock *node) {

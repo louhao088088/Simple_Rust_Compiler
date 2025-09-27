@@ -296,13 +296,14 @@ class Symbol {
 
     bool is_mutable;
     bool is_builtin;
+    bool is_main;
 
     ConstDecl *const_decl_node = nullptr;
 
     Symbol(std::string name, Kind kind, std::shared_ptr<Type> type = nullptr)
         : name(std::move(name)), kind(kind), type(std::move(type)),
           members(std::make_shared<SymbolTable>()), aliased_symbol(nullptr), is_mutable(false),
-          is_builtin(false) {}
+          is_builtin(false), is_main(false) {}
 
     virtual ~Symbol() = default;
 };

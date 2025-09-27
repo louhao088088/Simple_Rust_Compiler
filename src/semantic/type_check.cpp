@@ -418,7 +418,7 @@ std::shared_ptr<Symbol> TypeCheckVisitor::visit(CallExpr *node) {
     if (node->callee->resolved_symbol) {
         auto callee_symbol = node->callee->resolved_symbol;
         if (callee_symbol->name == "exit" && callee_symbol->is_builtin) {
-            if (current_function_symbol_ && current_function_symbol_->name != "main") {
+            if (current_function_symbol_ && !current_function_symbol_->is_main) {
                 error_reporter_.report_error(
                     "'exit' can only be called within the 'main' function.");
             }
@@ -868,13 +868,13 @@ void TypeCheckVisitor::visit(FnDecl *node) {
                                          actual_body_type->to_string() + "'.");
         }
     }
-    if (current_function_symbol_ && current_function_symbol_->name == "main") {
+    if (current_function_symbol_ && current_function_symbol_->is_main) {
         if (node->return_type && (*node->return_type)->resolved_type &&
             (*node->return_type)->resolved_type->kind != TypeKind::UNIT) {
             error_reporter_.report_error("The 'main' function must have a return type of '()'.");
         }
     }
-    if (current_function_symbol_ && current_function_symbol_->name == "main") {
+    if (current_function_symbol_ && current_function_symbol_->is_main) {
         if (node->body) {
             check_main_for_early_exit((*node->body).get());
         }
