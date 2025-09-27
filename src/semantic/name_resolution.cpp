@@ -701,11 +701,17 @@ void NameResolutionVisitor::resolve(Program *ast) {
             define_function_body(decl);
         } else if (auto *decl = dynamic_cast<ImplBlock *>(item.get())) {
             for (auto &item : decl->implemented_items) {
+                auto target_type = type_resolver_.resolve(decl->target_type.get());
+                auto target_type_symbol =
+                    std::dynamic_pointer_cast<StructType>(target_type)->symbol.lock();
+
+                symbol_table_.enter_scope();
+                symbol_table_.define_type("Self", target_type_symbol);
                 if (auto *fn_decl = dynamic_cast<FnDecl *>(item.get())) {
                     define_function_body(fn_decl);
                 }
+                symbol_table_.exit_scope();
             }
         }
     }
-    
 }
