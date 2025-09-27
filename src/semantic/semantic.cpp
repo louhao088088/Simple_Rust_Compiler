@@ -11,13 +11,17 @@ void SymbolTable::exit_scope() {
 }
 
 bool SymbolTable::define_value(const std::string &name, std::shared_ptr<Symbol> symbol) {
-    if (scopes_.empty())
-        return false;
-    auto &scope = scopes_.back();
-    if (scope.value_symbols.find(name) != scope.value_symbols.end()) {
+    if (scopes_.empty()) {
         return false;
     }
-    scope.value_symbols[name] = symbol;
+
+    auto &current_scope_map = scopes_.back().value_symbols;
+
+    if (current_scope_map.find(name) != current_scope_map.end()) {
+        return false;
+    }
+
+    current_scope_map.insert({name, symbol});
     return true;
 }
 
@@ -29,9 +33,8 @@ bool SymbolTable::define_variable(const std::string &name, std::shared_ptr<Symbo
     auto it = scope.value_symbols.find(name);
     if (it != scope.value_symbols.end()) {
         if (!allow_shadow) {
-            return false; // report duplicate
+            return false;
         }
-        // Shadowing: overwrite existing binding (Rust allows shadowing even in same block)
     }
     scope.value_symbols[name] = symbol;
     return true;
@@ -49,10 +52,12 @@ bool SymbolTable::define_type(const std::string &name, std::shared_ptr<Symbol> s
 }
 
 std::shared_ptr<Symbol> SymbolTable::lookup_value(const std::string &name) {
+
     for (auto it = scopes_.rbegin(); it != scopes_.rend(); ++it) {
-        auto found = it->value_symbols.find(name);
-        if (found != it->value_symbols.end()) {
-            return found->second;
+        const auto &scope_map = it->value_symbols;
+        auto found_it = scope_map.find(name);
+        if (found_it != scope_map.end()) {
+            return found_it->second;
         }
     }
     return nullptr;

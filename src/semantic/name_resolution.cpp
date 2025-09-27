@@ -23,8 +23,15 @@ std::shared_ptr<Symbol> NameResolutionVisitor::visit(ArrayInitializerExpr *node)
 }
 
 std::shared_ptr<Symbol> NameResolutionVisitor::visit(VariableExpr *node) {
+
     auto symbol = symbol_table_.lookup_value(node->name.lexeme);
+
     if (!symbol) {
+        symbol = symbol_table_.lookup_type(node->name.lexeme);
+    }
+
+    if (!symbol) {
+
         error_reporter_.report_error("Undefined variable '" + node->name.lexeme + "'",
                                      node->name.line, node->name.column);
         return nullptr;
@@ -334,7 +341,6 @@ std::shared_ptr<Symbol> NameResolutionVisitor::visit(AsExpr *node) {
 std::shared_ptr<Symbol> NameResolutionVisitor::visit(MatchExpr *node) {
     node->scrutinee->accept(this);
     for (auto &arm : node->arms) {
-        // Visit components of MatchArm manually since it's not an Expr
         arm->pattern->accept(this);
         if (arm->guard)
             (*arm->guard)->accept(this);
@@ -365,11 +371,13 @@ std::shared_ptr<Symbol> NameResolutionVisitor::visit(PathExpr *node) {
         return nullptr;
     }
 
-    if (!left_symbol->members) {
-        std::string left_path_str = get_full_path_string(node->left.get());
-        error_reporter_.report_error("'" + left_path_str + "' is not a module or enum");
+    if (!left_symbol->type) {
+        error_reporter_.report_error("'" + left_symbol->name +
+                                     "' is not a type or module, and has no members.");
         return nullptr;
     }
+
+    auto &members_table = left_symbol->type->members;
 
     auto right_name_opt = get_name_from_expr(node->right.get());
     if (!right_name_opt) {
@@ -378,7 +386,7 @@ std::shared_ptr<Symbol> NameResolutionVisitor::visit(PathExpr *node) {
     }
     std::string right_name = *right_name_opt;
 
-    auto final_symbol = left_symbol->members->lookup_value(right_name);
+    auto final_symbol = members_table->lookup_value(right_name);
 
     if (!final_symbol) {
         error_reporter_.report_error("name '" + right_name + "' is not found in '" +
@@ -560,14 +568,6 @@ void NameResolutionVisitor::declare_function(FnDecl *node) {
     node->resolved_symbol = fn_symbol;
 }
 
-void NameResolutionVisitor::define_pass(Item *item) {
-    if (auto *decl = dynamic_cast<FnDecl *>(item)) {
-        define_function_body(decl);
-    } else if (auto *decl = dynamic_cast<StructDecl *>(item)) {
-        define_struct_body(decl);
-    }
-}
-
 void NameResolutionVisitor::define_impl_block(ImplBlock *node) {
     auto target_type = type_resolver_.resolve(node->target_type.get());
     if (!target_type || target_type->kind != TypeKind::STRUCT) {
@@ -587,10 +587,11 @@ void NameResolutionVisitor::define_impl_block(ImplBlock *node) {
 
     for (auto &item : node->implemented_items) {
         if (auto *fn_decl = dynamic_cast<FnDecl *>(item.get())) {
-
             std::vector<std::shared_ptr<Type>> param_types;
             for (const auto &param : fn_decl->params) {
-                param_types.push_back(type_resolver_.resolve(param->type.get()));
+                auto param_type = type_resolver_.resolve(param->type.get());
+                if (param_type)
+                    param_types.push_back(param_type);
             }
             auto return_type = fn_decl->return_type
                                    ? type_resolver_.resolve((*fn_decl->return_type).get())
@@ -601,7 +602,7 @@ void NameResolutionVisitor::define_impl_block(ImplBlock *node) {
                 std::make_shared<Symbol>(fn_decl->name.lexeme, Symbol::FUNCTION, method_type);
             fn_decl->resolved_symbol = method_symbol;
 
-            if (!struct_symbol->members->define_value(fn_decl->name.lexeme, method_symbol)) {
+            if (!struct_type->members->define_value(fn_decl->name.lexeme, method_symbol)) {
                 error_reporter_.report_error("Method '" + fn_decl->name.lexeme +
                                                  "' already defined for this struct.",
                                              fn_decl->name.line);
@@ -614,7 +615,6 @@ void NameResolutionVisitor::define_impl_block(ImplBlock *node) {
             define_function_body(fn_decl);
         }
     }
-
     symbol_table_.exit_scope();
 }
 
@@ -691,12 +691,20 @@ void NameResolutionVisitor::resolve(Program *ast) {
     }
 
     for (auto &item : ast->items) {
+        if (auto *decl = dynamic_cast<StructDecl *>(item.get())) {
+            define_struct_body(decl);
+        }
+    }
+
+    for (auto &item : ast->items) {
         if (auto *decl = dynamic_cast<ImplBlock *>(item.get())) {
             define_impl_block(decl);
         }
     }
 
     for (auto &item : ast->items) {
-        define_pass(item.get());
+        if (auto *decl = dynamic_cast<FnDecl *>(item.get())) {
+            define_function_body(decl);
+        }
     }
 }

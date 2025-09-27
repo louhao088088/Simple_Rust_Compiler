@@ -62,7 +62,6 @@ std::shared_ptr<Symbol> TypeCheckVisitor::visit(ArrayLiteralExpr *node) {
 
     std::shared_ptr<Type> array_element_type = node->elements[0]->type;
 
-    // Find a basic element type.
     if (array_element_type->kind == TypeKind::ANY_INTEGER) {
         for (const auto &element : node->elements) {
             if (is_concrete_integer(element->type->kind)) {
@@ -72,7 +71,6 @@ std::shared_ptr<Symbol> TypeCheckVisitor::visit(ArrayLiteralExpr *node) {
         }
     }
 
-    // Check all elements are of the same type.
     for (const auto &element : node->elements) {
         if (!element->type || !array_element_type->equals(element->type.get())) {
             error_reporter_.report_error(
@@ -573,25 +571,19 @@ std::shared_ptr<Symbol> TypeCheckVisitor::visit(FieldAccessExpr *node) {
 
     if (method_symbol) {
 
-        switch (method_symbol->kind) {
-        case Symbol::VARIABLE: {
+        if (method_symbol->kind == Symbol::VARIABLE) {
+
             node->type = method_symbol->type;
             node->is_mutable_lvalue = node->object->is_mutable_lvalue;
-            break;
-        }
-
-        case Symbol::FUNCTION: {
+        } else if (method_symbol->kind == Symbol::FUNCTION) {
             node->type = method_symbol->type;
             node->is_mutable_lvalue = false;
-            break;
-        }
-
-        default:
+        } else {
             error_reporter_.report_error("Member '" + method_name + "' is not a field or method.",
                                          node->field.line);
-            break;
+            return nullptr;
         }
-
+        node->resolved_symbol = method_symbol;
         return nullptr;
     }
 
@@ -976,7 +968,7 @@ std::shared_ptr<Symbol> TypeCheckVisitor::visit(TupleExpr *node) {
     for (auto &element : node->elements) {
         element->accept(this);
     }
-    return nullptr; // TODO: Implement proper type checking
+    return nullptr;
 }
 
 std::shared_ptr<Symbol> TypeCheckVisitor::visit(AsExpr *node) {
@@ -1005,13 +997,13 @@ std::shared_ptr<Symbol> TypeCheckVisitor::visit(AsExpr *node) {
 std::shared_ptr<Symbol> TypeCheckVisitor::visit(MatchExpr *node) {
     node->scrutinee->accept(this);
     for (auto &arm : node->arms) {
-        // Visit components of MatchArm manually since it's not an Expr
+
         arm->pattern->accept(this);
         if (arm->guard)
             (*arm->guard)->accept(this);
         arm->body->accept(this);
     }
-    return nullptr; // TODO: Implement proper type checking
+    return nullptr;
 }
 
 std::shared_ptr<Symbol> TypeCheckVisitor::visit(PathExpr *node) {
@@ -1027,13 +1019,20 @@ std::shared_ptr<Symbol> TypeCheckVisitor::visit(PathExpr *node) {
         return nullptr;
     }
 
+    if (!left_symbol->type) {
+        error_reporter_.report_error("Internal error: Type symbol '" + left_symbol->name +
+                                     "' has no associated type.");
+        return nullptr;
+    }
+    auto &members_table = left_symbol->type->members;
+
     auto right_name_opt = get_name_from_expr(node->right.get());
     if (!right_name_opt) {
         error_reporter_.report_error("Expected an identifier after `::`.");
         return nullptr;
     }
 
-    auto assoc_fn_symbol = left_symbol->members->lookup_value(*right_name_opt);
+    auto assoc_fn_symbol = members_table->lookup_value(*right_name_opt);
     if (!assoc_fn_symbol) {
         error_reporter_.report_error("No function named '" + *right_name_opt +
                                      "' associated with type '" + left_symbol->name + "'.");
@@ -1055,10 +1054,8 @@ std::shared_ptr<Symbol> TypeCheckVisitor::visit(BlockExpr *node) {
     return nullptr;
 }
 
-// Missing statement visitors for TypeCheckVisitor
 void TypeCheckVisitor::visit(ItemStmt *node) { node->item->accept(this); }
 
-// Missing type node visitors for TypeCheckVisitor
 void TypeCheckVisitor::visit(PathTypeNode *node) { node->path->accept(this); }
 
 void TypeCheckVisitor::visit(RawPointerTypeNode *node) { node->pointee_type->accept(this); }
@@ -1067,13 +1064,9 @@ void TypeCheckVisitor::visit(ReferenceTypeNode *node) { node->referenced_type->a
 
 void TypeCheckVisitor::visit(SliceTypeNode *node) { node->element_type->accept(this); }
 
-void TypeCheckVisitor::visit(SelfTypeNode *node) {
-    // Self types are handled in context
-}
+void TypeCheckVisitor::visit(SelfTypeNode *node) {}
 
-void TypeCheckVisitor::visit(StructDecl *node) {
-    // TODO: Handle struct type checking
-}
+void TypeCheckVisitor::visit(StructDecl *node) {}
 
 void TypeCheckVisitor::visit(ConstDecl *node) {
     node->value->accept(this);
