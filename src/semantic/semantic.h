@@ -37,6 +37,7 @@ enum class TypeKind {
     FUNCTION,
     REFERENCE,
     NEVER,
+    ENUM,
     UNKNOWN,
 };
 class SymbolTable;
@@ -253,6 +254,29 @@ struct ReferenceType : public Type {
 
             return is_mutable == other_ref->is_mutable &&
                    referenced_type->equals(other_ref->referenced_type.get());
+        }
+        return false;
+    }
+};
+
+struct EnumType : public Type {
+    std::string name;
+    std::map<std::string, std::shared_ptr<Type>> variants;
+    std::weak_ptr<Symbol> symbol;
+
+    EnumType(std::string name, std::weak_ptr<Symbol> symbol)
+        : name(std::move(name)), symbol(symbol) {
+        this->kind = TypeKind::ENUM;
+    }
+
+    std::string to_string() const override { return name; }
+
+    bool equals(const Type *other) const override {
+        if (other->kind == TypeKind::NEVER) {
+            return true;
+        }
+        if (auto *other_enum = dynamic_cast<const EnumType *>(other)) {
+            return name == other_enum->name;
         }
         return false;
     }

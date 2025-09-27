@@ -465,39 +465,33 @@ void NameResolutionVisitor::visit(ConstDecl *node) {
 }
 
 void NameResolutionVisitor::visit(EnumDecl *node) {
-    auto enum_symbol = std::make_shared<Symbol>(node->name.lexeme, Symbol::TYPE);
 
-    enum_symbol->members = std::make_unique<SymbolTable>();
+    auto enum_symbol = std::make_shared<Symbol>(node->name.lexeme, Symbol::TYPE);
+    auto enum_type =
+        std::make_shared<EnumType>(node->name.lexeme, std::weak_ptr<Symbol>(enum_symbol));
+    enum_symbol->type = enum_type;
+    if (symbol_table_.lookup_type(node->name.lexeme)) {
+        error_reporter_.report_error("Type '" + node->name.lexeme + "' is already defined.",
+                                     node->name.line);
+        return;
+    }
+
     symbol_table_.define_type(node->name.lexeme, enum_symbol);
     node->resolved_symbol = enum_symbol;
 
     for (const auto &variant : node->variants) {
         auto variant_symbol = std::make_shared<Symbol>(variant->name.lexeme, Symbol::VARIANT);
-        enum_symbol->members->define_value(variant->name.lexeme, variant_symbol);
+        if (!enum_type->members->define_value(variant->name.lexeme, variant_symbol)) {
+            error_reporter_.report_error("Enum variant '" + variant->name.lexeme +
+                                             "' is already defined.",
+                                         variant->name.line);
+        }
     }
 }
 
-void NameResolutionVisitor::visit(ModDecl *node) {
-    auto mod_symbol = std::make_shared<Symbol>(node->name.lexeme, Symbol::MODULE);
-    mod_symbol->members = std::make_unique<SymbolTable>();
+void NameResolutionVisitor::visit(ModDecl *node) {}
 
-    if (!symbol_table_.define_value(node->name.lexeme, mod_symbol)) {
-        error_reporter_.report_error("Module '" + node->name.lexeme + "' is already defined.",
-                                     node->name.line);
-    }
-    node->resolved_symbol = mod_symbol;
-    symbol_table_.enter_scope();
-    for (auto &item : node->items) {
-        item->accept(this);
-    }
-    symbol_table_.exit_scope();
-}
-
-void NameResolutionVisitor::visit(TraitDecl *node) {
-    for (auto &item : node->associated_items) {
-        item->accept(this);
-    }
-}
+void NameResolutionVisitor::visit(TraitDecl *node) {}
 
 void NameResolutionVisitor::visit(ImplBlock *node) {
     if (node->trait_name)
@@ -669,6 +663,12 @@ void NameResolutionVisitor::define_struct_body(StructDecl *node) {
 void NameResolutionVisitor::resolve(Program *ast) {
     for (auto &item : ast->items) {
         if (auto *decl = dynamic_cast<ConstDecl *>(item.get())) {
+            decl->accept(this);
+        }
+    }
+
+    for (auto &item : ast->items) {
+        if (auto *decl = dynamic_cast<EnumDecl *>(item.get())) {
             decl->accept(this);
         }
     }

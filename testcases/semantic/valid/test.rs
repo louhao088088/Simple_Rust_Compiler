@@ -1,26 +1,29 @@
 /*
 Test Package: Semantic-1
-Test Target: return
-Author: Ruitian Wang
-Time: 2025-08-26
-Verdict: Fail
-Comment: exit function test, exit() cannot be used in methods even if named 'main'
+Test Target: misc
+Author: Wenxin Zheng
+Time: 2025-08-08
+Verdict: Success
+Comment: misc test, simple calculator with enums
 */
 
-struct TestStruct {
-    value: i32,
+// Simple calculator with basic operations
+// Perform arithmetic operations on two numbers
+enum Operation {
+    Add,
+    Subtract,
+    Multiply,
+    Divide,
+    Modulo,
 }
 
-impl TestStruct {
-    fn main(&self) {
-        println("This is a method named 'main' in a struct");
-        exit(0);  // This should fail - exit() not allowed in methods, even if named 'main'
+fn perform_operation(a: i32, b: i32, op: Operation) -> i32 {
+    if (op == Operation::Add) {
+        return a + b;
     }
+    1
 }
 
 fn main() {
-    let test: TestStruct = TestStruct { value: 39 };
     exit(0);
-    test.main();
-    
 }
