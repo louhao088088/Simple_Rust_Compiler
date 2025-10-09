@@ -159,8 +159,11 @@ void NameResolutionVisitor::visit(ContinueStmt *node) {}
 void NameResolutionVisitor::visit(TypeNameNode *node) {}
 
 void NameResolutionVisitor::visit(ArrayTypeNode *node) {
+
     node->element_type->accept(this);
-    node->size->accept(this);
+    if (node->size) {
+        node->size->accept(this);
+    }
 }
 
 void NameResolutionVisitor::visit(UnitTypeNode *node) {}

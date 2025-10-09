@@ -194,6 +194,13 @@ std::shared_ptr<Symbol> TypeCheckVisitor::visit(UnaryExpr *node) {
     return nullptr;
 }
 
+bool is_raw_pointer(std::shared_ptr<Type> t) { return t && t->kind == TypeKind::RAW_POINTER; }
+
+bool is_size_integer(std::shared_ptr<Type> t) {
+    return t && (t->kind == TypeKind::ISIZE || t->kind == TypeKind::USIZE ||
+                 t->kind == TypeKind::ANY_INTEGER);
+}
+
 std::shared_ptr<Symbol> TypeCheckVisitor::visit(BinaryExpr *node) {
     node->left->accept(this);
     node->right->accept(this);
@@ -206,8 +213,88 @@ std::shared_ptr<Symbol> TypeCheckVisitor::visit(BinaryExpr *node) {
     }
 
     switch (node->op.type) {
-    case TokenType::PLUS:
-    case TokenType::MINUS:
+    case TokenType::PLUS: {
+        if (is_raw_pointer(left_type) && is_size_integer(right_type)) {
+            node->type = node->left->type;
+            return nullptr;
+        }
+        if (is_size_integer(left_type) && is_raw_pointer(right_type)) {
+            node->type = node->right->type;
+            return nullptr;
+        }
+        bool left_is_int = is_any_integer_type(left_type->kind);
+        bool right_is_int = is_any_integer_type(right_type->kind);
+
+        if (left_is_int && right_is_int) {
+            if (is_concrete_integer(left_type->kind)) {
+                if (is_concrete_integer(right_type->kind)) {
+                    if (left_type->equals(right_type.get())) {
+                        node->type = left_type;
+                    } else {
+                        error_reporter_.report_error(
+                            "Mismatched integer types in binary operation. Both operands must be "
+                            "of the same concrete integer type.",
+                            node->op.line);
+                        return nullptr;
+                    }
+                } else {
+                    node->type = left_type;
+                }
+                node->type = left_type;
+            } else if (is_concrete_integer(right_type->kind)) {
+                node->type = right_type;
+            } else {
+                node->type = std::make_shared<PrimitiveType>(TypeKind::ANY_INTEGER);
+            }
+        } else {
+            error_reporter_.report_error("Arithmetic operations can only be performed on integers.",
+                                         node->op.line);
+        }
+        break;
+    }
+    case TokenType::MINUS: {
+        if (is_raw_pointer(left_type) && is_size_integer(right_type)) {
+            node->type = node->left->type;
+            return nullptr;
+        }
+        if (is_raw_pointer(left_type) && is_raw_pointer(right_type)) {
+            if (left_type->equals(right_type.get())) {
+
+                node->type = builtin_types_.isize_type;
+                return nullptr;
+            }
+        }
+        bool left_is_int = is_any_integer_type(left_type->kind);
+        bool right_is_int = is_any_integer_type(right_type->kind);
+
+        if (left_is_int && right_is_int) {
+            if (is_concrete_integer(left_type->kind)) {
+                if (is_concrete_integer(right_type->kind)) {
+                    if (left_type->equals(right_type.get())) {
+                        node->type = left_type;
+                    } else {
+                        error_reporter_.report_error(
+                            "Mismatched integer types in binary operation. Both operands must be "
+                            "of the same concrete integer type.",
+                            node->op.line);
+                        return nullptr;
+                    }
+                } else {
+                    node->type = left_type;
+                }
+                node->type = left_type;
+            } else if (is_concrete_integer(right_type->kind)) {
+                node->type = right_type;
+            } else {
+                node->type = std::make_shared<PrimitiveType>(TypeKind::ANY_INTEGER);
+            }
+        } else {
+            error_reporter_.report_error("Arithmetic operations can only be performed on integers.",
+                                         node->op.line);
+        }
+        break;
+    }
+
     case TokenType::STAR:
     case TokenType::SLASH:
     case TokenType::PERCENT:
@@ -976,7 +1063,26 @@ std::shared_ptr<Symbol> TypeCheckVisitor::visit(TupleExpr *node) {
 std::shared_ptr<Symbol> TypeCheckVisitor::visit(AsExpr *node) {
     node->expression->accept(this);
     node->target_type->accept(this);
+
+    auto source_type = node->expression->type;
+    auto target_type = node->target_type->resolved_type;
+
+    if (!source_type || !target_type) {
+        node->type = nullptr;
+        return nullptr;
+    }
+
+    if (target_type->kind == TypeKind::RAW_POINTER) {
+
+        if (source_type->kind == TypeKind::REFERENCE) {
+
+            node->type = target_type;
+            return nullptr;
+        }
+    }
+
     if (node->target_type->resolved_symbol && node->target_type->resolved_symbol->type) {
+
         if (node->expression->type->kind != TypeKind::ANY_INTEGER &&
             node->expression->type->kind != TypeKind::CHAR &&
             node->expression->type->kind != TypeKind::BOOL &&

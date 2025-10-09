@@ -948,6 +948,13 @@ std::shared_ptr<Expr> Parser::parse_expression(Precedence precedence) {
                 break;
             }
         }
+        if (auto *while_expr = dynamic_cast<WhileExpr *>(left.get())) {
+            break;
+        }
+        if (auto *loop_expr = dynamic_cast<LoopExpr *>(left.get())) {
+            break;
+        }
+
         advance();
         TokenType infix_type = previous().type;
         if (infix_parsers_.find(infix_type) == infix_parsers_.end()) {

@@ -38,6 +38,7 @@ enum class TypeKind {
     REFERENCE,
     NEVER,
     ENUM,
+    RAW_POINTER,
     UNKNOWN,
 };
 class SymbolTable;
@@ -254,6 +255,31 @@ struct ReferenceType : public Type {
 
             return is_mutable == other_ref->is_mutable &&
                    referenced_type->equals(other_ref->referenced_type.get());
+        }
+        return false;
+    }
+};
+
+struct RawPointerType : public Type {
+    std::shared_ptr<Type> pointee_type;
+    bool is_mutable;
+
+    RawPointerType(std::shared_ptr<Type> pointee, bool is_mut)
+        : pointee_type(std::move(pointee)), is_mutable(is_mut) {
+        this->kind = TypeKind::RAW_POINTER;
+    }
+
+    std::string to_string() const override {
+        return std::string(is_mutable ? "*mut " : "*const ") + pointee_type->to_string();
+    }
+
+    bool equals(const Type *other) const override {
+        if (other->kind == TypeKind::NEVER) {
+            return true;
+        }
+        if (auto *other_ptr = dynamic_cast<const RawPointerType *>(other)) {
+            return is_mutable == other_ptr->is_mutable &&
+                   pointee_type->equals(other_ptr->pointee_type.get());
         }
         return false;
     }

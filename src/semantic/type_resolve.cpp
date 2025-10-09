@@ -33,31 +33,16 @@ void TypeResolver::visit(TypeNameNode *node) {
 }
 
 void TypeResolver::visit(ArrayTypeNode *node) {
+
     auto element_type = resolve(node->element_type.get());
+
     if (!element_type) {
         resolved_type_ = nullptr;
         return;
     }
 
-    if (auto *var_expr = dynamic_cast<VariableExpr *>(node->size.get())) {
-        auto symbol = symbol_table_.lookup_value(var_expr->name.lexeme);
-        if (symbol && symbol->type) {
-            if (symbol->type->kind != TypeKind::USIZE) {
-                error_reporter_.report_error(
-                    "Array size must be of type 'usize', but found type '" +
-                        symbol->type->to_string() + "'.",
-                    var_expr->name.line);
-                resolved_type_ = nullptr;
-                return;
-            }
-        }
-    } else if (auto *lit_expr = dynamic_cast<LiteralExpr *>(node->size.get())) {
-    } else {
-
-        error_reporter_.report_error(
-            "Only variables and integer literals are supported as array sizes for now.");
-        resolved_type_ = nullptr;
-        return;
+    if (node->size) {
+        node->size->accept(&name_resolver_);
     }
 
     ConstEvaluator const_evaluator(symbol_table_, error_reporter_);
@@ -69,7 +54,14 @@ void TypeResolver::visit(ArrayTypeNode *node) {
         return;
     }
 
-    size_t size = *size_opt;
+    long long evaluated_size = *size_opt;
+    if (evaluated_size < 0) {
+        error_reporter_.report_error("Array size cannot be negative.");
+        resolved_type_ = nullptr;
+        return;
+    }
+
+    size_t size = static_cast<size_t>(evaluated_size);
     resolved_type_ = std::make_shared<ArrayType>(element_type, size);
 }
 
@@ -117,8 +109,15 @@ void TypeResolver::visit(ReferenceTypeNode *node) {
     resolved_type_ = std::make_shared<ReferenceType>(resolved_inner_type, node->is_mutable);
 }
 
+void TypeResolver::visit(RawPointerTypeNode *node) {
+    auto pointee_type = resolve(node->pointee_type.get());
+    if (!pointee_type) {
+        resolved_type_ = nullptr;
+        return;
+    }
+    resolved_type_ = std::make_shared<RawPointerType>(pointee_type, node->is_mutable);
+}
+
 void TypeResolver::visit(SliceTypeNode *node) { resolved_type_ = nullptr; }
 
 void TypeResolver::visit(SelfTypeNode *node) { resolved_type_ = nullptr; }
-
-void TypeResolver::visit(RawPointerTypeNode *node) { resolved_type_ = nullptr; }

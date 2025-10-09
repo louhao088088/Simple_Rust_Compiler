@@ -107,10 +107,6 @@ std::optional<long long> ConstEvaluator::visit(LiteralExpr *node) {
 std::optional<long long> ConstEvaluator::visit(VariableExpr *node) {
     std::shared_ptr<Symbol> symbol = node->resolved_symbol;
 
-    if (!symbol) {
-        symbol = symbol_table_.lookup(node->name.lexeme);
-    }
-
     if (symbol && symbol->kind == Symbol::CONSTANT && symbol->const_decl_node) {
         return this->evaluate(symbol->const_decl_node->value.get());
     }
