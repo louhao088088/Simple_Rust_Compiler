@@ -164,6 +164,9 @@ std::shared_ptr<Symbol> TypeCheckVisitor::visit(UnaryExpr *node) {
     case TokenType::BANG:
         if (operand_type->kind == TypeKind::BOOL) {
             node->type = builtin_types_.bool_type;
+        } else if (operand_type->kind == TypeKind::ANY_INTEGER ||
+                   is_any_integer_type(operand_type->kind)) {
+            node->type = operand_type;
         } else {
             error_reporter_.report_error(
                 "Logical NOT operator '!' can only be applied to boolean types.", node->op.line);
@@ -299,8 +302,6 @@ std::shared_ptr<Symbol> TypeCheckVisitor::visit(BinaryExpr *node) {
     case TokenType::SLASH:
     case TokenType::PERCENT:
     case TokenType::CARET:
-    case TokenType::LESS_LESS:
-    case TokenType::GREATER_GREATER:
     case TokenType::AMPERSAND:
     case TokenType::PIPE: {
 
@@ -328,6 +329,20 @@ std::shared_ptr<Symbol> TypeCheckVisitor::visit(BinaryExpr *node) {
             } else {
                 node->type = std::make_shared<PrimitiveType>(TypeKind::ANY_INTEGER);
             }
+        } else {
+            error_reporter_.report_error("Arithmetic operations can only be performed on integers.",
+                                         node->op.line);
+        }
+        break;
+    }
+
+    case TokenType::LESS_LESS:
+    case TokenType::GREATER_GREATER: {
+        bool left_is_int = is_any_integer_type(left_type->kind);
+        bool right_is_int = is_any_integer_type(right_type->kind);
+
+        if (left_is_int && right_is_int) {
+            node->type = left_type;
         } else {
             error_reporter_.report_error("Arithmetic operations can only be performed on integers.",
                                          node->op.line);
