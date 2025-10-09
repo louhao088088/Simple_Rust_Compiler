@@ -7,7 +7,7 @@ Number number_of_tokens(string token, ErrorReporter &error_reporter) {
             if (token[i] == '_')
                 continue;
 
-            if (!(token[i] >= '0' && token[i] <= '9') || !(token[i] >= 'a' && token[i] <= 'f') ||
+            if (!(token[i] >= '0' && token[i] <= '9') && !(token[i] >= 'a' && token[i] <= 'f') &&
                 !(token[i] >= 'A' && token[i] <= 'F')) {
                 if ((token[i] == 'i' || token[i] == 'u') &&
                     ((token.length() == i + 3 && token[i + 1] == '3' && token[i + 2] == '2') ||
@@ -40,6 +40,7 @@ Number number_of_tokens(string token, ErrorReporter &error_reporter) {
             }
             if (num == -1)
                 num = 0;
+
             num = num * 16 +
                   (token[i] >= '0' && token[i] <= '9'
                        ? token[i] - '0'
