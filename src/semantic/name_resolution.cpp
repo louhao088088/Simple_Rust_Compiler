@@ -330,6 +330,8 @@ std::shared_ptr<Symbol> NameResolutionVisitor::visit(TupleExpr *node) {
 std::shared_ptr<Symbol> NameResolutionVisitor::visit(AsExpr *node) {
     node->expression->accept(this);
     std::shared_ptr<Type> var_type = nullptr;
+    
+    node->target_type->accept(this);
     if (node->target_type) {
         var_type = type_resolver_.resolve(node->target_type.get());
         if (!var_type) {

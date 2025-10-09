@@ -399,6 +399,7 @@ class ConstEvaluator : public ExprVisitor<std::optional<long long>> {
     std::optional<long long> visit(BinaryExpr *node) override;
     std::optional<long long> visit(UnaryExpr *node) override;
     std::optional<long long> visit(GroupingExpr *node) override;
+    std::optional<long long> visit(AsExpr *node) override;
 
     // Default implementations for non-constant expressions
     std::optional<long long> visit(ArrayLiteralExpr *node) override { return std::nullopt; }
@@ -416,7 +417,6 @@ class ConstEvaluator : public ExprVisitor<std::optional<long long>> {
     std::optional<long long> visit(StructInitializerExpr *node) override { return std::nullopt; }
     std::optional<long long> visit(UnitExpr *node) override { return std::nullopt; }
     std::optional<long long> visit(TupleExpr *node) override { return std::nullopt; }
-    std::optional<long long> visit(AsExpr *node) override { return std::nullopt; }
     std::optional<long long> visit(MatchExpr *node) override { return std::nullopt; }
     std::optional<long long> visit(PathExpr *node) override { return std::nullopt; }
     std::optional<long long> visit(BlockExpr *node) override { return std::nullopt; }

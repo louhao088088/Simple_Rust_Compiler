@@ -919,6 +919,9 @@ std::shared_ptr<ExprStmt> Parser::parse_expression_statement() {
             return std::make_shared<ExprStmt>(std::move(expr), true);
         } else if (auto *while_expr = dynamic_cast<WhileExpr *>(expr.get())) {
             return std::make_shared<ExprStmt>(std::move(expr), true);
+        } else if (auto *block_expr = dynamic_cast<BlockExpr *>(expr.get())) {
+            return std::make_shared<ExprStmt>(std::move(expr),
+                                              block_expr->block_stmt->has_semicolon);
         }
         return std::make_shared<ExprStmt>(std::move(expr), false);
     }
@@ -953,6 +956,14 @@ std::shared_ptr<Expr> Parser::parse_expression(Precedence precedence) {
         }
         if (auto *loop_expr = dynamic_cast<LoopExpr *>(left.get())) {
             break;
+        }
+        if (auto *match_expr = dynamic_cast<MatchExpr *>(left.get())) {
+            break;
+        }
+        if (auto *block_expr = dynamic_cast<BlockExpr *>(left.get())) {
+            if (block_expr->block_stmt->has_semicolon) {
+                break;
+            }
         }
 
         advance();

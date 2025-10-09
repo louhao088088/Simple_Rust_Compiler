@@ -153,6 +153,26 @@ std::optional<long long> ConstEvaluator::visit(BinaryExpr *node) {
     return std::nullopt;
 }
 
+std::optional<long long> ConstEvaluator::visit(AsExpr *node) {
+
+    auto left_value_opt = evaluate(node->expression.get());
+
+    if (!left_value_opt) {
+        return std::nullopt;
+    }
+
+    if (node->target_type && node->target_type->resolved_type) {
+        auto target_type_kind = node->target_type->resolved_type->kind;
+        if (!is_concrete_integer(target_type_kind) && target_type_kind != TypeKind::ANY_INTEGER) {
+            error_reporter_.report_error("Constant casting is only supported for integer types.");
+            return std::nullopt;
+        }
+    } else {
+        return std::nullopt;
+    }
+    return left_value_opt;
+}
+
 std::optional<long long> ConstEvaluator::visit(UnaryExpr *node) {
     auto operand_val = evaluate(node->right.get());
 
