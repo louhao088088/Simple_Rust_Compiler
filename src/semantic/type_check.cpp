@@ -1209,7 +1209,9 @@ void TypeCheckVisitor::check_main_for_early_exit(BlockStmt *body) {
     }
 
     size_t statements_to_check = body->statements.size() - 1;
-
+    if (body->final_expr) {
+        statements_to_check++;
+    }
     for (size_t i = 0; i < statements_to_check; ++i) {
         auto &stmt = body->statements[i];
 
@@ -1230,6 +1232,32 @@ void TypeCheckVisitor::check_main_for_early_exit(BlockStmt *body) {
                 error_reporter_.report_error(
                     "Built-in function 'exit' must be the final statement in 'main'.");
             }
+        }
+    }
+    if (body->final_expr) {
+        return;
+    }
+    auto &stmt = body->statements.back();
+    auto *expr_stmt = dynamic_cast<ExprStmt *>(stmt.get());
+    if (!expr_stmt) {
+        error_reporter_.report_error(
+            "The final statement in 'main' must be an expression statement calling 'exit'.");
+        return;
+    }
+
+    auto *call_expr = dynamic_cast<CallExpr *>(expr_stmt->expression.get());
+    if (!call_expr) {
+        error_reporter_.report_error(
+            "The final statement in 'main' must be an expression statement calling 'exit'.");
+        return;
+    }
+
+    if (call_expr->callee->resolved_symbol) {
+        const auto &callee_symbol = call_expr->callee->resolved_symbol;
+
+        if (!(callee_symbol->name == "exit" && callee_symbol->is_builtin)) {
+            error_reporter_.report_error(
+                "The final statement in 'main' must be an expression statement calling 'exit'.");
         }
     }
 }

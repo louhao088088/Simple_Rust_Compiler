@@ -1,6 +1,4 @@
-fn exit(a : i32) {
-}
-
 fn main() {
-    exit(0);
+    let b: i32 = 3 + 1;
+    exit(b)
 }
