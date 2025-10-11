@@ -4,4 +4,5 @@ fn main() {
     let _: [u32; C] = [0; C]; // Constant item.
     let _: [u32; C] = [0; _]; // Inferred const.
     let _: [u32; C] = [0; (_)]; // Inferred const.
+    exit(0);
 }

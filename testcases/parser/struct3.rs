@@ -6,4 +6,5 @@ fn main() {
         1: 127,
         2: 0,
     }; // Specifying fields by index.
+    exit(0);
 }

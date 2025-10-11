@@ -9,4 +9,5 @@ fn main() {
     } {
         print("true")
     }
+    exit(0);
 }

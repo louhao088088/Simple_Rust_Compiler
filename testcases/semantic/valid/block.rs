@@ -9,4 +9,5 @@ fn main() {
         let mut p2: i32 = 1;
     }
     let a: i32 = 1;
+    exit(0);
 }

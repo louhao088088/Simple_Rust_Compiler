@@ -8,4 +8,5 @@ fn main() {
     let hhh = cr##"dadadas"##;
     let dasdasda = cr###"fdsadas"###;
     let geae = r##"asdas# ” 埃尔###\"""\nb多安是 "##;
+    exit(0);
 }

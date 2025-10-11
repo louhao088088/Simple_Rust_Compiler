@@ -5,4 +5,5 @@ fn main() {
     let a = c"foo #\"# bar";
     let a = r"addda";
     let b = a();
+    exit(0);
 }

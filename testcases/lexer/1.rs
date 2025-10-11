@@ -6,4 +6,5 @@ fn main() {
 
 
     println!(p);
+    exit(0);
 }

@@ -3,5 +3,5 @@ fn main() {
 
     let kk = "//";
     let tmp = 12/*122*/23;
-    
+    exit(0);
 }

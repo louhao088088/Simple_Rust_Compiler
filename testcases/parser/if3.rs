@@ -5,4 +5,5 @@ fn main() {
     } else {
         let _vowel = false;
     }
+    exit(0);
 }

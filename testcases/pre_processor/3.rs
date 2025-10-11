@@ -7,5 +7,5 @@ fn main() {
 
     let p=7.;
     let t="s\"sda";
-
+    exit(0);
 }

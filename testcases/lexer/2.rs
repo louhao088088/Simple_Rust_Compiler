@@ -4,4 +4,5 @@ fn main() {
     let o = 2 + -3;
     let uu = 2_i32;
     let o = -45;
+    exit(0);
 }

@@ -3,4 +3,5 @@ fn main() {
         let b = 2;
         b
     };
+    exit(0);
 }

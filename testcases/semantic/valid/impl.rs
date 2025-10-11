@@ -1,11 +1,3 @@
-/*
-Test Package: Semantic-1
-Test Target: expr
-Author: Wenxin Zheng
-Time: 2025-08-08
-Verdict: Success
-Comment: Depth-first search algorithm with graph traversal, complex control flow, and nested data structures; printInt returns `()`
-*/
 
 struct GraphNode {
     id: i32,
@@ -26,5 +18,5 @@ impl GraphNode {
 }
 
 fn main() {
-    
+    exit(0);
 }

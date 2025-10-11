@@ -5,4 +5,5 @@ fn main() {
     {
         const A: i32 = 30;
     }
+    exit(0);
 }

@@ -6,4 +6,6 @@ fn insert() -> bool {
     }
 }
 
-fn main() {}
+fn main() {
+    exit(0);
+}

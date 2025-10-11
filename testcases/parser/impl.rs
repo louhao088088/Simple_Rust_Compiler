@@ -14,4 +14,5 @@ impl Circle {
 
 fn main() {
     let c = Circle::new(2);
+    exit(0);
 }

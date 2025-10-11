@@ -11,4 +11,5 @@ fn main() {
     }
 
     let p = person { name: 1, world: 2 };
+    exit(0);
 }

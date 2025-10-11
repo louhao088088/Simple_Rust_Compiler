@@ -56,4 +56,5 @@ fn main() {
     } else {
         let _s = 0;
     }
+    exit(0);
 }

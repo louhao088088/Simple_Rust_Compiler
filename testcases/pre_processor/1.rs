@@ -11,4 +11,5 @@ fn main() {
     let ll = "\*asdas
     
     *\sdashelo \\ safasfas";
+    exit(0);
 }

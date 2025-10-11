@@ -3,4 +3,5 @@ fn main() {
         loop {}
         break;
     }
+    exit(0);
 }

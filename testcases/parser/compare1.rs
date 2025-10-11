@@ -3,6 +3,7 @@ fn main() {
     let b;
     let c;
     let d = if a > b == c { 0 } else { 1 };
+    exit(0);
 }
 
 //CE

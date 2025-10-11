@@ -1,11 +1,3 @@
-/*
-Test Package: Semantic-1
-Test Target: basic
-Author: Wenxin Zheng
-Time: 2025-08-08
-Verdict: Success
-Comment: basic test, Fibonacci function with iterative implementation
-*/
 
 fn main() {
     let fib10: i32 = fib(10);

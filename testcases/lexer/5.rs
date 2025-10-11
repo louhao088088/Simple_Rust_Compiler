@@ -3,4 +3,5 @@ fn main() {
     let c = c"ada";
     let o = b"paty";
     let g = b'H';
+    exit(0);
 }

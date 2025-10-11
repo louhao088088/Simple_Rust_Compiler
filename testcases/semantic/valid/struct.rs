@@ -11,4 +11,5 @@ fn main() {
         height: 2,
     };
     let c: i32 = p.height;
+    exit(0);
 }

@@ -19,4 +19,5 @@ fn main() {
         }
         let p = a + b;
     };
+    exit(0);
 }

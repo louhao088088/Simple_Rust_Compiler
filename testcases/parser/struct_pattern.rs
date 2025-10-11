@@ -5,4 +5,5 @@ fn main() {
         price: 1299,
         screen_size: 14,
     };
+    exit(0);
 }

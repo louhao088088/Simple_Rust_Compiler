@@ -5,4 +5,5 @@ struct Person {
 fn main() {
     
     if (Person { x: 32 }.x == 32) {}
+    exit(0);
 }

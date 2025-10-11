@@ -10,4 +10,5 @@ fn main() {
         age: 30,
         height: 2,
     };
+    exit(0);
 }

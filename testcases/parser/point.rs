@@ -4,4 +4,5 @@ fn main() {
     let mut y = 5;
     let mr: &mut i32 = &mut y;
     *mr += 1;
+    exit(0);
 }

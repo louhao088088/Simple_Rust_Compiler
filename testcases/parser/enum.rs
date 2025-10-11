@@ -4,6 +4,7 @@ fn main() {
         Baz = 123, // 123
         Quux,      // 124
     }
+    exit(0);
 }
 enum Animal {
     Dog,
