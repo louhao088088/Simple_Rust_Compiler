@@ -330,7 +330,7 @@ std::shared_ptr<Symbol> NameResolutionVisitor::visit(TupleExpr *node) {
 std::shared_ptr<Symbol> NameResolutionVisitor::visit(AsExpr *node) {
     node->expression->accept(this);
     std::shared_ptr<Type> var_type = nullptr;
-    
+
     node->target_type->accept(this);
     if (node->target_type) {
         var_type = type_resolver_.resolve(node->target_type.get());
@@ -645,6 +645,35 @@ void NameResolutionVisitor::define_function_body(FnDecl *node) {
     if (node->body) {
         symbol_table_.enter_scope();
 
+        std::vector<std::shared_ptr<Item>> inner_items;
+        for (auto &stmt : (*node->body)->statements) {
+            if (auto item_stmt = dynamic_cast<ItemStmt *>(stmt.get())) {
+                inner_items.push_back(item_stmt->item);
+            }
+        }
+
+        for (const auto &item : inner_items) {
+            if (auto decl = dynamic_cast<StructDecl *>(item.get()))
+                declare_struct(decl);
+            else if (auto decl = dynamic_cast<EnumDecl *>(item.get()))
+                item->accept(this);
+            else if (auto decl = dynamic_cast<ConstDecl *>(item.get()))
+                item->accept(this);
+        }
+
+        for (const auto &item : inner_items) {
+            if (auto decl = dynamic_cast<FnDecl *>(item.get()))
+                declare_function(decl);
+        }
+
+        for (const auto &item : inner_items) {
+            if (auto decl = dynamic_cast<ImplBlock *>(item.get())) {
+                declare_impl_method(decl);
+            } else if (auto decl = dynamic_cast<StructDecl *>(item.get())) {
+                define_struct_body(decl);
+            }
+        }
+
         for (size_t i = 0; i < node->params.size(); ++i) {
             const auto &param = node->params[i];
 
@@ -655,7 +684,31 @@ void NameResolutionVisitor::define_function_body(FnDecl *node) {
             current_type_ = nullptr;
         }
 
-        (*node->body)->accept(this);
+        for (auto &stmt : (*node->body)->statements) {
+            if (auto item_stmt = dynamic_cast<ItemStmt *>(stmt.get())) {
+                if (auto *decl = dynamic_cast<FnDecl *>(item_stmt->item.get())) {
+                    define_function_body(decl);
+                } else if (auto *decl = dynamic_cast<ImplBlock *>(item_stmt->item.get())) {
+                    for (auto &item : decl->implemented_items) {
+                        auto target_type = type_resolver_.resolve(decl->target_type.get());
+                        auto target_type_symbol =
+                            std::dynamic_pointer_cast<StructType>(target_type)->symbol.lock();
+
+                        symbol_table_.enter_scope();
+                        symbol_table_.define_type("Self", target_type_symbol);
+                        if (auto *fn_decl = dynamic_cast<FnDecl *>(item.get())) {
+                            define_function_body(fn_decl);
+                        }
+                        symbol_table_.exit_scope();
+                    }
+                }
+                continue;
+            }
+            stmt->accept(this);
+        }
+        if ((*node->body)->final_expr) {
+            (*(*node->body)->final_expr)->accept(this);
+        }
 
         symbol_table_.exit_scope();
     }
