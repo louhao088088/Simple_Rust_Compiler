@@ -18,6 +18,7 @@ add_executable(code
     src/semantic/name_resolution.cpp
     src/semantic/type_check.cpp
     src/semantic/type_resolve.cpp
+    src/semantic/const_evaluate.cpp
     src/tool/number.cpp
     src/error/error.cpp
     src/main.cpp
