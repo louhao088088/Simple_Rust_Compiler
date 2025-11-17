@@ -7,7 +7,7 @@ using std::string;
 using std::vector;
 
 void Token::print() const {
-    std::cout << "Token:" << tokenTypeToString(type) << ", \"" << lexeme << "\""
+    std::cerr << "Token:" << tokenTypeToString(type) << ", \"" << lexeme << "\""
               << " at line " << line << ", column " << column << std::endl;
 }
 
@@ -732,17 +732,17 @@ vector<Token> lexer_program(const Prog &program, ErrorReporter &error_reporter) 
         new_token.column = program.positions[i - 1].second;
         result.push_back(new_token);
     }
-   
+
     return result;
 }
 
 void print_lexer_result(const vector<Token> &tokens) {
-    puts("First Step lexer result:");
+    std::cerr << "First Step lexer result:" << std::endl;
 
     for (const auto &token : tokens) {
         token.print();
     }
 
-    puts("");
-    puts("");
+    std::cerr << std::endl;
+    std::cerr << std::endl;
 }

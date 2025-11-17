@@ -19,6 +19,16 @@ add_executable(code
     src/semantic/type_check.cpp
     src/semantic/type_resolve.cpp
     src/semantic/const_evaluate.cpp
+    src/ir/ir_generator_main.cpp
+    src/ir/ir_generator_statements.cpp
+    src/ir/ir_generator_expressions.cpp
+    src/ir/ir_generator_control_flow.cpp
+    src/ir/ir_generator_complex_exprs.cpp
+    src/ir/ir_generator_builtins.cpp
+    src/ir/ir_generator_helpers.cpp
+    src/ir/ir_emitter.cpp
+    src/ir/type_mapper.cpp
+    src/ir/value_manager.cpp
     src/tool/number.cpp
     src/error/error.cpp
     src/main.cpp

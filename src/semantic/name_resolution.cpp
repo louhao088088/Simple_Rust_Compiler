@@ -438,6 +438,7 @@ void NameResolutionVisitor::visit(StructDecl *node) {
             continue;
         }
         struct_type->fields[field_node->name.lexeme] = field_type;
+        struct_type->field_order.push_back(field_node->name.lexeme); // 保存字段顺序
         auto field_symbol =
             std::make_shared<Symbol>(field_node->name.lexeme, Symbol::VARIABLE, field_type);
         struct_symbol->members->define_value(field_node->name.lexeme, field_symbol);
@@ -728,6 +729,7 @@ void NameResolutionVisitor::define_struct_body(StructDecl *node) {
         }
 
         struct_type->fields[field_node->name.lexeme] = field_type;
+        struct_type->field_order.push_back(field_node->name.lexeme); // 保存字段顺序
         auto field_symbol =
             std::make_shared<Symbol>(field_node->name.lexeme, Symbol::VARIABLE, field_type);
         struct_type->members->define_value(field_node->name.lexeme, field_symbol);

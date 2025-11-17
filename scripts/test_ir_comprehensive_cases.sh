@@ -1,0 +1,131 @@
+#!/bin/bash
+
+# IR-1 综合测试用例自动化脚本
+# 测试 TestCases/IR-1 目录下的所有测试用例
+
+set -e
+
+# 颜色定义
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+NC='\033[0m' # No Color
+
+# 计数器
+TOTAL=0
+PASSED=0
+FAILED=0
+
+# 临时目录
+TEMP_DIR=$(mktemp -d)
+trap "rm -rf $TEMP_DIR" EXIT
+
+echo "========================================="
+echo "   IR-1 综合测试用例验证"
+echo "========================================="
+echo ""
+
+# 编译器路径
+COMPILER="./build/code"
+
+# 检查编译器是否存在
+if [ ! -f "$COMPILER" ]; then
+    echo -e "${RED}错误: 编译器不存在: $COMPILER${NC}"
+    echo "请先运行: cd build && make"
+    exit 1
+fi
+
+# 测试目录
+TEST_DIR="./TestCases/IR-1"
+
+# 遍历所有测试用例
+for test_case in "$TEST_DIR"/comprehensive*/; do
+    test_name=$(basename "$test_case")
+    rx_file="$test_case/${test_name}.rx"
+    in_file="$test_case/${test_name}.in"
+    out_file="$test_case/${test_name}.out"
+    
+    # 检查文件是否存在
+    if [ ! -f "$rx_file" ] || [ ! -f "$in_file" ] || [ ! -f "$out_file" ]; then
+        echo -e "${YELLOW}⚠ 跳过 $test_name: 文件不完整${NC}"
+        continue
+    fi
+    
+    TOTAL=$((TOTAL + 1))
+    
+    echo -n "测试 $test_name ... "
+    
+    # 生成 IR
+    ll_file="$TEMP_DIR/${test_name}.ll"
+    if ! $COMPILER < "$rx_file" > "$ll_file" 2>/dev/null; then
+        echo -e "${RED}❌ FAIL (IR生成失败)${NC}"
+        FAILED=$((FAILED + 1))
+        continue
+    fi
+    
+    # 验证 IR 语法
+    if ! llvm-as "$ll_file" -o /dev/null 2>/dev/null; then
+        echo -e "${RED}❌ FAIL (IR语法错误)${NC}"
+        FAILED=$((FAILED + 1))
+        continue
+    fi
+    
+    # 编译为可执行文件
+    exe_file="$TEMP_DIR/${test_name}"
+    if ! llc "$ll_file" -o "$TEMP_DIR/${test_name}.s" 2>/dev/null; then
+        echo -e "${RED}❌ FAIL (汇编生成失败)${NC}"
+        FAILED=$((FAILED + 1))
+        continue
+    fi
+    
+    if ! clang "$TEMP_DIR/${test_name}.s" -o "$exe_file" 2>/dev/null; then
+        echo -e "${RED}❌ FAIL (链接失败)${NC}"
+        FAILED=$((FAILED + 1))
+        continue
+    fi
+    
+    # 运行程序并比较输出
+    actual_output="$TEMP_DIR/${test_name}_actual.out"
+    if ! timeout 5s "$exe_file" < "$in_file" > "$actual_output" 2>/dev/null; then
+        echo -e "${RED}❌ FAIL (运行时错误或超时)${NC}"
+        FAILED=$((FAILED + 1))
+        continue
+    fi
+    
+    # 比较输出
+    if diff -q "$actual_output" "$out_file" > /dev/null 2>&1; then
+        echo -e "${GREEN}✅ PASS${NC}"
+        PASSED=$((PASSED + 1))
+    else
+        echo -e "${RED}❌ FAIL (输出不匹配)${NC}"
+        FAILED=$((FAILED + 1))
+        
+        # 显示差异（可选）
+        if [ "${SHOW_DIFF:-0}" = "1" ]; then
+            echo "预期输出:"
+            head -5 "$out_file"
+            echo "实际输出:"
+            head -5 "$actual_output"
+            echo "---"
+        fi
+    fi
+done
+
+echo ""
+echo "========================================="
+echo "           测试结果统计"
+echo "========================================="
+echo -e "✅ 通过: ${GREEN}$PASSED${NC}"
+echo -e "❌ 失败: ${RED}$FAILED${NC}"
+echo -e "📊 总计: $TOTAL"
+echo ""
+
+if [ $FAILED -eq 0 ]; then
+    echo -e "${GREEN}🎉 所有测试通过！${NC}"
+    exit 0
+else
+    echo -e "${RED}⚠️  有 $FAILED 个测试失败${NC}"
+    echo "提示: 设置 SHOW_DIFF=1 可以显示输出差异"
+    exit 1
+fi

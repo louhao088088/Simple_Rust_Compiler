@@ -1,3 +1,4 @@
+#include "ir/ir_generator.h"
 #include "lexer/lexer.h"
 #include "parser/parser.h"
 #include "pre_processor/pre_processor.h"
@@ -50,6 +51,13 @@ int main() {
     } else {
         std::cerr << "Semantic analysis completed successfully." << std::endl;
     }
+
+    // IR Generation
+    std::cerr << "\n--- IR Generation ---" << std::endl;
+    BuiltinTypes builtin_types; // 创建 builtin types（与语义分析中的相同）
+    IRGenerator ir_gen(builtin_types);
+    std::string llvm_ir = ir_gen.generate(ast.get());
+    std::cout << llvm_ir << std::endl;
 
     return 0;
 }

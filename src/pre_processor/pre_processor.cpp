@@ -89,8 +89,8 @@ Prog read_program() {
 }
 
 void print_program(const string &program) {
-    puts("Zeroth Step pre_preocessor:");
-    std::cout << program << std::endl;
-    puts("");
-    puts("");
+    std::cerr << "Zeroth Step pre_preocessor:" << std::endl;
+    std::cerr << program << std::endl;
+    std::cerr << std::endl;
+    std::cerr << std::endl;
 }

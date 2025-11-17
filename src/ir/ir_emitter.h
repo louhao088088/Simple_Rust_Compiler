@@ -55,6 +55,12 @@ class IREmitter {
                         const std::vector<std::pair<std::string, std::string>> &params);
 
     /**
+     * 完成entry块，输出缓冲的alloca指令
+     * 应在entry块的所有alloca后、其他指令前调用
+     */
+    void finish_entry_block();
+
+    /**
      * 结束函数定义
      * 输出: }
      */
@@ -148,6 +154,13 @@ class IREmitter {
     std::string emit_sext(const std::string &from_type, const std::string &value,
                           const std::string &to_type);
 
+    /**
+     * 位转换(指针类型转换)
+     * 例: %9 = bitcast [100 x i32]* %0 to i8*
+     */
+    std::string emit_bitcast(const std::string &from_type, const std::string &value,
+                             const std::string &to_type);
+
     // ========== 控制流 ==========
 
     /**
@@ -207,6 +220,14 @@ class IREmitter {
      */
     void emit_call_void(const std::string &func_name,
                         const std::vector<std::pair<std::string, std::string>> &args);
+
+    /**
+     * 生成vararg函数调用(用于printf, scanf等)
+     * 例: %0 = call i32 (i8*, ...) @printf(i8* %fmt, i32 42)
+     */
+    std::string emit_vararg_call(const std::string &return_type, const std::string &func_name,
+                                 const std::string &func_type,
+                                 const std::vector<std::pair<std::string, std::string>> &args);
 
     // ========== 指针和数组操作 ==========
 
@@ -281,6 +302,11 @@ class IREmitter {
     int temp_counter_;  // 临时变量计数器
     int label_counter_; // 标签计数器
     int indent_level_;  // 当前缩进层级
+
+    // alloca缓冲机制（用于提升alloca到entry块）
+    bool in_entry_block_;                    // 是否在entry块中
+    std::vector<std::string> alloca_buffer_; // 缓冲的alloca指令
+    std::stringstream instruction_buffer_;   // 非alloca指令缓冲
 
     // 辅助方法
 

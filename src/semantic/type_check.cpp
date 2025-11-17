@@ -1106,7 +1106,9 @@ std::shared_ptr<Symbol> TypeCheckVisitor::visit(AsExpr *node) {
                                          node->expression->type->to_string() + ".");
             return nullptr;
         }
-        if (!is_concrete_integer(node->target_type->resolved_symbol->type->kind)) {
+        // 目标类型可以是整数类型或bool
+        if (!is_concrete_integer(node->target_type->resolved_symbol->type->kind) &&
+            node->target_type->resolved_symbol->type->kind != TypeKind::BOOL) {
             error_reporter_.report_error("The target type is not supported: " +
                                          node->target_type->resolved_symbol->type->to_string() +
                                          ".");

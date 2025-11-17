@@ -4,7 +4,8 @@
 #include <iostream>
 
 IREmitter::IREmitter(const std::string &module_name)
-    : module_name_(module_name), temp_counter_(0), label_counter_(0), indent_level_(0) {
+    : module_name_(module_name), temp_counter_(0), label_counter_(0), indent_level_(0),
+      in_entry_block_(false) {
     // 输出Module头部
     ir_stream_ << "; ModuleID = '" << module_name_ << "'\n";
     ir_stream_ << "source_filename = \"" << module_name_ << "\"\n\n";
@@ -69,9 +70,39 @@ void IREmitter::begin_function(const std::string &return_type, const std::string
 
     // 重置临时变量计数器(每个函数独立编号)
     reset_temp_counter();
+
+    // 清空缓冲区
+    alloca_buffer_.clear();
+    instruction_buffer_.str("");
+    instruction_buffer_.clear();
+    in_entry_block_ = false; // 将在begin_basic_block("entry")时设置
+}
+
+void IREmitter::finish_entry_block() {
+    if (!in_entry_block_) {
+        return; // 已经完成，无需重复处理
+    }
+
+    // 输出所有缓冲的alloca指令
+    for (const auto &alloca_instr : alloca_buffer_) {
+        ir_stream_ << alloca_instr;
+    }
+
+    // 输出entry块的其他指令
+    ir_stream_ << instruction_buffer_.str();
+
+    // 清空缓冲区
+    alloca_buffer_.clear();
+    instruction_buffer_.str("");
+    instruction_buffer_.clear();
+
+    in_entry_block_ = false; // 标记已完成entry块
 }
 
 void IREmitter::end_function() {
+    // 确保entry块的指令已输出
+    finish_entry_block();
+
     indent_level_--;
     ir_stream_ << "}\n";
 }
@@ -79,6 +110,11 @@ void IREmitter::end_function() {
 // ========== 基本块 ==========
 
 void IREmitter::begin_basic_block(const std::string &label) {
+    // 如果之前在entry块，先完成entry块的输出
+    if (in_entry_block_ && label != "entry") {
+        finish_entry_block();
+    }
+
     // 基本块标签不缩进,直接输出
     // 但如果不是函数的第一个基本块,要减少缩进
     if (indent_level_ > 0) {
@@ -86,6 +122,14 @@ void IREmitter::begin_basic_block(const std::string &label) {
     }
     ir_stream_ << label << ":\n";
     indent_level_++;
+
+    // 如果是entry块，开启缓冲模式
+    if (label == "entry") {
+        in_entry_block_ = true;
+        alloca_buffer_.clear();
+        instruction_buffer_.str("");
+        instruction_buffer_.clear();
+    }
 }
 
 // ========== 内存操作指令 ==========
@@ -96,7 +140,11 @@ std::string IREmitter::emit_alloca(const std::string &type, const std::string &v
     if (!var_name.empty()) {
         line += " ; " + var_name;
     }
+
+    // TODO: alloca提升功能需要更复杂的实现（处理临时变量编号问题）
+    // 当前禁用缓冲，直接输出
     emit_line(line);
+
     return result;
 }
 
@@ -157,6 +205,13 @@ std::string IREmitter::emit_sext(const std::string &from_type, const std::string
                                  const std::string &to_type) {
     std::string result = new_temp();
     emit_line(result + " = sext " + from_type + " " + value + " to " + to_type);
+    return result;
+}
+
+std::string IREmitter::emit_bitcast(const std::string &from_type, const std::string &value,
+                                    const std::string &to_type) {
+    std::string result = new_temp();
+    emit_line(result + " = bitcast " + from_type + " " + value + " to " + to_type);
     return result;
 }
 
@@ -227,6 +282,26 @@ void IREmitter::emit_call_void(const std::string &func_name,
     emit_line(call_str);
 }
 
+std::string
+IREmitter::emit_vararg_call(const std::string &return_type, const std::string &func_name,
+                            const std::string &func_type,
+                            const std::vector<std::pair<std::string, std::string>> &args) {
+    std::string result = new_temp();
+    std::string call_str =
+        result + " = call " + return_type + " " + func_type + " @" + func_name + "(";
+
+    for (size_t i = 0; i < args.size(); ++i) {
+        call_str += args[i].first + " " + args[i].second;
+        if (i + 1 < args.size()) {
+            call_str += ", ";
+        }
+    }
+
+    call_str += ")";
+    emit_line(call_str);
+    return result;
+}
+
 // ========== 指针和数组操作 ==========
 
 std::string IREmitter::emit_getelementptr(const std::string &type, const std::string &ptr,
@@ -287,7 +362,16 @@ std::string IREmitter::get_ir_string() const { return ir_stream_.str(); }
 
 // ========== 私有辅助方法 ==========
 
-void IREmitter::emit_line(const std::string &line) { ir_stream_ << indent() << line << "\n"; }
+void IREmitter::emit_line(const std::string &line) {
+    std::string full_line = indent() + line + "\n";
+
+    // 在entry块时，非alloca指令使用instruction_buffer缓冲
+    if (in_entry_block_) {
+        instruction_buffer_ << full_line;
+    } else {
+        ir_stream_ << full_line;
+    }
+}
 
 void IREmitter::emit_raw(const std::string &text) { ir_stream_ << text; }
 

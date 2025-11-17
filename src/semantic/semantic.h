@@ -156,6 +156,7 @@ struct ArrayType : public Type {
 struct StructType : public Type {
     std::string name;
     std::map<std::string, std::shared_ptr<Type>> fields;
+    std::vector<std::string> field_order; // 字段顺序（用于IR生成）
     std::weak_ptr<Symbol> symbol;
 
     StructType(std::string name, std::weak_ptr<Symbol> symbol)
