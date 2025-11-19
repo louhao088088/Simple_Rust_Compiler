@@ -287,6 +287,13 @@ class IRGenerator : public ExprVisitor<void>, public StmtVisitor {
     // 常量表，用于存储已定义的常量值
     std::unordered_map<std::string, std::string> const_values_;
 
+    // 类型大小缓存：避免重复计算结构体大小
+    std::unordered_map<Type *, size_t> type_size_cache_;
+
+    // 字段索引缓存：<struct_type, field_name> -> field_index
+    // 使用pair的hash需要自定义hash函数，这里用string key: "struct_name.field_name"
+    std::unordered_map<std::string, int> field_index_cache_;
+
     // ========== 嵌套函数支持 ==========
 
     /**

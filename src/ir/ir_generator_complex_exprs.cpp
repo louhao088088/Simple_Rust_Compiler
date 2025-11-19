@@ -374,12 +374,21 @@ void IRGenerator::visit(StructInitializerExpr *node) {
             continue; // 跳过未能生成的字段
         }
 
-        // 获取字段索引
+        // 查找字段在field_order中的索引（使用缓存）
+        std::string cache_key = struct_type->name + "." + field_init->name.lexeme;
         int field_index = -1;
-        for (size_t i = 0; i < struct_type->field_order.size(); ++i) {
-            if (struct_type->field_order[i] == field_init->name.lexeme) {
-                field_index = static_cast<int>(i);
-                break;
+
+        auto cache_it = field_index_cache_.find(cache_key);
+        if (cache_it != field_index_cache_.end()) {
+            field_index = cache_it->second;
+        } else {
+            // 首次查找，线性搜索并缓存
+            for (size_t i = 0; i < struct_type->field_order.size(); ++i) {
+                if (struct_type->field_order[i] == field_init->name.lexeme) {
+                    field_index = static_cast<int>(i);
+                    field_index_cache_[cache_key] = field_index;
+                    break;
+                }
             }
         }
 
@@ -466,12 +475,21 @@ void IRGenerator::visit(FieldAccessExpr *node) {
         return;
     }
 
-    // 2. 从 field_order 中获取字段索引
+    // 2. 从 field_order 中获取字段索引（使用缓存）
+    std::string cache_key = struct_type->name + "." + node->field.lexeme;
     int field_index = -1;
-    for (size_t i = 0; i < struct_type->field_order.size(); ++i) {
-        if (struct_type->field_order[i] == node->field.lexeme) {
-            field_index = static_cast<int>(i);
-            break;
+
+    auto cache_it = field_index_cache_.find(cache_key);
+    if (cache_it != field_index_cache_.end()) {
+        field_index = cache_it->second;
+    } else {
+        // 首次查找，线性搜索并缓存
+        for (size_t i = 0; i < struct_type->field_order.size(); ++i) {
+            if (struct_type->field_order[i] == node->field.lexeme) {
+                field_index = static_cast<int>(i);
+                field_index_cache_[cache_key] = field_index;
+                break;
+            }
         }
     }
 

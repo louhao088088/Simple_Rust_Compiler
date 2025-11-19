@@ -7,7 +7,7 @@
 COMPILER="/home/louhao/compiler/build/code"
 TEST_DIR="/home/louhao/compiler/TestCases/IR-1"
 TEMP_DIR="/tmp/compiler_test"
-TIMEOUT=120  # 增加超时时间以应对大型测试
+TIMEOUT=30  # 增加超时时间以应对大型测试
 MAX_PARALLEL=8  # 最大并行数
 
 mkdir -p "$TEMP_DIR"
@@ -71,11 +71,20 @@ for i in {1..50}; do
         continue
     fi
     
-    # 运行（带超时）直接用lli解释执行
+    # 先用 opt 优化 IR（仅 mem2reg，提升局部变量到寄存器）
+    # 对于大型 IR，避免使用 -O1 等重量级优化（会导致内存溢出）
+    opt -mem2reg "$TEMP_DIR/${test_name}.ll" -o "$TEMP_DIR/${test_name}_opt.bc" 2>/dev/null
+    
+    # 如果 opt 失败（可能内存不足），回退到原始 IR
+    if [ ! -f "$TEMP_DIR/${test_name}_opt.bc" ] || [ ! -s "$TEMP_DIR/${test_name}_opt.bc" ]; then
+        cp "$TEMP_DIR/${test_name}.ll" "$TEMP_DIR/${test_name}_opt.bc"
+    fi
+    
+    # 运行（带超时）
     if [ -f "$test_path/${test_name}.in" ]; then
-        timeout $TIMEOUT lli "$TEMP_DIR/${test_name}.ll" < "$test_path/${test_name}.in" > "$TEMP_DIR/${test_name}.out" 2>&1
+        timeout $TIMEOUT lli "$TEMP_DIR/${test_name}_opt.bc" < "$test_path/${test_name}.in" > "$TEMP_DIR/${test_name}.out" 2>&1
     else
-        timeout $TIMEOUT lli "$TEMP_DIR/${test_name}.ll" > "$TEMP_DIR/${test_name}.out" 2>&1
+        timeout $TIMEOUT lli "$TEMP_DIR/${test_name}_opt.bc" > "$TEMP_DIR/${test_name}.out" 2>&1
     fi
     
     exit_code=$?

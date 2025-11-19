@@ -7,7 +7,6 @@
  * VariableInfo - 变量信息
  *
  * 存储变量在IR中的表示和元数据
- * 注意：使用纯字符串表示，不依赖LLVM C++ API
  */
 struct VariableInfo {
     std::string alloca_name; // IR中的变量名（如 "%x.addr", "%0", "@global_var"）

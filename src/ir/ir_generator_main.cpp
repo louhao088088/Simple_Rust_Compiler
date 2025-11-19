@@ -134,10 +134,10 @@ void IRGenerator::visit_function_decl(FnDecl *node) {
     // func_name 已在上面定义
     // 如果使用 sret，返回类型改为 void
     std::string actual_ret_type = use_sret ? "void" : ret_type_str;
-    
+
     // 设置当前函数的 sret 状态
     current_function_uses_sret_ = use_sret;
-    
+
     emitter_.begin_function(actual_ret_type, func_name, params);
     begin_block("bb.entry"); // 使用bb.entry避免与参数名entry冲突
 

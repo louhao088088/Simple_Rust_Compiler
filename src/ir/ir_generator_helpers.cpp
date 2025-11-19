@@ -261,22 +261,33 @@ size_t IRGenerator::get_type_size(Type *type) {
     if (!type)
         return 0;
 
+    // 检查缓存
+    auto cache_it = type_size_cache_.find(type);
+    if (cache_it != type_size_cache_.end()) {
+        return cache_it->second;
+    }
+
+    size_t size = 0;
+
     switch (type->kind) {
     case TypeKind::BOOL:
-        return 1; // i1 -> 1 byte
+        size = 1; // i1 -> 1 byte
+        break;
     case TypeKind::I32:
     case TypeKind::U32:
-        return 4;
+        size = 4;
+        break;
     case TypeKind::USIZE:
     case TypeKind::ISIZE:
     case TypeKind::REFERENCE:
-        return 8; // pointer size on x64
+        size = 8; // pointer size on x64
+        break;
     case TypeKind::ARRAY:
         if (auto arr_type = dynamic_cast<ArrayType *>(type)) {
             size_t elem_size = get_type_size(arr_type->element_type.get());
-            return elem_size * arr_type->size;
+            size = elem_size * arr_type->size;
         }
-        return 0;
+        break;
     case TypeKind::STRUCT:
         if (auto struct_type = dynamic_cast<StructType *>(type)) {
             // 计算结构体大小（简单求和，不考虑对齐）
@@ -287,12 +298,17 @@ size_t IRGenerator::get_type_size(Type *type) {
                     total += get_type_size(it->second.get());
                 }
             }
-            return total;
+            size = total;
         }
-        return 0;
+        break;
     default:
-        return 0;
+        size = 0;
+        break;
     }
+
+    // 缓存结果
+    type_size_cache_[type] = size;
+    return size;
 }
 
 // ========== 初始化检测 ==========

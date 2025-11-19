@@ -165,6 +165,94 @@ void IRGenerator::visit(BinaryExpr *node) {
         return;
     }
 
+    // 常量折叠优化：如果两个操作数都是字面量，尝试编译期计算
+    auto left_literal = dynamic_cast<LiteralExpr *>(node->left.get());
+    auto right_literal = dynamic_cast<LiteralExpr *>(node->right.get());
+
+    if (left_literal && right_literal &&
+        (left_literal->literal.type == TokenType::NUMBER ||
+         left_literal->literal.type == TokenType::TRUE ||
+         left_literal->literal.type == TokenType::FALSE) &&
+        (right_literal->literal.type == TokenType::NUMBER ||
+         right_literal->literal.type == TokenType::TRUE ||
+         right_literal->literal.type == TokenType::FALSE)) {
+
+        // 尝试常量折叠
+        try {
+            long long left_val = std::stoll(left_var);
+            long long right_val = std::stoll(right_var);
+            long long result_val = 0;
+            bool can_fold = true;
+
+            switch (node->op.type) {
+            case TokenType::PLUS:
+                result_val = left_val + right_val;
+                break;
+            case TokenType::MINUS:
+                result_val = left_val - right_val;
+                break;
+            case TokenType::STAR:
+                result_val = left_val * right_val;
+                break;
+            case TokenType::SLASH:
+                if (right_val != 0)
+                    result_val = left_val / right_val;
+                else
+                    can_fold = false;
+                break;
+            case TokenType::PERCENT:
+                if (right_val != 0)
+                    result_val = left_val % right_val;
+                else
+                    can_fold = false;
+                break;
+            case TokenType::LESS:
+                result_val = (left_val < right_val) ? 1 : 0;
+                break;
+            case TokenType::LESS_EQUAL:
+                result_val = (left_val <= right_val) ? 1 : 0;
+                break;
+            case TokenType::GREATER:
+                result_val = (left_val > right_val) ? 1 : 0;
+                break;
+            case TokenType::GREATER_EQUAL:
+                result_val = (left_val >= right_val) ? 1 : 0;
+                break;
+            case TokenType::EQUAL_EQUAL:
+                result_val = (left_val == right_val) ? 1 : 0;
+                break;
+            case TokenType::BANG_EQUAL:
+                result_val = (left_val != right_val) ? 1 : 0;
+                break;
+            case TokenType::AMPERSAND:
+                result_val = left_val & right_val;
+                break;
+            case TokenType::PIPE:
+                result_val = left_val | right_val;
+                break;
+            case TokenType::CARET:
+                result_val = left_val ^ right_val;
+                break;
+            case TokenType::LESS_LESS:
+                result_val = left_val << right_val;
+                break;
+            case TokenType::GREATER_GREATER:
+                result_val = left_val >> right_val;
+                break;
+            default:
+                can_fold = false;
+            }
+
+            if (can_fold) {
+                // 常量折叠成功，直接使用计算结果
+                store_expr_result(node, std::to_string(result_val));
+                return;
+            }
+        } catch (...) {
+            // 常量折叠失败，继续正常处理
+        }
+    }
+
     // 2. 获取操作数类型
     std::string type_str = type_mapper_.map(node->type.get());
 
@@ -491,7 +579,7 @@ void IRGenerator::visit(CallExpr *node) {
         ret_type_str = type_mapper_.map(node->type.get());
         ret_is_aggregate =
             (node->type->kind == TypeKind::ARRAY || node->type->kind == TypeKind::STRUCT);
-        
+
         // 检查是否使用 sret 优化
         if (should_use_sret_optimization(func_name, node->type.get())) {
             use_sret = true;
@@ -501,14 +589,14 @@ void IRGenerator::visit(CallExpr *node) {
     // 合并self参数和普通参数
     // self参数（如果有）应该在最前面
     std::vector<std::pair<std::string, std::string>> all_args;
-    
+
     // 如果使用 sret，先 alloca 并添加为第一个参数
     std::string sret_alloca;
     if (use_sret) {
         sret_alloca = emitter_.emit_alloca(ret_type_str);
         all_args.push_back({ret_type_str + "*", sret_alloca});
     }
-    
+
     all_args.insert(all_args.end(), self_args.begin(), self_args.end());
     all_args.insert(all_args.end(), args.begin(), args.end());
 
