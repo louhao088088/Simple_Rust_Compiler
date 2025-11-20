@@ -42,10 +42,18 @@ jobs:
           # 示例： mv your_output_name my-rust-compiler
 
       # 步骤4: 运行测试
-      - name: Run tests
+      - name: Grant execute permissions
         run: |
           chmod +x ./scripts/run_tests.sh
           chmod +x ./scripts/test_all_comprehensive.sh
-          ./scripts/run_tests.sh
-          ./scripts/test_all_comprehensive.sh
-          
+
+      # 步骤5: 运行基础测试
+      - name: Run basic tests
+        run: ./scripts/run_tests.sh
+
+      # 步骤6: 运行综合测试
+      # 使用 if: always() 确保即使上面的 steps 失败，这一步也会执行
+      # 或者使用 if: success() || failure() 来排除由取消工作流导致的跳过
+      - name: Run comprehensive tests
+        if: success() || failure()
+        run: ./scripts/test_all_comprehensive.sh
