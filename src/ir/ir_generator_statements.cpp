@@ -31,31 +31,9 @@ void IRGenerator::visit(BlockStmt *node) {
 
         auto &stmt = node->statements[i];
 
-        // 优化：检测连续的同名变量声明（shadowing 死代码消除）
-        // 如果当前是 LetStmt，且下一个语句也是同名变量的 LetStmt，跳过当前语句
-        bool should_skip = false;
-        if (auto let_stmt = dynamic_cast<LetStmt *>(stmt.get())) {
-            if (auto id_pattern = dynamic_cast<IdentifierPattern *>(let_stmt->pattern.get())) {
-                std::string var_name = id_pattern->name.lexeme;
-
-                // 检查下一个语句
-                if (i + 1 < node->statements.size()) {
-                    if (auto next_let = dynamic_cast<LetStmt *>(node->statements[i + 1].get())) {
-                        if (auto next_pattern =
-                                dynamic_cast<IdentifierPattern *>(next_let->pattern.get())) {
-                            if (next_pattern->name.lexeme == var_name) {
-                                // 连续的同名变量声明，跳过当前声明
-                                should_skip = true;
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        if (!should_skip) {
-            stmt->accept(this);
-        }
+        // 正常处理所有语句
+        // 注意：即使有shadowing，初始化表达式的副作用也必须执行
+        stmt->accept(this);
     }
 
     // 处理最终表达式（如果有）
