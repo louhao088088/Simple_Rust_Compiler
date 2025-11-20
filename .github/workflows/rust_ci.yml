@@ -11,18 +11,18 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # 1. 检出你的编译器代码 (放到当前目录)
+      # 1. 检出你的编译器代码
       - name: Checkout Compiler Code
         uses: actions/checkout@v4
 
-      # 2. 检出测试用例仓库 (放到 ./external_testcases 目录)
+      # 2. 检出测试用例仓库
       - name: Checkout Test Cases
         uses: actions/checkout@v4
         with:
           repository: peterzheng98/RCompiler-Testcases
-          path: external_testcases  # 将此仓库下载到名为 external_testcases 的子文件夹中
+          path: external_testcases
 
-      # 3. 安装依赖 (增加 llvm 用于 lli 和 opt)
+      # 3. 安装依赖
       - name: Install dependencies
         run: |
           sudo apt-get update
@@ -35,8 +35,8 @@ jobs:
           cd build
           cmake ..
           make
-          # 假设你的 CMake 生成的可执行文件叫 compiler，如果不是请修改这里
-          # 或者在这里重命名: mv MyCompiler compiler
+          echo "=== 查看构建目录下的文件 ==="
+          ls -l # 这一步是为了调试，让你确认可执行文件到底叫什么
 
       # 5. 赋予脚本执行权限
       - name: Grant execute permissions
@@ -44,10 +44,16 @@ jobs:
           chmod +x ./scripts/run_tests.sh
           chmod +x ./scripts/test_all_comprehensive.sh
 
-      # 6. 运行综合测试
-      # 我们将刚才下载的路径和编译出的路径传给脚本
+      # 6. 运行基础测试 (run_tests.sh)
+      # 注意：如果 run_tests.sh 里面也有硬编码路径(/home/louhao/...)，它也会报错！
+      # 你可能需要像修改 comprehensive 脚本一样修改它，或者在这里传参。
+      - name: Run Basic Tests
+        run: ./scripts/run_tests.sh
+
+      # 7. 运行综合测试 (test_all_comprehensive.sh)
+      # 修正了路径：./build/code
       - name: Run Comprehensive Tests
         run: |
-          # 参数1: 编译器可执行文件的路径
-          # 参数2: 测试用例的 IR-1 文件夹路径 (根据那个仓库的结构调整)
-          ./scripts/test_all_comprehensive.sh ./build/compiler ./external_testcases/TestCases/IR-1
+          # 参数1: 改为 ./build/code (根据你的截图)
+          # 参数2: 测试用例路径
+          ./scripts/test_all_comprehensive.sh ./build/code ./external_testcases/TestCases/IR-1
