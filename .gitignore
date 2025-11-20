@@ -12,3 +12,4 @@ test_reports
 temp_notes
 test_samples
 .git_commit_template
+temp.ll
