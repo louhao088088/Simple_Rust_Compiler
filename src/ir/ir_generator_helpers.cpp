@@ -266,11 +266,11 @@ size_t IRGenerator::get_type_alignment(Type *type) {
         return 1;
     case TypeKind::I32:
     case TypeKind::U32:
-        return 4;
     case TypeKind::USIZE:
     case TypeKind::ISIZE:
+        return 4; // 32-bit integers
     case TypeKind::REFERENCE:
-        return 8; // 64-bit pointers
+        return 4; // 32-bit pointers
     case TypeKind::ARRAY:
         if (auto arr_type = dynamic_cast<ArrayType *>(type)) {
             return get_type_alignment(arr_type->element_type.get());
@@ -314,12 +314,12 @@ size_t IRGenerator::get_type_size(Type *type) {
         break;
     case TypeKind::I32:
     case TypeKind::U32:
-        size = 4;
-        break;
     case TypeKind::USIZE:
     case TypeKind::ISIZE:
+        size = 4; // 32-bit integers
+        break;
     case TypeKind::REFERENCE:
-        size = 8; // pointer size on x64
+        size = 4; // pointer size on 32-bit platform
         break;
     case TypeKind::ARRAY:
         if (auto arr_type = dynamic_cast<ArrayType *>(type)) {

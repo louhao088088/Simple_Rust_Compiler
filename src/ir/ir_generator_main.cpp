@@ -151,8 +151,9 @@ void IRGenerator::visit_function_decl(FnDecl *node) {
     // 如果使用 sret，返回类型改为 void
     std::string actual_ret_type = use_sret ? "void" : ret_type_str;
 
-    // 设置当前函数的 sret 状态
+    // 设置当前函数的 sret 状态和返回类型
     current_function_uses_sret_ = use_sret;
+    current_function_return_type_str_ = use_sret ? "void" : ret_type_str;
 
     emitter_.begin_function(actual_ret_type, func_name, params);
     begin_block("bb.entry"); // 使用bb.entry避免与参数名entry冲突
@@ -290,6 +291,7 @@ void IRGenerator::visit_function_decl(FnDecl *node) {
     // 8. 重置终止标志和 sret 状态
     current_block_terminated_ = false;
     current_function_uses_sret_ = false;
+    current_function_return_type_str_ = "";
 
     // 9. 退出函数作用域
     value_manager_.exit_scope();

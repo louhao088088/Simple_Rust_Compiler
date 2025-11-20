@@ -165,6 +165,12 @@ class IRGenerator : public ExprVisitor<void>, public StmtVisitor {
      */
     bool current_function_uses_sret_ = false;
 
+    /**
+     * 当前函数的返回类型 (IR type string)
+     * 用于在 return 语句中进行类型匹配和转换
+     */
+    std::string current_function_return_type_str_;
+
     // ========== 左值生成标志 ==========
 
     /**

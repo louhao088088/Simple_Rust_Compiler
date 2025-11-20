@@ -216,7 +216,7 @@ void IRGenerator::visit(ReturnStmt *node) {
             std::string return_value = get_expr_result(return_expr.get());
 
             if (return_expr->type) {
-                std::string type_str = type_mapper_.map(return_expr->type.get());
+                std::string expr_type_str = type_mapper_.map(return_expr->type.get());
 
                 // 如果当前函数使用 sret，直接 ret void（结构体已在 self 中）
                 if (current_function_uses_sret_) {
@@ -228,10 +228,34 @@ void IRGenerator::visit(ReturnStmt *node) {
 
                     if (is_aggregate) {
                         // 聚合类型：需要load值（因为return_value是指针）
-                        return_value = emitter_.emit_load(type_str, return_value);
+                        return_value = emitter_.emit_load(expr_type_str, return_value);
                     }
 
-                    emitter_.emit_ret(type_str, return_value);
+                    // 检查返回值类型是否与函数返回类型匹配
+                    // 如果不匹配，需要插入类型转换指令
+                    if (!current_function_return_type_str_.empty() &&
+                        expr_type_str != current_function_return_type_str_) {
+                        // 需要类型转换
+                        // 目前仅处理整数类型的扩展/截断
+                        if ((expr_type_str == "i32" || expr_type_str == "i64") &&
+                            (current_function_return_type_str_ == "i32" ||
+                             current_function_return_type_str_ == "i64")) {
+                            // 整数类型转换
+                            if (expr_type_str == "i32" && current_function_return_type_str_ == "i64") {
+                                // i32 -> i64: 符号扩展
+                                return_value = emitter_.emit_sext(return_value, "i32", "i64");
+                            } else if (expr_type_str == "i64" && current_function_return_type_str_ == "i32") {
+                                // i64 -> i32: 截断
+                                return_value = emitter_.emit_trunc(return_value, "i64", "i32");
+                            }
+                        }
+                    }
+
+                    // 使用函数返回类型（如果可用）或表达式类型
+                    std::string ret_type = current_function_return_type_str_.empty()
+                                               ? expr_type_str
+                                               : current_function_return_type_str_;
+                    emitter_.emit_ret(ret_type, return_value);
                 }
                 current_block_terminated_ = true; // 标记基本块已终止
             }
