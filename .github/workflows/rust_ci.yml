@@ -56,4 +56,4 @@ jobs:
         run: |
           # 参数1: 改为 ./build/code (根据你的截图)
           # 参数2: 测试用例路径
-          ./scripts/test_all_comprehensive.sh ./build/code ./external_testcases/IR-1
+          ./scripts/test_all_comprehensive.sh ./build/code ./external_testcases/IR-1/src
