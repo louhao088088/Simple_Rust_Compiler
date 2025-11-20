@@ -242,7 +242,14 @@ void IRGenerator::visit_function_decl(FnDecl *node) {
             // 如果body有返回值且当前块未终止，生成ret指令
             if (!current_block_terminated_) {
                 if (use_sret) {
-                    // sret 模式：直接 ret void（结构体已经在 self 中构造完成）
+                    // sret 模式：需要将函数体结果复制到 sret_ptr
+                    if (!body_result.empty() && return_type_ptr) {
+                        // body_result 是指针，指向要返回的结构体
+                        // 将其内容复制到 sret_ptr
+                        size_t size_bytes = get_type_size(return_type_ptr);
+                        std::string ptr_type = ret_type_str + "*";
+                        emitter_.emit_memcpy("%sret_ptr", body_result, size_bytes, ptr_type);
+                    }
                     emitter_.emit_ret_void();
                 } else if (ret_type_str == "void") {
                     emitter_.emit_ret_void();

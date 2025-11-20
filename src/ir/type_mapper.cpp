@@ -86,10 +86,12 @@ std::string TypeMapper::map_primitive(const PrimitiveType *type) {
     switch (type->kind) {
     case TypeKind::I32:
     case TypeKind::U32:
+        return "i32";
+
     case TypeKind::ISIZE:
     case TypeKind::USIZE:
-        // 32位平台：所有整数类型都是i32
-        return "i32";
+        // 64位平台：usize/isize 映射为 i64
+        return "i64";
 
     case TypeKind::BOOL:
         return "i1";

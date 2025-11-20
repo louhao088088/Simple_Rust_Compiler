@@ -1,59 +1,53 @@
-# 工作流的名称
 name: C++ CI
 
-# 触发工作流的事件
 on:
   push:
-    branches: ["main"] # 当推送到 main 分支时
+    branches: ["main"]
   pull_request:
-    branches: ["main"] # 当向 main 分支提交 pull request 时
+    branches: ["main"]
 
-# 定义一系列任务
 jobs:
-  # 任务的唯一ID
   build-and-test:
-    # 任务运行的虚拟机环境
     runs-on: ubuntu-latest
 
-    # 任务包含的步骤
     steps:
-      # 步骤1: 检出你的代码
-      # 使用一个预先构建好的 action 来下载你的仓库代码
-      - name: Checkout repository
+      # 1. 检出你的编译器代码 (放到当前目录)
+      - name: Checkout Compiler Code
         uses: actions/checkout@v4
 
-      # 步骤2: 安装依赖
-      # 安装 C++ 编译器, CMake, Make 等
+      # 2. 检出测试用例仓库 (放到 ./external_testcases 目录)
+      - name: Checkout Test Cases
+        uses: actions/checkout@v4
+        with:
+          repository: peterzheng98/RCompiler-Testcases
+          path: external_testcases  # 将此仓库下载到名为 external_testcases 的子文件夹中
+
+      # 3. 安装依赖 (增加 llvm 用于 lli 和 opt)
       - name: Install dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y build-essential cmake
+          sudo apt-get install -y build-essential cmake llvm clang
 
-      # 步骤3: 配置和构建你的编译器
-      # 这里以 CMake 为例，如果你的项目用的是 Make，请相应修改
+      # 4. 构建编译器
       - name: Build the compiler
         run: |
           mkdir build
           cd build
           cmake ..
           make
-          # 将你的编译器可执行文件命名为 my-rust-compiler
-          # 如果 CMakeLists.txt 中定义了不同的名字，请在这里修改
-          # 示例： mv your_output_name my-rust-compiler
+          # 假设你的 CMake 生成的可执行文件叫 compiler，如果不是请修改这里
+          # 或者在这里重命名: mv MyCompiler compiler
 
-      # 步骤4: 运行测试
+      # 5. 赋予脚本执行权限
       - name: Grant execute permissions
         run: |
           chmod +x ./scripts/run_tests.sh
           chmod +x ./scripts/test_all_comprehensive.sh
 
-      # 步骤5: 运行基础测试
-      - name: Run basic tests
-        run: ./scripts/run_tests.sh
-
-      # 步骤6: 运行综合测试
-      # 使用 if: always() 确保即使上面的 steps 失败，这一步也会执行
-      # 或者使用 if: success() || failure() 来排除由取消工作流导致的跳过
-      - name: Run comprehensive tests
-        if: success() || failure()
-        run: ./scripts/test_all_comprehensive.sh
+      # 6. 运行综合测试
+      # 我们将刚才下载的路径和编译出的路径传给脚本
+      - name: Run Comprehensive Tests
+        run: |
+          # 参数1: 编译器可执行文件的路径
+          # 参数2: 测试用例的 IR-1 文件夹路径 (根据那个仓库的结构调整)
+          ./scripts/test_all_comprehensive.sh ./build/compiler ./external_testcases/TestCases/IR-1

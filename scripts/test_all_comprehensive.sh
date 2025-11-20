@@ -4,9 +4,33 @@
 # 忽略末尾换行符差异
 # 使用并行编译和测试以提高速度
 
-COMPILER="/home/louhao/compiler/build/code"
-TEST_DIR="/home/louhao/compiler/TestCases/IR-1"
+# 配置区域 (支持通过命令行参数覆盖)
+# 用法: ./script.sh [编译器路径] [测试用例目录]
+# ==========================================
+
+# 1. 获取编译器路径 (默认为当前目录 build 下的编译器)
+# CI环境里我们通常会在项目根目录运行，所以默认值设为相对路径
+COMPILER=${1:-"./build/code"}
+
+# 2. 获取测试用例目录 (默认为当前目录下的 testcases 文件夹)
+TEST_DIR=${2:-"./TestCases/IR-1"}
+
+# 3. 临时目录 (保持 /tmp 即可，CI 环境也有这个目录)
 TEMP_DIR="/tmp/compiler_test"
+TIMEOUT=300 
+MAX_PARALLEL=8 
+
+# 检查编译器是否存在
+if [ ! -f "$COMPILER" ]; then
+    echo "Error: Compiler not found at $COMPILER"
+    exit 1
+fi
+
+# 检查测试目录是否存在
+if [ ! -d "$TEST_DIR" ]; then
+    echo "Error: Test directory not found at $TEST_DIR"
+    exit 1
+fi
 TIMEOUT=300  # 增加超时时间以应对大型测试
 MAX_PARALLEL=8  # 最大并行数
 
