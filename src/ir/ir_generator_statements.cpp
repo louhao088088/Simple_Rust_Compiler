@@ -241,10 +241,12 @@ void IRGenerator::visit(ReturnStmt *node) {
                             (current_function_return_type_str_ == "i32" ||
                              current_function_return_type_str_ == "i64")) {
                             // 整数类型转换
-                            if (expr_type_str == "i32" && current_function_return_type_str_ == "i64") {
+                            if (expr_type_str == "i32" &&
+                                current_function_return_type_str_ == "i64") {
                                 // i32 -> i64: 符号扩展
                                 return_value = emitter_.emit_sext(return_value, "i32", "i64");
-                            } else if (expr_type_str == "i64" && current_function_return_type_str_ == "i32") {
+                            } else if (expr_type_str == "i64" &&
+                                       current_function_return_type_str_ == "i32") {
                                 // i64 -> i32: 截断
                                 return_value = emitter_.emit_trunc(return_value, "i64", "i32");
                             }

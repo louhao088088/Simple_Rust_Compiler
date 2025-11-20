@@ -1,4 +1,4 @@
-name: C++ CI (32-bit)
+name: C++ CI
 
 on:
   push:
@@ -8,60 +8,46 @@ on:
 
 jobs:
   build-and-test:
-    # 宿主机依然是 ubuntu-latest，但在容器内运行
     runs-on: ubuntu-latest
-    
-    # === 关键修改：指定使用 32 位 Ubuntu 镜像 ===
-    container:
-      image: i386/ubuntu:latest
-      options: --privileged #有时 llvm 需要一些特权，加上保险
 
     steps:
-      # 1. 安装基础工具 (因为 Docker 镜像很干净，需要先装 git 才能 checkout)
-      # 注意：容器内默认是 root，不需要 sudo
-      - name: Install Git and Essentials
-        run: |
-          apt-get update
-          apt-get install -y git build-essential cmake python3
-
-      # 2. 检出你的编译器代码
+      # 1. 检出你的编译器代码 (放到当前目录)
       - name: Checkout Compiler Code
         uses: actions/checkout@v4
 
-      # 3. 检出测试用例仓库
+      # 2. 检出测试用例仓库 (放到 ./external_testcases 目录)
       - name: Checkout Test Cases
         uses: actions/checkout@v4
         with:
           repository: peterzheng98/RCompiler-Testcases
-          path: external_testcases
+          path: external_testcases  # 将此仓库下载到名为 external_testcases 的子文件夹中
 
-      # 4. 安装 LLVM 和 Clang (32位)
-      # 在 i386 镜像里，apt-get install llvm 装下来的就是 32 位的
-      - name: Install LLVM
+      # 3. 安装依赖 (增加 llvm 用于 lli 和 opt)
+      - name: Install dependencies
         run: |
-          apt-get install -y llvm clang
+          sudo apt-get update
+          sudo apt-get install -y build-essential cmake llvm clang
 
-      # 5. 构建编译器
-      # GCC 在这个环境里默认生成 32 位程序，无需 -m32 参数
+      # 4. 构建编译器
       - name: Build the compiler
         run: |
           mkdir build
           cd build
           cmake ..
           make
-          # 确保你的CMakeLists.txt能生成可执行文件，或者在这里mv
+          # 假设你的 CMake 生成的可执行文件叫 compiler，如果不是请修改这里
+          # 或者在这里重命名: mv MyCompiler compiler
 
-      # 6. 赋予脚本权限
+      # 5. 赋予脚本执行权限
       - name: Grant execute permissions
         run: |
           chmod +x ./scripts/run_tests.sh
           chmod +x ./scripts/test_all_comprehensive.sh
 
-      # 7. 运行综合测试
-      # 传入路径参数
+      # 6. 运行综合测试
+      # 我们将刚才下载的路径和编译出的路径传给脚本
       - name: Run Comprehensive Tests
         run: |
-          # 修正：有些 i386 镜像里 diff 可能没装，保险起见装一下
-          apt-get install -y diffutils 
-          
+          # 参数1: 编译器可执行文件的路径
+          # 参数2: 测试用例的 IR-1 文件夹路径 (根据那个仓库的结构调整)
           ./scripts/test_all_comprehensive.sh ./build/compiler ./external_testcases/TestCases/IR-1
