@@ -98,10 +98,11 @@ void IRGenerator::visit_function_decl(FnDecl *node) {
     std::string func_name = node->name.lexeme;
     if (return_type_ptr && should_use_sret_optimization(func_name, return_type_ptr)) {
         use_sret = true;
-        // 添加 self 参数作为第一个参数
-        params.push_back({ret_type_str + "*", "self"});
-        param_names.push_back("self");
-        param_is_aggregate.push_back(false);
+        // 添加 sret 参数作为第一个参数
+        // 使用特殊名称避免与用户参数冲突
+        params.push_back({ret_type_str + "*", "sret_ptr"});
+        param_names.push_back("sret_ptr");
+        // param_is_aggregate 仅用于跟踪用户参数，不需要为 sret 添加条目
     }
 
     for (const auto &param : node->params) {
@@ -117,11 +118,26 @@ void IRGenerator::visit_function_decl(FnDecl *node) {
             if (auto id_pattern = dynamic_cast<IdentifierPattern *>(param->pattern.get())) {
                 std::string param_name = id_pattern->name.lexeme;
 
+                // 检查是否为可变引用类型
+                bool is_mut_ref = false;
+                if (resolved_type->kind == TypeKind::REFERENCE) {
+                    if (auto ref_type = dynamic_cast<ReferenceType *>(resolved_type)) {
+                        if (ref_type->is_mutable) {
+                            is_mut_ref = true;
+                        }
+                    }
+                }
+
                 // 聚合类型参数使用指针传递
                 if (is_aggregate) {
                     params.push_back({param_type_str + "*", param_name});
                 } else {
-                    params.push_back({param_type_str, param_name});
+                    std::string type_with_attr = param_type_str;
+                    // 优化：可变引用参数添加 noalias 属性，帮助 LLVM 优化
+                    if (is_mut_ref) {
+                        type_with_attr += " noalias";
+                    }
+                    params.push_back({type_with_attr, param_name});
                 }
 
                 param_names.push_back(param_name);
@@ -150,7 +166,7 @@ void IRGenerator::visit_function_decl(FnDecl *node) {
     // 如果使用 sret，将 self 注册为特殊变量
     size_t param_start_index = 0;
     if (use_sret) {
-        value_manager_.define_variable("__sret_self", "%self", ret_type_str + "*", false);
+        value_manager_.define_variable("__sret_self", "%sret_ptr", ret_type_str + "*", false);
         param_start_index = 1; // 真实参数从索引 1 开始
     }
 
@@ -184,27 +200,12 @@ void IRGenerator::visit_function_decl(FnDecl *node) {
                     auto resolved = param->type->resolved_type.get();
                     size_t size_bytes = get_type_size(resolved);
 
-                    if (size_bytes > 0) {
-                        // 生成memcpy: call void @llvm.memcpy.p0.p0.i64(i8* dest, i8* src, i64 size,
-                        // i1 false)
-                        std::string dest_ptr =
-                            emitter_.emit_bitcast(param_type_str + "*", local_alloca, "i8*");
-                        std::string src_ptr =
-                            emitter_.emit_bitcast(param_type_str + "*", param_ir_name, "i8*");
+                    // 目标是指针类型 (e.g. %Point*)
+                    std::string ptr_type = param_type_str + "*";
+                    emitter_.emit_memcpy(local_alloca, param_ir_name, size_bytes, ptr_type);
 
-                        // memcpy 参数: (dest, src, size, isvolatile)
-                        std::vector<std::pair<std::string, std::string>> memcpy_args = {
-                            {"i8*", dest_ptr},
-                            {"i8*", src_ptr},
-                            {"i64", std::to_string(size_bytes)},
-                            {"i1", "false"} // isvolatile
-                        };
-                        emitter_.emit_call_void("llvm.memcpy.p0.p0.i64", memcpy_args);
-                    }
-
-                    // 注册本地副本
-                    std::string ptr_type_str = param_type_str + "*";
-                    value_manager_.define_variable(param_name, local_alloca, ptr_type_str,
+                    // 注册本地变量
+                    value_manager_.define_variable(param_name, local_alloca, param_type_str + "*",
                                                    is_mutable);
                 } else {
                     // 基础类型参数：需要 alloca + store

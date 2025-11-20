@@ -257,6 +257,45 @@ bool IRGenerator::evaluate_const_expr(Expr *expr, std::string &result) {
 }
 // ========== 类型大小计算 ==========
 
+size_t IRGenerator::get_type_alignment(Type *type) {
+    if (!type)
+        return 1;
+
+    switch (type->kind) {
+    case TypeKind::BOOL:
+        return 1;
+    case TypeKind::I32:
+    case TypeKind::U32:
+        return 4;
+    case TypeKind::USIZE:
+    case TypeKind::ISIZE:
+    case TypeKind::REFERENCE:
+        return 8; // 64-bit pointers
+    case TypeKind::ARRAY:
+        if (auto arr_type = dynamic_cast<ArrayType *>(type)) {
+            return get_type_alignment(arr_type->element_type.get());
+        }
+        return 1;
+    case TypeKind::STRUCT:
+        if (auto struct_type = dynamic_cast<StructType *>(type)) {
+            size_t max_align = 1;
+            for (const auto &field_name : struct_type->field_order) {
+                auto it = struct_type->fields.find(field_name);
+                if (it != struct_type->fields.end()) {
+                    size_t field_align = get_type_alignment(it->second.get());
+                    if (field_align > max_align) {
+                        max_align = field_align;
+                    }
+                }
+            }
+            return max_align;
+        }
+        return 1;
+    default:
+        return 1;
+    }
+}
+
 size_t IRGenerator::get_type_size(Type *type) {
     if (!type)
         return 0;
@@ -285,20 +324,48 @@ size_t IRGenerator::get_type_size(Type *type) {
     case TypeKind::ARRAY:
         if (auto arr_type = dynamic_cast<ArrayType *>(type)) {
             size_t elem_size = get_type_size(arr_type->element_type.get());
+            size_t elem_align = get_type_alignment(arr_type->element_type.get());
+
+            // 数组元素大小必须是对齐的倍数
+            if (elem_size % elem_align != 0) {
+                elem_size += (elem_align - (elem_size % elem_align));
+            }
+
             size = elem_size * arr_type->size;
         }
         break;
     case TypeKind::STRUCT:
         if (auto struct_type = dynamic_cast<StructType *>(type)) {
-            // 计算结构体大小（简单求和，不考虑对齐）
-            size_t total = 0;
+            // 计算结构体大小（考虑对齐和填充）
+            size_t offset = 0;
+            size_t max_align = 1;
+
             for (const auto &field_name : struct_type->field_order) {
                 auto it = struct_type->fields.find(field_name);
                 if (it != struct_type->fields.end()) {
-                    total += get_type_size(it->second.get());
+                    Type *field_type = it->second.get();
+                    size_t field_size = get_type_size(field_type);
+                    size_t field_align = get_type_alignment(field_type);
+
+                    if (field_align > max_align) {
+                        max_align = field_align;
+                    }
+
+                    // 添加填充以满足字段对齐
+                    if (offset % field_align != 0) {
+                        offset += (field_align - (offset % field_align));
+                    }
+
+                    offset += field_size;
                 }
             }
-            size = total;
+
+            // 添加尾部填充以满足结构体整体对齐
+            if (offset % max_align != 0) {
+                offset += (max_align - (offset % max_align));
+            }
+
+            size = offset;
         }
         break;
     default:
@@ -357,17 +424,14 @@ bool IRGenerator::is_zero_initializer(Expr *expr) {
 }
 
 bool IRGenerator::should_use_sret_optimization(const std::string &func_name, Type *return_type) {
-    // 1. 检查函数名是否以 _new 结尾
-    if (func_name.length() < 4)
-        return false;
-    if (func_name.substr(func_name.length() - 4) != "_new")
-        return false;
+    // 1. 移除函数名限制：所有返回结构体的函数都应该使用 SRET 优化
+    // 这是一个通用的 ABI 优化，不应局限于构造函数
 
     // 2. 检查返回类型是否为结构体
     if (!return_type || return_type->kind != TypeKind::STRUCT)
         return false;
 
-    // 3. 检查结构体大小是否 > 64 字节
+    // 3. 检查结构体大小是否 > 0 字节 (所有结构体都使用 sret，统一调用约定并避免拷贝)
     size_t size = get_type_size(return_type);
-    return size > 64;
+    return size > 0;
 }

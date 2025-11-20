@@ -4,8 +4,8 @@
 #include <iostream>
 
 IREmitter::IREmitter(const std::string &module_name)
-    : module_name_(module_name), temp_counter_(0), label_counter_(0), indent_level_(0),
-      in_entry_block_(false) {
+    : module_name_(module_name), temp_counter_(0), label_counter_(0), stack_counter_(0),
+      indent_level_(0), in_entry_block_(false), is_inside_function_(false) {
     // 输出Module头部
     ir_stream_ << "; ModuleID = '" << module_name_ << "'\n";
     ir_stream_ << "source_filename = \"" << module_name_ << "\"\n\n";
@@ -55,7 +55,14 @@ void IREmitter::emit_function_declaration(const std::string &return_type, const 
 
 void IREmitter::begin_function(const std::string &return_type, const std::string &name,
                                const std::vector<std::pair<std::string, std::string>> &params) {
+    // 开启函数体缓冲模式
+    is_inside_function_ = true;
+    function_body_buffer_.str("");
+    function_body_buffer_.clear();
+    function_allocas_.clear();
+
     // define return_type @name(type1 %param1, type2 %param2, ...) {
+    // 注意：函数头直接输出到 ir_stream_，因为它是最先输出的
     ir_stream_ << "\ndefine " << return_type << " @" << name << "(";
 
     for (size_t i = 0; i < params.size(); ++i) {
@@ -71,79 +78,93 @@ void IREmitter::begin_function(const std::string &return_type, const std::string
     // 重置临时变量计数器(每个函数独立编号)
     reset_temp_counter();
 
-    // 清空缓冲区
+    // 清空旧的缓冲区（不再使用）
     alloca_buffer_.clear();
     instruction_buffer_.str("");
     instruction_buffer_.clear();
-    in_entry_block_ = false; // 将在begin_basic_block("entry")时设置
+    in_entry_block_ = false;
 }
 
 void IREmitter::finish_entry_block() {
-    if (!in_entry_block_) {
-        return; // 已经完成，无需重复处理
-    }
-
-    // 输出所有缓冲的alloca指令
-    for (const auto &alloca_instr : alloca_buffer_) {
-        ir_stream_ << alloca_instr;
-    }
-
-    // 输出entry块的其他指令
-    ir_stream_ << instruction_buffer_.str();
-
-    // 清空缓冲区
-    alloca_buffer_.clear();
-    instruction_buffer_.str("");
-    instruction_buffer_.clear();
-
-    in_entry_block_ = false; // 标记已完成entry块
+    // 不再需要此函数，因为我们使用全函数缓冲
 }
 
 void IREmitter::end_function() {
-    // 确保entry块的指令已输出
-    finish_entry_block();
-
     indent_level_--;
+
+    // 组合最终的函数体
+    std::string body = function_body_buffer_.str();
+
+    // 寻找插入点：第一个基本块标签之后
+    // 假设第一个基本块标签以 ":\n" 结尾
+    size_t pos = body.find(":\n");
+
+    if (pos != std::string::npos) {
+        // 插入点在 ":\n" 之后
+        size_t insert_pos = pos + 2;
+
+        // 先输出标签部分
+        ir_stream_ << body.substr(0, insert_pos);
+
+        // 输出所有提升的 alloca 指令
+        for (const auto &alloca_instr : function_allocas_) {
+            // alloca 指令已经包含了换行符，但需要缩进
+            ir_stream_ << "  " << alloca_instr;
+        }
+
+        // 输出剩余的函数体
+        ir_stream_ << body.substr(insert_pos);
+    } else {
+        // 如果没有找到标签（不太可能，除非函数为空或只有一个隐式块），直接输出
+        for (const auto &alloca_instr : function_allocas_) {
+            ir_stream_ << "  " << alloca_instr;
+        }
+        ir_stream_ << body;
+    }
+
     ir_stream_ << "}\n";
+    is_inside_function_ = false;
 }
 
 // ========== 基本块 ==========
 
 void IREmitter::begin_basic_block(const std::string &label) {
-    // 如果之前在entry块，先完成entry块的输出
-    if (in_entry_block_ && label != "entry") {
-        finish_entry_block();
-    }
-
     // 基本块标签不缩进,直接输出
     // 但如果不是函数的第一个基本块,要减少缩进
     if (indent_level_ > 0) {
         indent_level_--;
     }
-    ir_stream_ << label << ":\n";
-    indent_level_++;
 
-    // 如果是entry块，开启缓冲模式
-    if (label == "entry") {
-        in_entry_block_ = true;
-        alloca_buffer_.clear();
-        instruction_buffer_.str("");
-        instruction_buffer_.clear();
+    // 输出标签到缓冲
+    if (is_inside_function_) {
+        function_body_buffer_ << label << ":\n";
+    } else {
+        ir_stream_ << label << ":\n";
     }
+
+    indent_level_++;
 }
 
 // ========== 内存操作指令 ==========
 
 std::string IREmitter::emit_alloca(const std::string &type, const std::string &var_name) {
-    std::string result = new_temp();
+    // 使用 stack_counter_ 生成唯一名称，避免干扰 temp_counter_ 的顺序
+    // 这样即使 alloca 被提升到函数开头，也不会导致后续指令编号断层
+    std::string result = "%stack." + std::to_string(stack_counter_++);
+
     std::string line = result + " = alloca " + type;
     if (!var_name.empty()) {
         line += " ; " + var_name;
     }
+    line += "\n";
 
-    // TODO: alloca提升功能需要更复杂的实现（处理临时变量编号问题）
-    // 当前禁用缓冲，直接输出
-    emit_line(line);
+    if (is_inside_function_) {
+        // 缓冲 alloca 指令，稍后提升到 entry 块
+        // 注意：这里不加缩进，因为最后输出时统一加
+        function_allocas_.push_back(line);
+    } else {
+        emit_line(line);
+    }
 
     return result;
 }
@@ -155,8 +176,37 @@ void IREmitter::emit_store(const std::string &value_type, const std::string &val
 
 std::string IREmitter::emit_load(const std::string &type, const std::string &ptr) {
     std::string result = new_temp();
+    // %1 = load i32, i32* %0
     emit_line(result + " = load " + type + ", " + type + "* " + ptr);
     return result;
+}
+
+void IREmitter::emit_memcpy(const std::string &dest_ptr, const std::string &src_ptr, size_t bytes,
+                            const std::string &ptr_type) {
+    // 1. Bitcast pointers to i8*
+    std::string dest_i8 = emit_bitcast(ptr_type, dest_ptr, "i8*");
+    std::string src_i8 = emit_bitcast(ptr_type, src_ptr, "i8*");
+
+    // 2. Call llvm.memcpy
+    // 使用通用的 intrinsic 名称: llvm.memcpy.p0.p0.i64
+    // (dest, src, len, isvolatile)
+    std::stringstream ss;
+    ss << "call void @llvm.memcpy.p0.p0.i64(i8* " << dest_i8 << ", i8* " << src_i8 << ", i64 "
+       << bytes << ", i1 false)";
+    emit_line(ss.str());
+}
+
+void IREmitter::emit_memset(const std::string &dest_ptr, int value, size_t bytes,
+                            const std::string &ptr_type) {
+    // 1. Bitcast pointer to i8*
+    std::string dest_i8 = emit_bitcast(ptr_type, dest_ptr, "i8*");
+
+    // 2. Call llvm.memset
+    // call void @llvm.memset.p0.i64(i8* <dest>, i8 <val>, i64 <len>, i1 <isvolatile>)
+    std::stringstream ss;
+    ss << "call void @llvm.memset.p0.i64(i8* " << dest_i8 << ", i8 " << value << ", i64 " << bytes
+       << ", i1 false)";
+    emit_line(ss.str());
 }
 
 // ========== 算术和逻辑运算 ==========
@@ -336,7 +386,10 @@ std::string IREmitter::new_temp() { return "%" + std::to_string(temp_counter_++)
 
 std::string IREmitter::new_label() { return "label" + std::to_string(label_counter_++); }
 
-void IREmitter::reset_temp_counter() { temp_counter_ = 0; }
+void IREmitter::reset_temp_counter() {
+    temp_counter_ = 0;
+    stack_counter_ = 0;
+}
 
 // ========== 注释 ==========
 
@@ -363,17 +416,20 @@ std::string IREmitter::get_ir_string() const { return ir_stream_.str(); }
 // ========== 私有辅助方法 ==========
 
 void IREmitter::emit_line(const std::string &line) {
-    std::string full_line = indent() + line + "\n";
-
-    // 在entry块时，非alloca指令使用instruction_buffer缓冲
-    if (in_entry_block_) {
-        instruction_buffer_ << full_line;
+    if (is_inside_function_) {
+        function_body_buffer_ << indent() << line << "\n";
     } else {
-        ir_stream_ << full_line;
+        ir_stream_ << indent() << line << "\n";
     }
 }
 
-void IREmitter::emit_raw(const std::string &text) { ir_stream_ << text; }
+void IREmitter::emit_raw(const std::string &text) {
+    if (is_inside_function_) {
+        function_body_buffer_ << text;
+    } else {
+        ir_stream_ << text;
+    }
+}
 
 std::string IREmitter::indent() const {
     return std::string(indent_level_ * 2, ' '); // 每层缩进2个空格

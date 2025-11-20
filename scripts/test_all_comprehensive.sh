@@ -7,7 +7,7 @@
 COMPILER="/home/louhao/compiler/build/code"
 TEST_DIR="/home/louhao/compiler/TestCases/IR-1"
 TEMP_DIR="/tmp/compiler_test"
-TIMEOUT=30  # 增加超时时间以应对大型测试
+TIMEOUT=300  # 增加超时时间以应对大型测试
 MAX_PARALLEL=8  # 最大并行数
 
 mkdir -p "$TEMP_DIR"

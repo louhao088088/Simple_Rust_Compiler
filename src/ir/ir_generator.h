@@ -11,6 +11,7 @@
 #include <memory>
 #include <set>
 #include <string>
+#include <unordered_map>
 #include <vector>
 
 /**
@@ -79,12 +80,37 @@ class IRGenerator : public ExprVisitor<void>, public StmtVisitor {
     void visit(ContinueStmt *node) override;
     void visit(ItemStmt *node) override;
 
+    // ========== 辅助方法 ==========
+
+    /**
+     * 设置目标地址（用于聚合类型的原地初始化优化）
+     * @param address 目标内存地址
+     */
+    void set_target_address(const std::string &address) { target_address_ = address; }
+
+    /**
+     * 获取并清除目标地址
+     * @return 目标地址，如果没有则返回空字符串
+     */
+    std::string take_target_address() {
+        std::string addr = target_address_;
+        target_address_ = "";
+        return addr;
+    }
+
   private:
     // ========== 核心组件 ==========
 
     IREmitter emitter_;          // IR 文本生成器
     TypeMapper type_mapper_;     // 类型映射器
     ValueManager value_manager_; // 变量管理器
+
+    // ========== 优化状态 ==========
+
+    /**
+     * 目标地址（用于聚合类型的原地初始化优化）
+     */
+    std::string target_address_;
 
     // ========== 表达式结果存储 ==========
 
@@ -264,11 +290,15 @@ class IRGenerator : public ExprVisitor<void>, public StmtVisitor {
     bool evaluate_const_expr(Expr *expr, std::string &result);
 
     /**
-     * 计算类型的大小（字节数）
-     * @param type 类型指针
-     * @return 类型的字节大小
+     * 获取类型的大小（字节）
+     * 考虑对齐和填充
      */
     size_t get_type_size(Type *type);
+
+    /**
+     * 获取类型的对齐要求（字节）
+     */
+    size_t get_type_alignment(Type *type);
 
     /**
      * 检查表达式是否为零初始化器

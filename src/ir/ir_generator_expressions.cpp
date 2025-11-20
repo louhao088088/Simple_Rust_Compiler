@@ -667,19 +667,23 @@ void IRGenerator::visit(AssignmentExpr *node) {
             std::string value_to_store = value_var;
 
             if (value_is_aggregate) {
-                // 聚合类型：总是load值（因为value_var是指针）
-                value_to_store = emitter_.emit_load(value_type_str, value_var);
-            }
+                // 聚合类型：使用 memcpy 优化
+                // value_var 是源指针，var_info->alloca_name 是目标指针
+                size_t size = get_type_size(node->value->type.get());
+                // 目标类型是指针类型 (e.g. %Point*)
+                std::string ptr_type = target_type_str + "*";
+                emitter_.emit_memcpy(var_info->alloca_name, value_var, size, ptr_type);
+            } else {
+                // 类型转换：如果赋值bool到整数类型，需要zext
+                if (node->value->type->kind == TypeKind::BOOL &&
+                    (var_expr->type->kind == TypeKind::I32 ||
+                     var_expr->type->kind == TypeKind::USIZE)) {
+                    value_to_store = emitter_.emit_zext("i1", value_to_store, target_type_str);
+                    value_type_str = target_type_str; // 更新值的类型为目标类型
+                }
 
-            // 类型转换：如果赋值bool到整数类型，需要zext
-            if (node->value->type->kind == TypeKind::BOOL &&
-                (var_expr->type->kind == TypeKind::I32 ||
-                 var_expr->type->kind == TypeKind::USIZE)) {
-                value_to_store = emitter_.emit_zext("i1", value_to_store, target_type_str);
-                value_type_str = target_type_str; // 更新值的类型为目标类型
+                emitter_.emit_store(target_type_str, value_to_store, var_info->alloca_name);
             }
-
-            emitter_.emit_store(target_type_str, value_to_store, var_info->alloca_name);
         }
 
         // 赋值表达式在 Rust 中返回 ()
@@ -703,11 +707,13 @@ void IRGenerator::visit(AssignmentExpr *node) {
             std::string value_to_store = value_var;
 
             if (value_is_aggregate) {
-                // 聚合类型：总是load值（因为value_var是指针）
-                value_to_store = emitter_.emit_load(type_str, value_var);
+                // 聚合类型：使用 memcpy 优化
+                size_t size = get_type_size(node->value->type.get());
+                std::string ptr_type = type_str + "*";
+                emitter_.emit_memcpy(elem_ptr, value_var, size, ptr_type);
+            } else {
+                emitter_.emit_store(type_str, value_to_store, elem_ptr);
             }
-
-            emitter_.emit_store(type_str, value_to_store, elem_ptr);
         }
 
         store_expr_result(node, "");
@@ -730,11 +736,13 @@ void IRGenerator::visit(AssignmentExpr *node) {
             std::string value_to_store = value_var;
 
             if (value_is_aggregate) {
-                // 聚合类型：总是load值（因为value_var是指针）
-                value_to_store = emitter_.emit_load(type_str, value_var);
+                // 聚合类型：使用 memcpy 优化
+                size_t size = get_type_size(node->value->type.get());
+                std::string ptr_type = type_str + "*";
+                emitter_.emit_memcpy(field_ptr, value_var, size, ptr_type);
+            } else {
+                emitter_.emit_store(type_str, value_to_store, field_ptr);
             }
-
-            emitter_.emit_store(type_str, value_to_store, field_ptr);
         }
 
         store_expr_result(node, "");
@@ -754,11 +762,14 @@ void IRGenerator::visit(AssignmentExpr *node) {
                                            node->value->type->kind == TypeKind::STRUCT);
 
                 if (value_is_aggregate) {
-                    value_to_store = emitter_.emit_load(value_type_str, value_var);
+                    // 聚合类型：使用 memcpy 优化
+                    size_t size = get_type_size(node->value->type.get());
+                    std::string ptr_type = value_type_str + "*";
+                    emitter_.emit_memcpy(ptr_value, value_var, size, ptr_type);
+                } else {
+                    // 直接store到指针指向的位置
+                    emitter_.emit_store(value_type_str, value_to_store, ptr_value);
                 }
-
-                // 直接store到指针指向的位置
-                emitter_.emit_store(value_type_str, value_to_store, ptr_value);
             }
         }
 

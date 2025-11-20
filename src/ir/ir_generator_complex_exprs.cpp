@@ -46,7 +46,11 @@ void IRGenerator::visit(ArrayLiteralExpr *node) {
     std::string array_ir_type = "[" + std::to_string(array_size) + " x " + elem_ir_type + "]";
 
     // 1. 分配数组空间
-    std::string array_ptr = emitter_.emit_alloca(array_ir_type);
+    // 优化：如果存在目标地址（原地初始化），直接使用
+    std::string array_ptr = take_target_address();
+    if (array_ptr.empty()) {
+        array_ptr = emitter_.emit_alloca(array_ir_type);
+    }
 
     // 2. 初始化每个元素
     for (size_t i = 0; i < node->elements.size(); ++i) {
@@ -106,14 +110,8 @@ void IRGenerator::visit(ArrayInitializerExpr *node) {
         return;
     }
 
-    // 计算初始化值
-    node->value->accept(this);
-    std::string init_value = get_expr_result(node->value.get());
-
-    if (init_value.empty()) {
-        store_expr_result(node, "");
-        return;
-    }
+    // 优化：尽早获取目标地址，防止子表达式错误使用
+    std::string target_ptr = take_target_address();
 
     // 获取数组大小
     size_t array_size = array_type->size;
@@ -122,20 +120,44 @@ void IRGenerator::visit(ArrayInitializerExpr *node) {
     std::string elem_ir_type = type_mapper_.map(array_type->element_type.get());
     std::string array_ir_type = "[" + std::to_string(array_size) + " x " + elem_ir_type + "]";
 
-    // 如果初始化值是聚合类型(数组/结构体)，需要load整个值
-    // 因为子表达式返回的是指针，但store需要的是值
+    // 检查初始化值是否是聚合类型(数组/结构体)
     bool value_is_aggregate = false;
     if (node->value->type) {
         value_is_aggregate = (node->value->type->kind == TypeKind::ARRAY ||
                               node->value->type->kind == TypeKind::STRUCT);
     }
 
+    // 计算初始化值
+    // 如果值是聚合类型，为它分配临时空间作为目标地址，避免误用外层 SRET 指针
+    if (value_is_aggregate) {
+        std::string temp_ptr = emitter_.emit_alloca(elem_ir_type);
+        set_target_address(temp_ptr);
+    }
+
+    node->value->accept(this);
+
+    // 清除未使用的target
+    take_target_address();
+
+    std::string init_value = get_expr_result(node->value.get());
+
+    if (init_value.empty()) {
+        store_expr_result(node, "");
+        return;
+    }
+
+    // 如果初始化值是聚合类型，需要load整个值
+    // 因为子表达式返回的是指针，但store需要的是值
     if (value_is_aggregate) {
         init_value = emitter_.emit_load(elem_ir_type, init_value);
     }
 
     // 1. 分配数组空间
-    std::string array_ptr = emitter_.emit_alloca(array_ir_type);
+    // 优化：如果存在目标地址（原地初始化），直接使用
+    std::string array_ptr = target_ptr;
+    if (array_ptr.empty()) {
+        array_ptr = emitter_.emit_alloca(array_ir_type);
+    }
 
     // 2. 初始化元素
     const size_t UNROLL_THRESHOLD = 16; // 小于等于16个元素时展开
@@ -163,13 +185,8 @@ void IRGenerator::visit(ArrayInitializerExpr *node) {
     if (is_zero_init && array_size > MEMSET_THRESHOLD && elem_size > 0) {
         size_t total_bytes = array_size * elem_size;
 
-        // 将数组指针转换为i8*
-        std::string i8_ptr = emitter_.emit_bitcast(array_ir_type + "*", array_ptr, "i8*");
-
         // 调用memset: memset(ptr, 0, size)
-        std::vector<std::pair<std::string, std::string>> memset_args = {
-            {"i8*", i8_ptr}, {"i8", "0"}, {"i64", std::to_string(total_bytes)}, {"i1", "false"}};
-        emitter_.emit_call_void("llvm.memset.p0.i64", memset_args);
+        emitter_.emit_memset(array_ptr, 0, total_bytes, array_ir_type + "*");
     } else if (array_size <= UNROLL_THRESHOLD) {
         // 小数组：展开为多个store指令
         for (size_t i = 0; i < array_size; ++i) {
@@ -355,8 +372,14 @@ void IRGenerator::visit(StructInitializerExpr *node) {
     // 如果存在 __sret_self 变量，说明当前在 sret 优化的构造函数中
     // 直接使用 self 而不是 alloca
     std::string struct_ptr;
+
+    // 优化：优先使用目标地址（原地初始化）
+    std::string target_ptr = take_target_address();
+
     auto sret_self = value_manager_.lookup_variable("__sret_self");
-    if (sret_self) {
+    if (!target_ptr.empty()) {
+        struct_ptr = target_ptr;
+    } else if (sret_self) {
         // 使用 sret self 指针
         struct_ptr = sret_self->alloca_name;
     } else {
@@ -366,14 +389,6 @@ void IRGenerator::visit(StructInitializerExpr *node) {
 
     // 2. 初始化每个字段
     for (const auto &field_init : node->fields) {
-        // 计算字段值
-        field_init->value->accept(this);
-        std::string field_value = get_expr_result(field_init->value.get());
-
-        if (field_value.empty()) {
-            continue; // 跳过未能生成的字段
-        }
-
         // 查找字段在field_order中的索引（使用缓存）
         std::string cache_key = struct_type->name + "." + field_init->name.lexeme;
         int field_index = -1;
@@ -408,9 +423,32 @@ void IRGenerator::visit(StructInitializerExpr *node) {
         std::string field_ptr =
             emitter_.emit_getelementptr_inbounds(struct_ir_type, struct_ptr, indices);
 
-        // 检查字段是否为聚合类型，如果是且field_value是指针，需要先load
+        // 优化：对于聚合类型字段，尝试原地初始化
         bool field_is_aggregate =
             (it->second->kind == TypeKind::ARRAY || it->second->kind == TypeKind::STRUCT);
+
+        if (field_is_aggregate) {
+            set_target_address(field_ptr);
+        }
+
+        // 计算字段值
+        field_init->value->accept(this);
+
+        // 清除未使用的target（如果子表达式没有使用它）
+        take_target_address();
+
+        std::string field_value = get_expr_result(field_init->value.get());
+
+        if (field_value.empty()) {
+            continue; // 跳过未能生成的字段
+        }
+
+        // 如果发生了原地初始化，field_value 应该是 field_ptr
+        // 此时不需要 store
+        if (field_is_aggregate && field_value == field_ptr) {
+            continue;
+        }
+
         std::string value_to_store = field_value;
 
         if (field_is_aggregate) {

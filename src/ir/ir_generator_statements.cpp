@@ -168,18 +168,34 @@ void IRGenerator::visit(LetStmt *node) {
         if (node->initializer.has_value()) {
             auto init_expr = node->initializer.value();
             if (init_expr) {
+                // 优化：对于聚合类型，尝试使用目标地址传递（原地初始化）
+                // 这可以避免 StructInitializer/ArrayInitializer 创建临时 alloca
+                bool is_aggregate =
+                    (var_type->kind == TypeKind::ARRAY || var_type->kind == TypeKind::STRUCT);
+
+                if (is_aggregate) {
+                    set_target_address(alloca_name);
+                }
+
                 init_expr->accept(this);
+
+                // 清除未使用的 target（如果子表达式没有使用它）
+                take_target_address();
 
                 std::string init_value = get_expr_result(init_expr.get());
                 if (!init_value.empty()) {
-                    // 如果初始化值是聚合类型，需要load（因为init_value是指针）
-                    bool is_aggregate =
-                        (var_type->kind == TypeKind::ARRAY || var_type->kind == TypeKind::STRUCT);
-                    if (is_aggregate) {
-                        init_value = emitter_.emit_load(type_str, init_value);
+                    // 如果发生了原地初始化，init_value 应该是 alloca_name
+                    // 此时不需要 store/memcpy
+                    if (is_aggregate && init_value == alloca_name) {
+                        // 已经原地初始化完成
+                    } else if (is_aggregate) {
+                        // 聚合类型：使用 memcpy 优化
+                        size_t size = get_type_size(var_type.get());
+                        std::string ptr_type = type_str + "*";
+                        emitter_.emit_memcpy(alloca_name, init_value, size, ptr_type);
+                    } else {
+                        emitter_.emit_store(type_str, init_value, alloca_name);
                     }
-
-                    emitter_.emit_store(type_str, init_value, alloca_name);
                 }
             }
         }
