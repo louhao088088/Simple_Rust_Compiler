@@ -41,7 +41,28 @@ void IRGenerator::visit(BlockStmt *node) {
     value_manager_.exit_scope();
 }
 
-// Generate IR for expression statements.
+/**
+ * Generate IR for expression statements.
+ *
+ * Purpose: Execute expression for its side effects, discard result
+ *
+ * Examples:
+ * - Function calls: print(x);
+ * - Method calls: vec.push(item);
+ * - Assignments: x = 5; (though assignment is actually an expression)
+ *
+ * Process:
+ * 1. Evaluate the expression
+ * 2. Ignore the returned value
+ * 3. Only side effects matter (function calls, assignments, etc.)
+ *
+ * Note:
+ * - Pure expressions without side effects are wasteful but legal
+ * - Examples: 42; or x + y; (computed but unused)
+ * - Semantic analyzer may warn about unused results
+ *
+ * @param node The expression statement AST node
+ */
 void IRGenerator::visit(ExprStmt *node) {
     if (node->expression) {
         node->expression->accept(this);
@@ -169,7 +190,37 @@ void IRGenerator::visit(LetStmt *node) {
     value_manager_.define_variable(var_name, alloca_name, ptr_type_str, is_mutable);
 }
 
-// Generate IR for return statements.
+/**
+ * Generate IR for return statements.
+ *
+ * Forms:
+ * 1. return; (void return)
+ *    -> ret void
+ *
+ * 2. return value; (scalar return)
+ *    -> ret i32 %value
+ *
+ * 3. return struct; (SRET optimization)
+ *    -> memcpy to sret pointer, then ret void
+ *
+ * SRET handling:
+ * - Large structs use hidden pointer parameter
+ * - Function signature: void @foo(%Struct* sret %retval)
+ * - Copy result to sret pointer, return void
+ *
+ * Example SRET:
+ *   fn get_point() -> Point {
+ *       let p = Point { x: 1, y: 2 };
+ *       return p;  // Copies to sret pointer
+ *   }
+ *
+ * Example scalar:
+ *   fn add(a: i32, b: i32) -> i32 {
+ *       return a + b;  // ret i32 %sum
+ *   }
+ *
+ * @param node The return statement AST node
+ */
 void IRGenerator::visit(ReturnStmt *node) {
     if (node->value.has_value()) {
         auto return_expr = node->value.value();
@@ -234,6 +285,29 @@ void IRGenerator::visit(BreakStmt *node) {
     current_block_terminated_ = true;
 }
 
+/**
+ * Generate IR for continue statements.
+ *
+ * Purpose: Skip rest of loop body, jump to next iteration
+ *
+ * Process:
+ * 1. Look up continue target from continue_stack_
+ *    - For while: jumps to condition check (while.cond)
+ *    - For loop: jumps to loop body start (loop.body)
+ * 2. Generate unconditional branch to that label
+ * 3. Mark current block as terminated
+ *
+ * IR examples:
+ * - While: br label %while.cond.N
+ * - Loop: br label %loop.body.N
+ *
+ * Context requirements:
+ * - Must be inside a loop (continue_stack_ not empty)
+ * - Semantic analysis ensures this
+ *
+ * @param node The continue statement AST node
+ * @note Code after continue in same block is unreachable
+ */
 void IRGenerator::visit(ContinueStmt *node) {
     if (loop_stack_.empty()) {
         return;
@@ -245,7 +319,30 @@ void IRGenerator::visit(ContinueStmt *node) {
     current_block_terminated_ = true;
 }
 
-// Generate IR for item statements (struct declarations inside functions).
+/**
+ * Generate IR for item statements (struct declarations inside functions).
+ *
+ * Rust allows struct definitions inside function bodies:
+ *   fn main() {
+ *       struct Point { x: i32, y: i32 }
+ *       let p = Point { x: 1, y: 2 };
+ *   }
+ *
+ * Handling:
+ * - Struct types must be global in LLVM IR
+ * - Local struct definitions are "hoisted" to module level
+ * - Actually processed by collect_all_structs() before function generation
+ * - This function is essentially a no-op in IR generation phase
+ *
+ * Why this works:
+ * 1. First pass: collect_all_structs() finds all structs
+ * 2. Emit all struct type definitions globally
+ * 3. Second pass: generate functions
+ * 4. When visiting ItemStmt, type already defined
+ *
+ * @param node The item statement AST node
+ * @note Type definition already emitted, no IR generation needed here
+ */
 void IRGenerator::visit(ItemStmt *node) {
 
     if (!node->item) {

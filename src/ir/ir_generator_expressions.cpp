@@ -84,7 +84,32 @@ void IRGenerator::visit(LiteralExpr *node) {
     store_expr_result(node, value);
 }
 
-// Generate IR for variable expressions (load from local or global variables).
+/**
+ * Generate IR for variable expressions.
+ *
+ * Variables can be:
+ * - Local variables: Allocated on stack with alloca
+ * - Function parameters: Allocated on entry, populated by caller
+ * - Global variables: Defined at module level
+ *
+ * Loading behavior:
+ * 1. Regular types (i32, bool):
+ *    %value = load i32, i32* %var.addr
+ *
+ * 2. Aggregates in lvalue context (assignment target):
+ *    Return pointer without loading
+ *    Example: arr[0] = 5  (arr returns pointer)
+ *
+ * 3. Reference types (&T, &mut T):
+ *    Load the pointer, not the pointee
+ *    Example: let r = &x; (r is the pointer to x)
+ *
+ * Type resolution:
+ * - Type comes from semantic analysis
+ * - Used to generate correct LLVM type string
+ *
+ * @param node The variable expression AST node
+ */
 void IRGenerator::visit(VariableExpr *node) {
     std::string var_name = node->name.lexeme;
 
@@ -275,7 +300,25 @@ void IRGenerator::visit(BinaryExpr *node) {
     store_expr_result(node, result);
 }
 
-// Generate IR for unary expressions (-, !, &, *).
+/**
+ * Generate IR for unary expressions.
+ *
+ * Operators:
+ * - Negation (-x): Implemented as sub T 0, %x
+ *   Example: -5 becomes sub i32 0, 5
+ *
+ * - Logical NOT (!x): Implemented as xor i1 %x, 1
+ *   Example: !true becomes xor i1 1, 1 -> 0
+ *
+ * - Dereference (*ptr): Loads value through pointer
+ *   Example: *ptr becomes load T, T* %ptr
+ *
+ * - Address-of (&x): Returns pointer to lvalue
+ *   Sets generating_lvalue_ flag to prevent automatic load
+ *   Example: &x returns %x.addr directly without load
+ *
+ * @param node The unary expression AST node
+ */
 void IRGenerator::visit(UnaryExpr *node) {
     if (!node->type) {
         return;
@@ -570,7 +613,34 @@ void IRGenerator::visit(CallExpr *node) {
     }
 }
 
-// Generate IR for assignment expressions.
+/**
+ * Generate IR for assignment expressions.
+ *
+ * Syntax: lvalue = rvalue
+ *
+ * Process:
+ * 1. Evaluate right-hand side (value expression)
+ * 2. Get pointer to left-hand side (lvalue address)
+ * 3. Store value to pointer
+ *
+ * Examples:
+ * - Simple variable: x = 5
+ *   store i32 5, i32* %x.addr
+ *
+ * - Array element: arr[i] = 10
+ *   %ptr = getelementptr [10 x i32], [10 x i32]* %arr, i32 0, i32 %i
+ *   store i32 10, i32* %ptr
+ *
+ * - Struct field: point.x = 3
+ *   %ptr = getelementptr %Point, %Point* %point, i32 0, i32 0
+ *   store i32 3, i32* %ptr
+ *
+ * Return value:
+ * - Assignment is an expression that returns the assigned value
+ * - Enables chaining: x = y = 5
+ *
+ * @param node The assignment expression AST node
+ */
 void IRGenerator::visit(AssignmentExpr *node) {
 
     node->value->accept(this);
@@ -698,7 +768,29 @@ void IRGenerator::visit(AssignmentExpr *node) {
     }
 }
 
-// Generate IR for grouping expressions (parentheses).
+/**
+ * Generate IR for grouping expressions (parentheses).
+ *
+ * Purpose: Parentheses control evaluation order and precedence
+ *
+ * Examples:
+ * - (x + y) * z
+ * - (a && b) || c
+ * - return (value);
+ *
+ * IR generation:
+ * - Simply forward to inner expression
+ * - Parentheses affect AST structure, not IR
+ * - No additional IR code generated
+ *
+ * Why parentheses matter:
+ * - Change operator precedence: (a + b) * c vs a + (b * c)
+ * - Group operands for clarity: if ((x > 0) && (y < 10))
+ * - Return complex expressions: return (x + y);
+ *
+ * @param node The grouping expression AST node
+ * @note This is essentially a pass-through, no IR emitted
+ */
 void IRGenerator::visit(GroupingExpr *node) {
     if (node->expression) {
         node->expression->accept(this);
@@ -708,7 +800,41 @@ void IRGenerator::visit(GroupingExpr *node) {
     }
 }
 
-// Generate IR for block expressions.
+/**
+ * Generate IR for block expressions.
+ *
+ * Syntax:
+ *   {
+ *       statement1;
+ *       statement2;
+ *       final_expression  // Optional, no semicolon
+ *   }
+ *
+ * Value semantics:
+ * - Statements execute sequentially
+ * - Final expression (if present) becomes block's value
+ * - Without final expr, block evaluates to unit ()
+ *
+ * Examples:
+ *   let x = {
+ *       let temp = 5;
+ *       temp * 2  // Returns 10
+ *   };
+ *
+ *   if condition {
+ *       do_something();
+ *       42  // Block returns 42
+ *   } else {
+ *       0   // Block returns 0
+ *   }
+ *
+ * IR generation:
+ * - Execute all statements in order
+ * - Propagate final expression's result
+ * - Track aggregate value loads for optimization
+ *
+ * @param node The block expression AST node
+ */
 void IRGenerator::visit(BlockExpr *node) {
     if (node->block_stmt) {
         node->block_stmt->accept(this);
@@ -731,7 +857,33 @@ void IRGenerator::visit(BlockExpr *node) {
     store_expr_result(node, "");
 }
 
-// Generate IR for type cast expressions (as).
+/**
+ * Generate IR for type cast expressions (as operator).
+ *
+ * Syntax: expression as TargetType
+ *
+ * Supported conversions:
+ * 1. Integer widening/narrowing:
+ *    - Signed: sext (sign-extend) or trunc
+ *      Example: i32 to i64 -> sext i32 %x to i64
+ *    - Unsigned: zext (zero-extend) or trunc
+ *      Example: u8 to u32 -> zext i8 %x to i32
+ *
+ * 2. Sign changes (no IR instruction needed):
+ *    - i32 to u32, u32 to i32
+ *    - Bitwise identical, only semantic difference
+ *
+ * 3. Bool to integer:
+ *    - zext i1 to i32 (false->0, true->1)
+ *
+ * 4. Integer to bool:
+ *    - icmp ne i32 %x, 0 (0->false, non-zero->true)
+ *
+ * 5. Pointer casts:
+ *    - bitcast T* to U*
+ *
+ * @param node The type cast expression AST node
+ */
 void IRGenerator::visit(AsExpr *node) {
 
     node->expression->accept(this);
@@ -781,7 +933,35 @@ void IRGenerator::visit(AsExpr *node) {
     store_expr_result(node, result);
 }
 
-// Generate IR for reference expressions (&expr).
+/**
+ * Generate IR for reference expressions (&expr).
+ *
+ * Purpose: Take address of an lvalue
+ *
+ * Syntax: &variable, &arr[i], &struct.field
+ *
+ * Process:
+ * 1. Set generating_lvalue_ flag to true
+ * 2. Visit inner expression
+ * 3. Inner expression returns pointer instead of value
+ * 4. Pass pointer through as result
+ *
+ * Examples:
+ * - &x: Returns %x.addr (pointer to x)
+ * - &arr[i]: Returns GEP result pointer
+ * - &point.x: Returns field pointer from GEP
+ *
+ * Type transformation:
+ * - Input expression type: T
+ * - Output type: &T (pointer to T)
+ *
+ * Use cases:
+ * - Pass by reference to functions
+ * - Store references in structs
+ * - Take address for unsafe operations
+ *
+ * @param node The reference expression AST node
+ */
 void IRGenerator::visit(ReferenceExpr *node) {
 
     bool was_generating_lvalue = generating_lvalue_;
@@ -814,7 +994,35 @@ void IRGenerator::visit(ReferenceExpr *node) {
     }
 }
 
-// Generate IR for compound assignment expressions (+=, -=, *=, /=, %=).
+/**
+ * Generate IR for compound assignment expressions.
+ *
+ * Operators: +=, -=, *=, /=, %=
+ *
+ * Equivalent transformation:
+ *   x += y  becomes  x = x + y
+ *   arr[i] *= 5  becomes  arr[i] = arr[i] * 5
+ *
+ * Process:
+ * 1. Evaluate left side to get pointer (lvalue)
+ * 2. Load current value from pointer
+ * 3. Evaluate right side expression
+ * 4. Perform binary operation (add/sub/mul/div/rem)
+ * 5. Store result back to pointer
+ *
+ * Example IR for x += 5:
+ *   %1 = load i32, i32* %x.addr
+ *   %2 = add i32 %1, 5
+ *   store i32 %2, i32* %x.addr
+ *
+ * Works with:
+ * - Simple variables: x += 5
+ * - Array elements: arr[i] += 5
+ * - Struct fields: point.x += 5
+ * - Dereferences: *ptr += 5
+ *
+ * @param node The compound assignment expression AST node
+ */
 void IRGenerator::visit(CompoundAssignmentExpr *node) {
 
     std::string target_ptr;

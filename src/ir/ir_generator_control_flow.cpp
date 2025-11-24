@@ -129,7 +129,41 @@ void IRGenerator::visit(IfExpr *node) {
     }
 }
 
-// Generate IR for while loop expressions.
+/**
+ * Generate IR for while loop expressions.
+ *
+ * Syntax: while condition { body }
+ *
+ * IR structure:
+ *   br label %while.cond.N
+ *
+ * while.cond.N:
+ *   %cond = <evaluate condition>
+ *   br i1 %cond, label %while.body.N, label %while.end.N
+ *
+ * while.body.N:
+ *   <loop body statements>
+ *   br label %while.cond.N
+ *
+ * while.end.N:
+ *   ; Continue after loop
+ *
+ * Loop control:
+ * - break: Jumps to %while.end.N
+ * - continue: Jumps to %while.cond.N (re-evaluate condition)
+ *
+ * Value:
+ * - While loops always return () (unit type)
+ * - Not expressions in terms of producing values
+ *
+ * Example:
+ *   while i < 10 {
+ *       print(i);
+ *       i += 1;
+ *   }
+ *
+ * @param node The while expression AST node
+ */
 void IRGenerator::visit(WhileExpr *node) {
 
     int current_while = while_counter_++;
@@ -167,7 +201,40 @@ void IRGenerator::visit(WhileExpr *node) {
     store_expr_result(node, "");
 }
 
-// Generate IR for infinite loop expressions.
+/**
+ * Generate IR for infinite loop expressions.
+ *
+ * Syntax: loop { body }
+ *
+ * IR structure:
+ *   br label %loop.body.N
+ *
+ * loop.body.N:
+ *   <loop body statements>
+ *   br label %loop.body.N  ; Unconditional jump back
+ *
+ * loop.end.N:
+ *   ; Only reached via break
+ *
+ * Exiting:
+ * - Must use 'break' to exit (no condition)
+ * - Without break, infinite loop
+ * - break with value: Becomes loop's return value
+ *
+ * Loop control:
+ * - break: Jumps to %loop.end.N
+ * - continue: Jumps to %loop.body.N (restart iteration)
+ *
+ * Example:
+ *   let result = loop {
+ *       counter += 1;
+ *       if counter > 10 {
+ *           break counter;  // Returns counter value
+ *       }
+ *   };
+ *
+ * @param node The loop expression AST node
+ */
 void IRGenerator::visit(LoopExpr *node) {
 
     int current_loop = loop_counter_++;

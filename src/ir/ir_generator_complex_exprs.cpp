@@ -205,6 +205,28 @@ void IRGenerator::visit(ArrayInitializerExpr *node) {
     store_expr_result(node, array_ptr);
 }
 
+/**
+ * Generate IR for array index expressions.
+ *
+ * Example: arr[i]
+ *
+ * Process:
+ * 1. Evaluate base expression to get array pointer
+ * 2. Evaluate index expression to get i32 index value
+ * 3. Use GEP (getelementptr) to calculate element address:
+ *    %elem_ptr = getelementptr [N x T], ptr %arr, i64 0, i64 %index
+ * 4. Load element value (unless used as lvalue in assignment)
+ *
+ * GEP indices explained:
+ * - First i64 0: Dereference the pointer to the array
+ * - Second i64 %index: Index into the array
+ *
+ * Lvalue vs Rvalue:
+ * - Rvalue: Load and return element value
+ * - Lvalue (in assignment): Return element pointer for store
+ *
+ * @param node The index expression AST node
+ */
 void IRGenerator::visit(IndexExpr *node) {
 
     if (!node->type) {

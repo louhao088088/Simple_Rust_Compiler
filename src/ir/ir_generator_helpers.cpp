@@ -1,5 +1,30 @@
 #include "ir_generator.h"
 
+/**
+ * Retrieve the IR value associated with an expression.
+ *
+ * Purpose:
+ * - Map AST expression nodes to their generated IR values
+ * - Enables parent nodes to access child expression results
+ *
+ * Example flow:
+ *   visit(BinaryExpr):
+ *     1. node->left->accept(this)  // Generates IR
+ *     2. left_val = get_expr_result(node->left)  // Retrieves "%1"
+ *     3. node->right->accept(this)
+ *     4. right_val = get_expr_result(node->right)  // Retrieves "%2"
+ *     5. %3 = add i32 %1, %2
+ *     6. store_expr_result(node, "%3")
+ *
+ * Return values:
+ * - SSA register: "%1", "%temp_5", "%sum"
+ * - Global: "@global_var"
+ * - Literal: "42", "true"
+ * - Empty string: Expression failed or has no value
+ *
+ * @param expr The expression to look up
+ * @return The IR value string, or "" if not found
+ */
 std::string IRGenerator::get_expr_result(Expr *expr) {
     auto it = expr_results_.find(expr);
     if (it != expr_results_.end()) {
@@ -8,16 +33,88 @@ std::string IRGenerator::get_expr_result(Expr *expr) {
     return "";
 }
 
+/**
+ * Store the IR value generated for an expression.
+ *
+ * Purpose:
+ * - Associate generated IR values with AST nodes
+ * - Enables parent nodes to retrieve child results
+ * - Creates mapping from Expr* -> IR value string
+ *
+ * Example:
+ *   After generating: %1 = add i32 %a, %b
+ *   Call: store_expr_result(binary_expr, "%1")
+ *   Later: get_expr_result(binary_expr) returns "%1"
+ *
+ * Usage pattern:
+ *   void visit(SomeExpr* node) {
+ *       // ... generate IR code ...
+ *       std::string result = emitter_.emit_add(...);
+ *       store_expr_result(node, result);
+ *   }
+ *
+ * @param node The expression AST node
+ * @param ir_var The IR value string (register, global, literal)
+ */
 void IRGenerator::store_expr_result(Expr *node, const std::string &ir_var) {
     expr_results_[node] = ir_var;
 }
 
+/**
+ * Begin a new basic block in the current function.
+ *
+ * Purpose:
+ * - Start a labeled basic block for control flow
+ * - Reset termination flag (new block not yet terminated)
+ * - Track current block label
+ *
+ * Basic blocks:
+ * - Unit of control flow in LLVM IR
+ * - Must end with terminator (br, ret, unreachable)
+ * - Labels used for branch targets
+ *
+ * Examples:
+ *   begin_block("if.then");
+ *   // Generate code for then branch
+ *   emitter_.emit_br("if.end");
+ *
+ *   begin_block("if.end");
+ *   // Continue after if statement
+ *
+ * @param label The label name for this basic block
+ */
 void IRGenerator::begin_block(const std::string &label) {
     emitter_.begin_basic_block(label);
     current_block_label_ = label;
     current_block_terminated_ = false;
 }
 
+/**
+ * Convert binary operator token to LLVM IR instruction name.
+ *
+ * Arithmetic operators:
+ * - + -> add (both signed and unsigned)
+ * - - -> sub
+ * - * -> mul
+ * - / -> sdiv (signed) or udiv (unsigned)
+ * - % -> srem (signed) or urem (unsigned)
+ *
+ * Bitwise operators:
+ * - & -> and
+ * - | -> or
+ * - ^ -> xor
+ * - << -> shl (shift left)
+ * - >> -> ashr (arithmetic) or lshr (logical)
+ *
+ * Signedness matters for:
+ * - Division: sdiv rounds toward 0, udiv rounds down
+ * - Remainder: srem can be negative, urem always positive
+ * - Right shift: ashr preserves sign bit, lshr inserts 0
+ *
+ * @param op The binary operator token
+ * @param is_unsigned Whether operands are unsigned
+ * @return LLVM IR instruction name
+ */
 std::string IRGenerator::token_to_ir_op(const Token &op, bool is_unsigned) {
     switch (op.type) {
     case TokenType::PLUS:
@@ -45,6 +142,29 @@ std::string IRGenerator::token_to_ir_op(const Token &op, bool is_unsigned) {
     }
 }
 
+/**
+ * Convert comparison operator token to LLVM icmp predicate.
+ *
+ * Comparison operators:
+ * - == -> eq (equal)
+ * - != -> ne (not equal)
+ * - < -> slt (signed) or ult (unsigned)
+ * - <= -> sle (signed) or ule (unsigned)
+ * - > -> sgt (signed) or ugt (unsigned)
+ * - >= -> sge (signed) or uge (unsigned)
+ *
+ * Signedness matters:
+ * - Signed: -1 < 1 (true, slt)
+ * - Unsigned: 0xFFFFFFFF < 1 (false, ult - treats as large positive)
+ *
+ * Usage:
+ *   %cmp = icmp slt i32 %a, %b  // Signed less than
+ *   %cmp = icmp ult i32 %a, %b  // Unsigned less than
+ *
+ * @param op The comparison operator token
+ * @param is_unsigned Whether operands are unsigned
+ * @return LLVM icmp predicate string
+ */
 std::string IRGenerator::token_to_icmp_pred(const Token &op, bool is_unsigned) {
     switch (op.type) {
     case TokenType::EQUAL_EQUAL:
@@ -64,6 +184,26 @@ std::string IRGenerator::token_to_icmp_pred(const Token &op, bool is_unsigned) {
     }
 }
 
+/**
+ * Check if a type is a signed integer.
+ *
+ * Signed integer types:
+ * - i32: 32-bit signed integer
+ * - isize: Platform-dependent signed integer (32-bit in this compiler)
+ *
+ * Not signed:
+ * - u32, usize: Unsigned variants
+ * - bool: Considered unsigned (i1)
+ * - Pointers, arrays, structs: Not integers
+ *
+ * Used for:
+ * - Choosing signed vs unsigned IR instructions (sdiv vs udiv)
+ * - Selecting comparison predicates (slt vs ult)
+ * - Right shift behavior (ashr vs lshr)
+ *
+ * @param type The type to check
+ * @return true if type is signed integer (i32 or isize)
+ */
 bool IRGenerator::is_signed_integer(Type *type) {
     if (!type)
         return false;
@@ -89,6 +229,33 @@ int IRGenerator::get_integer_bits(TypeKind kind) {
     }
 }
 
+/**
+ * Evaluate constant expression at compile time.
+ *
+ * Supported expressions:
+ * - Literals: 42, true, false, "hello"
+ * - Const references: const X = 10; const Y = X;
+ * - Binary arithmetic: 5 + 3, 10 * 2
+ * - Unary negation: -5
+ *
+ * Purpose:
+ * - Enable const declaration initialization
+ * - Compute array sizes at compile time
+ * - Support constant folding optimizations
+ *
+ * Limitations:
+ * - No function calls
+ * - No variable references (except other consts)
+ * - Integer arithmetic only (no floating point)
+ *
+ * Example:
+ *   const SIZE: i32 = 10 * 2 + 5;  // Evaluates to "25"
+ *   const FLAG: bool = true;       // Evaluates to "1"
+ *
+ * @param expr The expression to evaluate
+ * @param result [out] The string representation of the constant value
+ * @return true if successfully evaluated
+ */
 bool IRGenerator::evaluate_const_expr(Expr *expr, std::string &result) {
 
     if (!expr) {
@@ -410,6 +577,38 @@ bool IRGenerator::is_zero_initializer(Expr *expr) {
     return false;
 }
 
+/**
+ * Determine if a function should use SRET (Structure Return) optimization.
+ *
+ * SRET optimization:
+ * - Large structs returned via hidden pointer parameter
+ * - Avoids copying large structures through registers
+ * - Caller allocates space, passes pointer as first arg
+ *
+ * Without SRET:
+ *   define %LargeStruct @foo() {
+ *       %result = alloca %LargeStruct
+ *       ...
+ *       %loaded = load %LargeStruct, %LargeStruct* %result
+ *       ret %LargeStruct %loaded  // Expensive copy!
+ *   }
+ *
+ * With SRET:
+ *   define void @foo(%LargeStruct* sret %return_ptr) {
+ *       ...
+ *       call void @llvm.memcpy(%return_ptr, %local_struct, size)
+ *       ret void
+ *   }
+ *
+ * Criteria:
+ * - Return type is struct or array
+ * - Size is large (threshold-based decision)
+ * - Not for main() function (special case)
+ *
+ * @param func_name Function name being generated
+ * @param return_type The return type to check
+ * @return true if SRET should be used
+ */
 bool IRGenerator::should_use_sret_optimization(const std::string &func_name, Type *return_type) {
 
     if (!return_type || return_type->kind != TypeKind::STRUCT)

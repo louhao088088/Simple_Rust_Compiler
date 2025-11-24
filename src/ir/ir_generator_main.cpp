@@ -37,7 +37,31 @@ std::string IRGenerator::generate(Program *program) {
     return emitter_.get_ir_string();
 }
 
-// Dispatch to appropriate visitor based on item type.
+/**
+ * Dispatch to appropriate visitor based on item type.
+ *
+ * Top-level items:
+ * - fn: Function declarations -> visit_function_decl()
+ * - struct: Type definitions -> (handled in first pass)
+ * - const: Global constants -> visit_const_decl()
+ * - impl: Method implementations -> visit_impl_block()
+ *
+ * Processing order:
+ * 1. First pass: collect_all_structs() gathers struct definitions
+ * 2. Second pass: This function processes functions, consts, impls
+ *
+ * Why struct_decl is empty:
+ * - Struct types already emitted before functions
+ * - No additional IR generation needed here
+ *
+ * Example program:
+ *   struct Point { x: i32, y: i32 }  // Skipped (already emitted)
+ *   const MAX: i32 = 100;             // visit_const_decl()
+ *   fn main() { ... }                 // visit_function_decl()
+ *   impl Point { ... }                // visit_impl_block()
+ *
+ * @param item The top-level item to process
+ */
 void IRGenerator::visit_item(Item *item) {
     if (auto fn_decl = dynamic_cast<FnDecl *>(item)) {
         visit_function_decl(fn_decl);
@@ -263,7 +287,36 @@ void IRGenerator::visit_function_decl(FnDecl *node) {
     nested_functions_ = std::move(outer_nested_functions);
 }
 
-// Generate IR for struct type declarations.
+/**
+ * Generate IR for struct type declarations.
+ *
+ * Example Rust:
+ *   struct Point {
+ *       x: i32,
+ *       y: i32,
+ *   }
+ *
+ * Generated LLVM IR:
+ *   %Point = type { i32, i32 }
+ *
+ * Process:
+ * 1. Extract struct type information from semantic analysis
+ * 2. Map each field to LLVM type string
+ * 3. Preserve field order (important for GEP indices)
+ * 4. Emit type definition to IR
+ *
+ * Field ordering:
+ * - Follows declaration order in source code
+ * - GEP uses numeric indices: 0, 1, 2...
+ * - Example: point.y -> getelementptr %Point, ..., i32 1
+ *
+ * Type handling:
+ * - Recursive structs use pointers: struct Node { next: &Node }
+ * - Nested structs are inlined: struct Outer { inner: Inner }
+ * - Arrays in structs: struct Data { values: [i32; 10] }
+ *
+ * @param node The struct declaration AST node
+ */
 void IRGenerator::visit_struct_decl(StructDecl *node) {
     if (!node->resolved_symbol || !node->resolved_symbol->type) {
         return;
@@ -286,7 +339,36 @@ void IRGenerator::visit_struct_decl(StructDecl *node) {
     emitter_.emit_struct_type(struct_type->name, field_types);
 }
 
-// Generate IR for const declarations.
+/**
+ * Generate IR for const declarations.
+ *
+ * Example Rust:
+ *   const PI: f64 = 3.14159;
+ *   const MAX_SIZE: i32 = 1000;
+ *
+ * Generated LLVM IR:
+ *   @PI = constant double 3.14159
+ *   @MAX_SIZE = constant i32 1000
+ *
+ * Process:
+ * 1. Evaluate constant expression at compile time
+ * 2. Emit as global constant (not variable)
+ * 3. Store value for later constant folding
+ *
+ * Constant evaluation:
+ * - Literals: Direct value extraction
+ * - Arithmetic: Compile-time computation
+ * - String literals: Global constant array
+ * - Const references: Look up in const_values_ map
+ *
+ * Differences from let:
+ * - Globals vs stack allocation
+ * - Immutable by nature (not just semantic)
+ * - Must be compile-time evaluable
+ * - No address taking (inlined at use sites)
+ *
+ * @param node The const declaration AST node
+ */
 void IRGenerator::visit_const_decl(ConstDecl *node) {
 
     if (!node->type || !node->type->resolved_type) {
@@ -308,7 +390,33 @@ void IRGenerator::visit_const_decl(ConstDecl *node) {
                   << std::endl;
     }
 }
-// Generate IR for impl blocks.
+
+/**
+ * Generate IR for impl blocks (method implementations).
+ *
+ * Example Rust:
+ *   impl Point {
+ *       fn new(x: i32, y: i32) -> Point { ... }
+ *       fn distance(&self) -> i32 { ... }
+ *   }
+ *
+ * Process:
+ * - Each method is generated as a regular function
+ * - First parameter of instance methods is 'self' (implicit pointer)
+ * - Static methods (no self) are just regular functions
+ *
+ * Method name mangling:
+ * - new -> Point_new
+ * - distance -> Point_distance
+ * - Prevents name collision between types
+ *
+ * Self parameter:
+ * - &self -> %self: T*
+ * - &mut self -> %self: T* (mutability is semantic only)
+ * - self -> %self: T (moves ownership, rare)
+ *
+ * @param node The impl block AST node
+ */
 void IRGenerator::visit_impl_block(ImplBlock *node) {
 
     if (!node->target_type || !node->target_type->resolved_type) {
@@ -339,6 +447,33 @@ void IRGenerator::visit_impl_block(ImplBlock *node) {
     }
 }
 
+/**
+ * Collect all struct declarations from the entire program.
+ *
+ * Purpose: Ensure all struct types are defined before functions
+ *
+ * Process:
+ * 1. Traverse top-level items for struct declarations
+ * 2. Recursively search function bodies for local structs
+ * 3. Store unique structs in local_structs_set_
+ * 4. Emit all collected struct definitions
+ *
+ * Why needed:
+ * - LLVM requires type definitions before use
+ * - Functions may reference structs defined inside other functions
+ * - Local structs (in function bodies) must be hoisted to global scope
+ *
+ * Example:
+ *   fn main() {
+ *       struct Point { x: i32, y: i32 }  // Local struct
+ *       let p = Point { x: 1, y: 2 };
+ *   }
+ *
+ * All struct types must be emitted at module level before any function.
+ *
+ * @param program The program AST root node
+ * @note Prevents "use of undefined type" errors in IR
+ */
 void IRGenerator::collect_all_structs(Program *program) {
     for (const auto &item : program->items) {
         if (auto struct_decl = dynamic_cast<StructDecl *>(item.get())) {
@@ -351,6 +486,36 @@ void IRGenerator::collect_all_structs(Program *program) {
     }
 }
 
+/**
+ * Recursively collect struct declarations from statement trees.
+ *
+ * Purpose:
+ * - Find structs defined inside function bodies
+ * - Add them to local_structs_set_ for later processing
+ * - Enables struct hoisting to module level
+ *
+ * Example:
+ *   fn main() {
+ *       struct Point { x: i32, y: i32 }  // Found here
+ *       let p = Point { x: 1, y: 2 };
+ *       {
+ *           struct Color { r: u8, g: u8 }  // Found in nested block
+ *       }
+ *   }
+ *
+ * Traversal:
+ * - BlockStmt: Recursively check all statements
+ * - ItemStmt: Extract struct/function declarations
+ * - Other statements: Ignored (no item declarations)
+ *
+ * Why this is needed:
+ * - LLVM requires type definitions before use
+ * - Rust allows structs anywhere in function body
+ * - Must collect and emit all struct types first
+ * - Then generate function bodies that use them
+ *
+ * @param stmt The statement to search for struct declarations
+ */
 void IRGenerator::collect_structs_from_stmt(Stmt *stmt) {
     if (!stmt)
         return;
