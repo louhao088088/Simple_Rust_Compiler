@@ -86,9 +86,7 @@ class TypeMapper {
   private:
     BuiltinTypes &builtin_types_;
 
-    // 类型缓存：Rust Type指针 -> IR类型字符串
     std::unordered_map<const Type *, std::string> type_cache_;
 
-    // 已声明的结构体名称集合
     std::unordered_map<std::string, bool> declared_structs_;
 };

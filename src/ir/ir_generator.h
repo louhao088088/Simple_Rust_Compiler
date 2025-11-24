@@ -43,7 +43,6 @@ class IRGenerator : public ExprVisitor<void>, public StmtVisitor {
      */
     std::string generate(Program *program);
 
-    // ========== Expression Visitors ==========
 
     void visit(LiteralExpr *node) override;
     void visit(ArrayLiteralExpr *node) override;
@@ -70,7 +69,6 @@ class IRGenerator : public ExprVisitor<void>, public StmtVisitor {
     void visit(PathExpr *node) override;
     void visit(BlockExpr *node) override;
 
-    // ========== Statement Visitors ==========
 
     void visit(BlockStmt *node) override;
     void visit(ExprStmt *node) override;
@@ -80,7 +78,6 @@ class IRGenerator : public ExprVisitor<void>, public StmtVisitor {
     void visit(ContinueStmt *node) override;
     void visit(ItemStmt *node) override;
 
-    // ========== 辅助方法 ==========
 
     /**
      * 设置目标地址（用于聚合类型的原地初始化优化）
@@ -99,20 +96,17 @@ class IRGenerator : public ExprVisitor<void>, public StmtVisitor {
     }
 
   private:
-    // ========== 核心组件 ==========
 
-    IREmitter emitter_;          // IR 文本生成器
-    TypeMapper type_mapper_;     // 类型映射器
-    ValueManager value_manager_; // 变量管理器
+    IREmitter emitter_;
+    TypeMapper type_mapper_;
+    ValueManager value_manager_;
 
-    // ========== 优化状态 ==========
 
     /**
      * 目标地址（用于聚合类型的原地初始化优化）
      */
     std::string target_address_;
 
-    // ========== 表达式结果存储 ==========
 
     /**
      * 表达式结果存储
@@ -128,25 +122,22 @@ class IRGenerator : public ExprVisitor<void>, public StmtVisitor {
      */
     std::set<Expr *> loaded_aggregate_results_;
 
-    // ========== 控制流计数器 ==========
 
-    int if_counter_ = 0;    // if 语句标签计数
-    int while_counter_ = 0; // while 循环标签计数
-    int loop_counter_ = 0;  // loop 循环标签计数
+    int if_counter_ = 0;
+    int while_counter_ = 0;
+    int loop_counter_ = 0;
 
-    // ========== 循环上下文栈 ==========
 
     /**
      * 循环上下文：用于 break/continue 跳转
      */
     struct LoopContext {
-        std::string continue_label; // continue 跳转目标
-        std::string break_label;    // break 跳转目标
+        std::string continue_label;
+        std::string break_label;
     };
 
-    std::vector<LoopContext> loop_stack_; // 循环上下文栈
+    std::vector<LoopContext> loop_stack_;
 
-    // ========== 基本块状态追踪 ==========
 
     /**
      * 标记当前基本块是否已终止（有 br/ret/unreachable）
@@ -171,7 +162,6 @@ class IRGenerator : public ExprVisitor<void>, public StmtVisitor {
      */
     std::string current_function_return_type_str_;
 
-    // ========== 左值生成标志 ==========
 
     /**
      * 标记当前是否在生成左值（用于赋值目标）
@@ -179,7 +169,6 @@ class IRGenerator : public ExprVisitor<void>, public StmtVisitor {
      */
     bool generating_lvalue_ = false;
 
-    // ========== Item 处理 ==========
 
     /**
      * 处理顶层 Item（函数、结构体等）
@@ -217,7 +206,6 @@ class IRGenerator : public ExprVisitor<void>, public StmtVisitor {
      */
     void collect_structs_from_stmt(Stmt *stmt);
 
-    // ========== 辅助方法 ==========
 
     /**
      * 获取表达式的计算结果（IR 变量名）
@@ -320,17 +308,12 @@ class IRGenerator : public ExprVisitor<void>, public StmtVisitor {
      */
     bool should_use_sret_optimization(const std::string &func_name, Type *return_type);
 
-    // 常量表，用于存储已定义的常量值
     std::unordered_map<std::string, std::string> const_values_;
 
-    // 类型大小缓存：避免重复计算结构体大小
     std::unordered_map<Type *, size_t> type_size_cache_;
 
-    // 字段索引缓存：<struct_type, field_name> -> field_index
-    // 使用pair的hash需要自定义hash函数，这里用string key: "struct_name.field_name"
     std::unordered_map<std::string, int> field_index_cache_;
 
-    // ========== 嵌套函数支持 ==========
 
     /**
      * 嵌套函数队列：存储在函数体内定义的函数

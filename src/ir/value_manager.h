@@ -9,11 +9,11 @@
  * 存储变量在IR中的表示和元数据
  */
 struct VariableInfo {
-    std::string alloca_name; // IR中的变量名（如 "%x.addr", "%0", "@global_var"）
-    std::string type_str;    // IR类型字符串（如 "i32", "i32*", "[10 x i32]"）
-    bool is_mutable;         // 是否可变（Rust语义）
-    bool is_parameter;       // 是否是函数参数
-    bool is_global;          // 是否是全局变量
+    std::string alloca_name;
+    std::string type_str;
+    bool is_mutable;
+    bool is_parameter;
+    bool is_global;
 
     VariableInfo() : is_mutable(false), is_parameter(false), is_global(false) {}
 
@@ -42,7 +42,6 @@ class ValueManager {
   public:
     ValueManager();
 
-    // ========== 作用域管理 ==========
 
     /**
      * 进入新作用域
@@ -62,7 +61,6 @@ class ValueManager {
      */
     size_t scope_depth() const;
 
-    // ========== 变量操作 ==========
 
     /**
      * 在当前作用域定义局部变量
@@ -130,7 +128,6 @@ class ValueManager {
      */
     VariableInfo *lookup_variable_in_current_scope(const std::string &name);
 
-    // ========== 调试和辅助 ==========
 
     /**
      * 获取当前作用域的所有变量名（用于调试）
@@ -151,5 +148,5 @@ class ValueManager {
         std::unordered_map<std::string, VariableInfo> variables;
     };
 
-    std::vector<Scope> scope_stack_; // 作用域栈
+    std::vector<Scope> scope_stack_;
 };

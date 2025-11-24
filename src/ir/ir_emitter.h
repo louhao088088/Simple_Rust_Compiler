@@ -22,7 +22,6 @@ class IREmitter {
      */
     explicit IREmitter(const std::string &module_name);
 
-    // ========== Module级别 ==========
 
     /**
      * 输出全局变量声明
@@ -45,7 +44,6 @@ class IREmitter {
                                    const std::vector<std::string> &param_types,
                                    bool is_vararg = false);
 
-    // ========== 函数级别 ==========
 
     /**
      * 开始函数定义
@@ -66,7 +64,6 @@ class IREmitter {
      */
     void end_function();
 
-    // ========== 基本块 ==========
 
     /**
      * 创建并进入新的基本块
@@ -74,7 +71,6 @@ class IREmitter {
      */
     void begin_basic_block(const std::string &label);
 
-    // ========== 内存操作指令 ==========
 
     /**
      * alloca指令: 在栈上分配内存
@@ -111,7 +107,6 @@ class IREmitter {
     void emit_memset(const std::string &dest_ptr, int value, size_t bytes,
                      const std::string &ptr_type);
 
-    // ========== 算术和逻辑运算 ==========
 
     /**
      * 二元运算指令
@@ -145,7 +140,6 @@ class IREmitter {
      */
     std::string emit_not(const std::string &operand);
 
-    // ========== 类型转换 ==========
 
     /**
      * 截断转换(窄化)
@@ -175,7 +169,6 @@ class IREmitter {
     std::string emit_bitcast(const std::string &from_type, const std::string &value,
                              const std::string &to_type);
 
-    // ========== 控制流 ==========
 
     /**
      * 返回指令(带返回值)
@@ -217,7 +210,6 @@ class IREmitter {
      */
     void emit_unreachable();
 
-    // ========== 函数调用 ==========
 
     /**
      * call指令(有返回值)
@@ -243,7 +235,6 @@ class IREmitter {
                                  const std::string &func_type,
                                  const std::vector<std::pair<std::string, std::string>> &args);
 
-    // ========== 指针和数组操作 ==========
 
     /**
      * getelementptr指令(计算元素地址)
@@ -260,7 +251,6 @@ class IREmitter {
     std::string emit_getelementptr_inbounds(const std::string &type, const std::string &ptr,
                                             const std::vector<std::string> &indices);
 
-    // ========== 临时变量和标签管理 ==========
 
     /**
      * 获取新的临时变量名
@@ -279,7 +269,6 @@ class IREmitter {
      */
     void reset_temp_counter();
 
-    // ========== 注释 ==========
 
     /**
      * 添加注释行
@@ -292,7 +281,6 @@ class IREmitter {
      */
     void emit_blank_line();
 
-    // ========== 输出 ==========
 
     /**
      * 将累积的IR输出到文件
@@ -311,24 +299,21 @@ class IREmitter {
 
   private:
     std::string module_name_;
-    std::stringstream ir_stream_; // 累积的IR文本
+    std::stringstream ir_stream_;
 
-    size_t temp_counter_;  // 临时变量计数器
-    size_t label_counter_; // 标签计数器
+    size_t temp_counter_;
+    size_t label_counter_;
     size_t stack_counter_;
-    int indent_level_; // 当前缩进层级
+    int indent_level_;
 
-    // alloca缓冲机制（用于提升alloca到entry块）
-    bool in_entry_block_;                    // 是否在entry块中
-    std::vector<std::string> alloca_buffer_; // 缓冲的alloca指令
-    std::stringstream instruction_buffer_;   // 非alloca指令缓冲
+    bool in_entry_block_;
+    std::vector<std::string> alloca_buffer_;
+    std::stringstream instruction_buffer_;
 
-    // 函数体缓冲机制（用于全函数范围的alloca提升）
-    bool is_inside_function_;                   // 是否在函数体内
-    std::stringstream function_body_buffer_;    // 缓冲当前函数的指令
-    std::vector<std::string> function_allocas_; // 缓冲当前函数的所有alloca指令
+    bool is_inside_function_;
+    std::stringstream function_body_buffer_;
+    std::vector<std::string> function_allocas_;
 
-    // 辅助方法
 
     /**
      * 输出一行(带缩进)
