@@ -3,7 +3,22 @@
 #include <map>
 #include <set>
 
-// Generate IR for block statements (scope management and sequential execution).
+/**
+ * Generate IR for block statements.
+ *
+ * Features:
+ * - Creates new variable scope (enter/exit scope)
+ * - Executes statements sequentially
+ * - Handles optional final expression (block value)
+ * - Respects early termination (return/break/continue)
+ *
+ * Scope management:
+ * - Variables defined in block are destroyed on exit
+ * - Supports variable shadowing
+ * - Nested blocks create nested scopes
+ *
+ * @param node The block statement AST node
+ */
 void IRGenerator::visit(BlockStmt *node) {
     value_manager_.enter_scope();
 
@@ -33,7 +48,31 @@ void IRGenerator::visit(ExprStmt *node) {
     }
 }
 
-// Generate IR for let statements (variable declarations with initialization).
+/**
+ * Generate IR for let statements (variable declarations).
+ *
+ * Syntax: let [mut] name: Type = initializer;
+ *
+ * Type inference:
+ * - Explicit type annotation takes priority
+ * - Otherwise inferred from initializer expression
+ *
+ * Handling strategies:
+ * 1. Reference types (&T, &mut T):
+ *    - No alloca needed, store pointer directly
+ *    - Pointer value comes from initializer
+ *
+ * 2. Aggregate types returning pointer (array/struct literals, function calls):
+ *    - Initializer already returns pointer
+ *    - Use that pointer directly, no copy needed
+ *
+ * 3. Regular types:
+ *    - Allocate stack space (alloca)
+ *    - Evaluate initializer
+ *    - Store value to allocated space
+ *
+ * @param node The let statement AST node
+ */
 void IRGenerator::visit(LetStmt *node) {
     auto id_pattern = dynamic_cast<IdentifierPattern *>(node->pattern.get());
     if (!id_pattern) {

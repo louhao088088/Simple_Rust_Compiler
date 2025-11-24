@@ -1,6 +1,27 @@
 #include "ir_generator.h"
 
-// Emit declarations for C library functions used by built-in functions.
+/**
+ * Emit declarations for C library functions used by built-ins.
+ *
+ * Declares:
+ * 1. printf: i32 @printf(i8*, ...)
+ *    - Variadic function for formatted output
+ *    - Returns number of characters printed
+ *
+ * 2. scanf: i32 @scanf(i8*, ...)
+ *    - Variadic function for formatted input
+ *    - Returns number of items successfully read
+ *
+ * 3. exit: void @exit(i32) noreturn
+ *    - Terminates program with exit code
+ *    - Marked noreturn (LLVM knows it doesn't return)
+ *
+ * Also declares format string constants:
+ * - @.str.print = private constant [4 x i8] c"%d\0A\00"
+ * - @.str.scan = private constant [3 x i8] c"%d\00"
+ *
+ * @note Called once at the start of IR generation
+ */
 void IRGenerator::emit_builtin_declarations() {
     emitter_.emit_function_declaration("i32", "printf", {"i8*"}, true);
     emitter_.emit_function_declaration("i32", "scanf", {"i8*"}, true);

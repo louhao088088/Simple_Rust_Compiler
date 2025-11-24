@@ -253,7 +253,30 @@ size_t IRGenerator::get_type_alignment(Type *type) {
     }
 }
 
-// Get the size in bytes of a type.
+/**
+ * Calculate the size in bytes of a type.
+ *
+ * Size table (32-bit platform):
+ * - i32, u32, isize, usize, char: 4 bytes
+ * - bool: 1 byte
+ * - unit type (): 0 bytes
+ * - pointers/references: 4 bytes
+ * - arrays: element_size × array_length
+ * - structs: sum of field sizes
+ *
+ * Features:
+ * - Result caching to avoid redundant calculations
+ * - Recursive size computation for nested types
+ *
+ * Limitations:
+ * - Does not account for struct field padding/alignment
+ * - Assumes tight packing of struct fields
+ * - Platform-specific (32-bit assumed)
+ *
+ * @param type The type to measure
+ * @return Size in bytes
+ * @note Used for memcpy/memset size calculations
+ */
 size_t IRGenerator::get_type_size(Type *type) {
     if (!type)
         return 0;
@@ -330,7 +353,23 @@ size_t IRGenerator::get_type_size(Type *type) {
     return size;
 }
 
-// Check if an expression is a zero initializer.
+/**
+ * Check if an expression is a zero initializer.
+ *
+ * Recursively checks:
+ * - Integer literals with value 0
+ * - Boolean literal false
+ * - Array literals with all zero elements
+ * - Struct initializers with all zero fields
+ *
+ * Purpose:
+ * - Enables memset optimization for zero initialization
+ * - Example: [0; 1000] can use single memset instead of 1000 stores
+ * - Significantly reduces code size for large zero-initialized arrays
+ *
+ * @param expr The expression to check
+ * @return true if expression evaluates to all zeros
+ */
 bool IRGenerator::is_zero_initializer(Expr *expr) {
     if (!expr)
         return false;

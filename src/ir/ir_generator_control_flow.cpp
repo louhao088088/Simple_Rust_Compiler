@@ -1,8 +1,34 @@
+
 #include "ir_generator.h"
 
-// Generate IR for if expressions with conditional branching and PHI nodes.
+/**
+ * Generate IR for if expressions with optional else branch.
+ *
+ * IR structure:
+ *   current_block:
+ *     %cond = <condition evaluation>
+ *     br i1 %cond, label %if.then.N, label %if.else.N (or %if.end.N)
+ *
+ *   if.then.N:
+ *     <then branch code>
+ *     br label %if.end.N
+ *
+ *   if.else.N:  (if else exists)
+ *     <else branch code>
+ *     br label %if.end.N
+ *
+ *   if.end.N:
+ *     %result = phi T [%then_val, %actual_then_block], [%else_val, %actual_else_block]
+ *
+ * Features:
+ * - PHI nodes for merging values from different branches
+ * - Proper handling of early termination (return/break/continue)
+ * - Support for if-expressions (returns value) and if-statements (unit type)
+ * - Tracks actual predecessor blocks for accurate PHI generation
+ *
+ * @param node The if expression AST node
+ */
 void IRGenerator::visit(IfExpr *node) {
-
     int current_if = if_counter_++;
 
     std::string then_label = "if.then." + std::to_string(current_if);

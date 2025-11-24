@@ -1,6 +1,24 @@
 #include "ir_generator.h"
 
-// Generate IR for array literal expressions.
+/**
+ * Generate IR for array literal expressions.
+ *
+ * Example: [1, 2, 3, 4, 5]
+ *
+ * Strategy:
+ * 1. Allocate array on stack (or use target_address if provided)
+ * 2. For each element:
+ *    a. Generate element expression
+ *    b. Use GEP to calculate element pointer
+ *    c. Store element value
+ *
+ * Optimization:
+ * - Target address mechanism: allows in-place initialization
+ * - Avoids extra copy when used in let statement or return
+ *
+ * @param node The array literal expression AST node
+ * @return Pointer to the initialized array
+ */
 void IRGenerator::visit(ArrayLiteralExpr *node) {
 
     if (!node->type) {
@@ -51,7 +69,30 @@ void IRGenerator::visit(ArrayLiteralExpr *node) {
     store_expr_result(node, array_ptr);
 }
 
-// Generate IR for array initializer expressions ([value; size]).
+/**
+ * Generate IR for array initializer expressions.
+ *
+ * Syntax: [value; size]  // Creates array with 'size' copies of 'value'
+ * Example: [0; 100]  // Array of 100 zeros
+ *
+ * Optimization strategies:
+ * 1. Small arrays (≤16 elements):
+ *    - Unroll as individual GEP + store instructions
+ *    - Best for small constant-size arrays
+ *
+ * 2. Zero initialization (>64 elements):
+ *    - Use llvm.memset.p0i8 intrinsic
+ *    - Single call to set all bytes to zero
+ *    - Most efficient for zero-init
+ *
+ * 3. Large arrays with non-zero value (>16 elements):
+ *    - Generate initialization loop:
+ *      for (i = 0; i < size; i++) arr[i] = value;
+ *    - Avoids code bloat from unrolling
+ *
+ * @param node The array initializer expression AST node
+ * @return Pointer to the initialized array
+ */
 void IRGenerator::visit(ArrayInitializerExpr *node) {
 
     if (!node->type) {

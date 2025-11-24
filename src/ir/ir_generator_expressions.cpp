@@ -381,7 +381,27 @@ void IRGenerator::visit_logical_binary_expr(BinaryExpr *node) {
     store_expr_result(node, result);
 }
 
-// Generate IR for function call expressions.
+/**
+ * Generate IR for function call expressions.
+ *
+ * Handles:
+ * - Built-in functions: print, scan, exit (special handling)
+ * - User-defined functions: regular call instruction
+ * - Method calls: impl block methods (self parameter)
+ * - SRET optimization: large struct returns via pointer parameter
+ *
+ * Argument passing strategy:
+ * - Scalar types: pass by value (loaded if from variable)
+ * - Aggregate types (arrays/structs): pass pointer directly
+ * - References: pass pointer value
+ *
+ * Return value handling:
+ * - Void functions: no return value
+ * - Scalar returns: use call result directly
+ * - Aggregate returns: SRET or direct pointer
+ *
+ * @param node The call expression AST node
+ */
 void IRGenerator::visit(CallExpr *node) {
     std::vector<std::pair<std::string, std::string>> args;
 
