@@ -339,7 +339,7 @@ void Semantic(std::shared_ptr<Program> &ast, ErrorReporter &error_reporter) {
         std::cerr << "Name resolution completed with errors." << std::endl;
         return;
     } else {
-        std::cerr << "Name resolution completed successfully." << std::endl;
+        //std::cerr << "Name resolution completed successfully." << std::endl;
     }
 
     TypeCheckVisitor type_checker(symbol_table, builtins, error_reporter);

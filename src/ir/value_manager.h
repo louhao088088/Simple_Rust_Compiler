@@ -4,9 +4,9 @@
 #include <vector>
 
 /**
- * VariableInfo - 变量信息
+ * VariableInfo - Variable information
  *
- * 存储变量在IR中的表示和元数据
+ * Stores variable representation and metadata in IR
  */
 struct VariableInfo {
     std::string alloca_name;
@@ -24,125 +24,122 @@ struct VariableInfo {
 };
 
 /**
- * ValueManager - 变量和值管理器
+ * ValueManager - Variable and value manager
  *
- * 核心职责:
- * 1. 管理变量作用域栈
- * 2. 变量名到IR变量的映射（纯字符串）
- * 3. 支持变量遮蔽(shadowing)
- * 4. 检测重复定义
- * 5. 处理局部变量、函数参数和全局变量
+ * Core responsibilities:
+ * 1. Manage variable scope stack
+ * 2. Variable name to IR variable mapping (pure strings)
+ * 3. Support variable shadowing
+ * 4. Detect duplicate definitions
+ * 5. Handle local variables, function parameters, and global variables
  *
- * 设计原则：
- * - 不使用LLVM C++ API
- * - 所有IR表示都是字符串
- * - 与IREmitter和TypeMapper协作
+ * Design principles:
+ * - Do not use LLVM C++ API
+ * - All IR representations are strings
+ * - Cooperate with IREmitter and TypeMapper
  */
 class ValueManager {
   public:
     ValueManager();
 
-
     /**
-     * 进入新作用域
-     * 例如：函数体、代码块、循环体
+     * Enter new scope
+     * E.g., function body, code block, loop body
      */
     void enter_scope();
 
     /**
-     * 退出当前作用域
-     * 注意：不能退出全局作用域
+     * Exit current scope
+     * Note: Cannot exit global scope
      */
     void exit_scope();
 
     /**
-     * 获取当前作用域深度
-     * @return 0表示全局作用域，1表示第一层嵌套，以此类推
+     * Get current scope depth
+     * @return 0 for global scope, 1 for first nested level, and so on
      */
     size_t scope_depth() const;
 
-
     /**
-     * 在当前作用域定义局部变量
-     * @param name 源代码中的变量名
-     * @param alloca_name IR中的alloca变量名（如 "%0"）
-     * @param type_str IR类型字符串（如 "i32"）
-     * @param is_mutable 是否可变
+     * Define local variable in current scope
+     * @param name Variable name in source code
+     * @param alloca_name Alloca variable name in IR (e.g., "%0")
+     * @param type_str IR type string (e.g., "i32")
+     * @param is_mutable Whether mutable
      */
     void define_variable(const std::string &name, const std::string &alloca_name,
                          const std::string &type_str, bool is_mutable);
 
     /**
-     * 定义函数参数
-     * 函数参数在IR中是函数参数（如 %a），不是alloca结果
-     * @param name 参数名
-     * @param param_name IR中的参数名（如 "%a"）
-     * @param type_str IR类型字符串
-     * @param is_mutable 是否可变（Rust中参数默认不可变）
+     * Define function parameter
+     * Function parameters in IR are function arguments (e.g., %a), not alloca results
+     * @param name Parameter name
+     * @param param_name Parameter name in IR (e.g., "%a")
+     * @param type_str IR type string
+     * @param is_mutable Whether mutable (parameters are immutable by default in Rust)
      */
     void define_parameter(const std::string &name, const std::string &param_name,
                           const std::string &type_str, bool is_mutable = false);
 
     /**
-     * 定义全局变量
-     * 全局变量在IR中使用@前缀（如 @global_var）
-     * @param name 变量名
-     * @param global_name IR中的全局变量名（如 "@global_var"）
-     * @param type_str IR类型字符串
-     * @param is_mutable 是否可变（Rust中需要用static mut）
+     * Define global variable
+     * Global variables use @ prefix in IR (e.g., @global_var)
+     * @param name Variable name
+     * @param global_name Global variable name in IR (e.g., "@global_var")
+     * @param type_str IR type string
+     * @param is_mutable Whether mutable (requires static mut in Rust)
      */
     void define_global(const std::string &name, const std::string &global_name,
                        const std::string &type_str, bool is_mutable = false);
 
     /**
-     * 查找变量（从当前作用域向外层查找）
-     * @param name 源代码中的变量名
-     * @return 变量信息指针，未找到返回nullptr
+     * Lookup variable (searches from current scope outward)
+     * @param name Variable name in source code
+     * @return Pointer to variable info, nullptr if not found
      */
     VariableInfo *lookup_variable(const std::string &name);
 
     /**
-     * 查找变量（const版本）
+     * Lookup variable (const version)
      */
     const VariableInfo *lookup_variable(const std::string &name) const;
 
     /**
-     * 检查当前作用域是否已定义该变量
-     * 用于检测重复定义（不包括shadowing）
-     * @param name 源代码中的变量名
-     * @return true表示当前作用域已定义
+     * Check if variable is defined in current scope
+     * Used to detect duplicate definitions (not including shadowing)
+     * @param name Variable name in source code
+     * @return true if already defined in current scope
      */
     bool is_defined_in_current_scope(const std::string &name) const;
 
     /**
-     * 检查变量是否存在（在任何作用域）
-     * @param name 源代码中的变量名
-     * @return true表示变量存在
+     * Check if variable exists (in any scope)
+     * @param name Variable name in source code
+     * @return true if variable exists
      */
     bool variable_exists(const std::string &name) const;
 
     /**
-     * 查找当前作用域的变量（不向外层查找）
-     * @param name 源代码中的变量名
-     * @return 变量信息指针，未找到返回nullptr
+     * Lookup variable in current scope only (does not search outer scopes)
+     * @param name Variable name in source code
+     * @return Pointer to variable info, nullptr if not found
      */
     VariableInfo *lookup_variable_in_current_scope(const std::string &name);
 
-
     /**
-     * 获取当前作用域的所有变量名（用于调试）
+     * Get all variable names in current scope (for debugging)
      */
     std::vector<std::string> get_current_scope_variables() const;
 
     /**
-     * 清空所有作用域（用于测试）
+     * Clear all scopes (for testing)
      */
     void clear();
 
   private:
     /**
-     * Scope - 单个作用域
-     * 存储该作用域内定义的所有变量
+     * Scope - Single scope
+     * Stores all variables defined in this scope
      */
     struct Scope {
         std::unordered_map<std::string, VariableInfo> variables;
