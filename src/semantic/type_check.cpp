@@ -460,8 +460,7 @@ std::shared_ptr<Symbol> TypeCheckVisitor::visit(CallExpr *node) {
 
     if (node->callee->type->kind != TypeKind::FUNCTION) {
         if (auto *path_expr = dynamic_cast<PathExpr *>(node->callee.get())) {
-            if (path_expr->resolved_symbol &&
-                path_expr->resolved_symbol->kind == Symbol::VARIANT) {
+            if (path_expr->resolved_symbol && path_expr->resolved_symbol->kind == Symbol::VARIANT) {
                 error_reporter_.report_error("Enum variant '" + path_expr->resolved_symbol->name +
                                              "' is not a tuple variant and cannot be called.");
                 return nullptr;
