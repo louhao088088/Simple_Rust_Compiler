@@ -63,7 +63,13 @@ clean:
 	@echo "Cleaning up..."
 	@rm -rf $(BUILD_DIR) $(TARGET)
 
+# --- 新增部分 ---
+# 定义 build 目标，让它直接去执行 all 目标
+build: all
+# ----------------
+
 # 包含自动生成的依赖文件
 -include $(DEPS)
 
-.PHONY: all clean
+# 修改 .PHONY，把 build 也加进去，防止目录下有名为 build 的文件导致冲突
+.PHONY: all clean build
