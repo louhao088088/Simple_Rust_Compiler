@@ -5,4 +5,4 @@ build:
 	@cd build && cmake .. && cmake --build .
 
 run:
-	@./build/code
+	@./build/code 
