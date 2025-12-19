@@ -374,6 +374,10 @@ std::shared_ptr<Symbol> TypeCheckVisitor::visit(BinaryExpr *node) {
             is_valid = true;
         } else if (left_type->kind == TypeKind::STR && right_type->kind == TypeKind::STR) {
             is_valid = true;
+        } else if (left_type->kind == TypeKind::ENUM && right_type->kind == TypeKind::ENUM) {
+            if (left_type->equals(right_type.get())) {
+                is_valid = true;
+            }
         }
 
         if (is_valid) {
@@ -381,7 +385,7 @@ std::shared_ptr<Symbol> TypeCheckVisitor::visit(BinaryExpr *node) {
         } else {
             error_reporter_.report_error(
                 "Invalid operands for equality operator. Operands must be of the same compatible "
-                "type (integers, booleans, or references).",
+                "type (integers, booleans, enums, or references).",
                 node->op.line);
         }
         break;
@@ -455,6 +459,14 @@ std::shared_ptr<Symbol> TypeCheckVisitor::visit(CallExpr *node) {
     }
 
     if (node->callee->type->kind != TypeKind::FUNCTION) {
+        if (auto *path_expr = dynamic_cast<PathExpr *>(node->callee.get())) {
+            if (path_expr->resolved_symbol &&
+                path_expr->resolved_symbol->kind == Symbol::VARIANT) {
+                error_reporter_.report_error("Enum variant '" + path_expr->resolved_symbol->name +
+                                             "' is not a tuple variant and cannot be called.");
+                return nullptr;
+            }
+        }
         error_reporter_.report_error("This expression is not callable.");
         return nullptr;
     }
@@ -492,6 +504,24 @@ std::shared_ptr<Symbol> TypeCheckVisitor::visit(CallExpr *node) {
                 error_reporter_.report_error("Mismatched types. Expected argument type '" +
                                              param_type->to_string() + "' but found '" +
                                              arg_type->to_string() + "'.");
+            } else if (arg_type && arg_type->kind == TypeKind::ANY_INTEGER &&
+                       is_concrete_integer(param_type->kind)) {
+                ConstEvaluator evaluator(symbol_table_, error_reporter_);
+                auto val = evaluator.evaluate(node->arguments[i].get());
+                if (val) {
+                    long long v = *val;
+                    bool overflow = false;
+                    if (param_type->kind == TypeKind::I32) {
+                        if (v < -2147483648LL || v > 2147483647LL)
+                            overflow = true;
+                    } else if (param_type->kind == TypeKind::U32) {
+                        if (v < 0 || v > 4294967295LL)
+                            overflow = true;
+                    }
+                    if (overflow) {
+                        error_reporter_.report_error("Integer literal overflow.");
+                    }
+                }
             }
         }
 
@@ -511,6 +541,24 @@ std::shared_ptr<Symbol> TypeCheckVisitor::visit(CallExpr *node) {
                 error_reporter_.report_error("Mismatched types. Expected argument type '" +
                                              param_type->to_string() + "' but found '" +
                                              arg_type->to_string() + "'.");
+            } else if (arg_type && arg_type->kind == TypeKind::ANY_INTEGER &&
+                       is_concrete_integer(param_type->kind)) {
+                ConstEvaluator evaluator(symbol_table_, error_reporter_);
+                auto val = evaluator.evaluate(node->arguments[i].get());
+                if (val) {
+                    long long v = *val;
+                    bool overflow = false;
+                    if (param_type->kind == TypeKind::I32) {
+                        if (v < -2147483648LL || v > 2147483647LL)
+                            overflow = true;
+                    } else if (param_type->kind == TypeKind::U32) {
+                        if (v < 0 || v > 4294967295LL)
+                            overflow = true;
+                    }
+                    if (overflow) {
+                        error_reporter_.report_error("Integer literal overflow.");
+                    }
+                }
             }
         }
     }
@@ -647,6 +695,15 @@ std::shared_ptr<Symbol> TypeCheckVisitor::visit(IndexExpr *node) {
     if (!is_any_integer_type(index_type->kind)) {
         error_reporter_.report_error("Array index must be an integer.");
         return nullptr;
+    }
+
+    ConstEvaluator evaluator(symbol_table_, error_reporter_);
+    auto index_val = evaluator.evaluate(node->index.get());
+    if (index_val) {
+        if (*index_val < 0 || *index_val >= array_type->size) {
+            error_reporter_.report_error("Array index out of bounds.");
+            return nullptr;
+        }
     }
 
     node->type = array_type->element_type;

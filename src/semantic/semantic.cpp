@@ -221,7 +221,7 @@ void define_builtin_method(SymbolTable &symbol_table, BuiltinTypes &builtin_type
     builtin_types.any_integer_type = anyint_symbol ? anyint_symbol->type : nullptr;
 
     if (!u32_symbol || !string_symbol || !str_symbol || !usize_symbol || !anyint_symbol) {
-        std::cerr << "FATAL: A required built-in type was not defined." << std::endl;
+        // std::cerr << "FATAL: A required built-in type was not defined." << std::endl;
         return;
     }
 
@@ -336,10 +336,10 @@ void Semantic(std::shared_ptr<Program> &ast, ErrorReporter &error_reporter) {
     name_resolver.resolve(ast.get());
 
     if (error_reporter.has_errors()) {
-        std::cerr << "Name resolution completed with errors." << std::endl;
+        // std::cerr << "Name resolution completed with errors." << std::endl;
         return;
     } else {
-        //std::cerr << "Name resolution completed successfully." << std::endl;
+        // std::cerr << "Name resolution completed successfully." << std::endl;
     }
 
     TypeCheckVisitor type_checker(symbol_table, builtins, error_reporter);
@@ -348,7 +348,7 @@ void Semantic(std::shared_ptr<Program> &ast, ErrorReporter &error_reporter) {
         item->accept(&type_checker);
     }
     if (error_reporter.has_errors()) {
-        std::cerr << "Type checking completed with errors." << std::endl;
+        // std::cerr << "Type checking completed with errors." << std::endl;
         return;
     }
 

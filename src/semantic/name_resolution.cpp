@@ -484,6 +484,23 @@ void NameResolutionVisitor::visit(EnumDecl *node) {
 
     for (const auto &variant : node->variants) {
         auto variant_symbol = std::make_shared<Symbol>(variant->name.lexeme, Symbol::VARIANT);
+
+        if (variant->kind == EnumVariantKind::Plain) {
+            variant_symbol->type = enum_symbol->type;
+        } else if (variant->kind == EnumVariantKind::Tuple) {
+            std::vector<std::shared_ptr<Type>> param_types;
+            for (auto &type_node : variant->tuple_types) {
+                auto type = type_resolver_.resolve(type_node.get());
+                param_types.push_back(type);
+            }
+            variant_symbol->type = std::make_shared<FunctionType>(enum_symbol->type, param_types);
+        } else if (variant->kind == EnumVariantKind::Struct) {
+            for (auto &field : variant->fields) {
+                type_resolver_.resolve(field->type.get());
+            }
+            variant_symbol->type = enum_symbol->type;
+        }
+
         if (!enum_symbol->members->define_value(variant->name.lexeme, variant_symbol)) {
             error_reporter_.report_error("Enum variant '" + variant->name.lexeme +
                                              "' is already defined.",
