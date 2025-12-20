@@ -115,11 +115,11 @@ bool IRGenerator::handle_builtin_function(
             return false;
         }
 
-        emitter_.emit_call_void("exit", {{"i32", arg_value}});
+        // emitter_.emit_call_void("exit", {{"i32", arg_value}});
 
-        emitter_.emit_unreachable();
+        // emitter_.emit_unreachable();
 
-        current_block_terminated_ = true;
+        // current_block_terminated_ = true;
 
         store_expr_result(node, "");
         return true;

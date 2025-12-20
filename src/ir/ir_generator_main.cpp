@@ -117,6 +117,9 @@ void IRGenerator::visit_function_decl(FnDecl *node) {
     std::vector<bool> param_is_aggregate;
 
     std::string func_name = node->name.lexeme;
+    if (func_name == "main") {
+        ret_type_str = "i32";
+    }
     if (return_type_ptr && should_use_sret_optimization(func_name, return_type_ptr)) {
         use_sret = true;
         params.push_back({ret_type_str + "*", "sret_ptr"});
