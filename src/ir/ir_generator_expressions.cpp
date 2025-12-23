@@ -385,12 +385,18 @@ void IRGenerator::visit_logical_binary_expr(BinaryExpr *node) {
         return;
     }
 
-    std::string left_block = current_block_label_;
-
+    // For short-circuit: the PHI predecessor for left_var is the trampoline block
+    // that jumps to end_label (true branch for ||, false branch for &&)
+    std::string left_phi_pred;
+    
     if (is_or) {
-        emitter_.emit_cond_br(left_var, end_label, rhs_label);
+        // ||: if left is true, jump to end; otherwise evaluate right
+        auto [jmp_true, jmp_false] = emitter_.emit_cond_br(left_var, end_label, rhs_label);
+        left_phi_pred = jmp_true;  // left_var comes from jmp_true (the true trampoline)
     } else {
-        emitter_.emit_cond_br(left_var, rhs_label, end_label);
+        // &&: if left is true, evaluate right; otherwise jump to end
+        auto [jmp_true, jmp_false] = emitter_.emit_cond_br(left_var, rhs_label, end_label);
+        left_phi_pred = jmp_false;  // left_var comes from jmp_false (the false trampoline)
     }
 
     begin_block(rhs_label);
@@ -417,7 +423,7 @@ void IRGenerator::visit_logical_binary_expr(BinaryExpr *node) {
     current_block_terminated_ = false;
 
     std::vector<std::pair<std::string, std::string>> phi_incoming;
-    phi_incoming.push_back({left_var, left_block});
+    phi_incoming.push_back({left_var, left_phi_pred});
     phi_incoming.push_back({right_var, right_block});
 
     std::string result = emitter_.emit_phi("i1", phi_incoming);

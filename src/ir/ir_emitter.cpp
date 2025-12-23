@@ -5,7 +5,7 @@
 
 IREmitter::IREmitter(const std::string &module_name)
     : module_name_(module_name), temp_counter_(0), label_counter_(0), stack_counter_(0),
-      indent_level_(0), in_entry_block_(false), is_inside_function_(false) {
+      trampoline_counter_(0), indent_level_(0), in_entry_block_(false), is_inside_function_(false) {
     ir_stream_ << "; ModuleID = '" << module_name_ << "'\n";
     ir_stream_ << "source_filename = \"" << module_name_ << "\"\n\n";
 }
@@ -225,9 +225,45 @@ void IREmitter::emit_ret_void() { emit_line("ret void"); }
 
 void IREmitter::emit_br(const std::string &target_label) { emit_line("br label %" + target_label); }
 
-void IREmitter::emit_cond_br(const std::string &condition, const std::string &true_label,
-                             const std::string &false_label) {
-    emit_line("br i1 " + condition + ", label %" + true_label + ", label %" + false_label);
+std::pair<std::string, std::string> IREmitter::emit_cond_br(const std::string &condition, 
+                                                              const std::string &true_label,
+                                                              const std::string &false_label) {
+    // Use trampoline blocks to avoid RISC-V beq/bne ±4KB range limitation
+    // beq/bne can only jump ±4KB, but jal can jump ±1MB
+    // Pattern:
+    //   br i1 %cond, label %jmp_true_N, label %jmp_false_N
+    //   jmp_true_N:  br label %true_label   (will become: jal true_label)
+    //   jmp_false_N: br label %false_label  (will become: jal false_label)
+    
+    size_t tramp_id = trampoline_counter_++;
+    std::string jmp_true = "jmp_true_" + std::to_string(tramp_id);
+    std::string jmp_false = "jmp_false_" + std::to_string(tramp_id);
+    
+    // Conditional branch to nearby trampoline blocks
+    emit_line("br i1 " + condition + ", label %" + jmp_true + ", label %" + jmp_false);
+    
+    // Trampoline block for true branch
+    if (indent_level_ > 0) indent_level_--;
+    if (is_inside_function_) {
+        function_body_buffer_ << jmp_true << ":\n";
+    } else {
+        ir_stream_ << jmp_true << ":\n";
+    }
+    indent_level_++;
+    emit_line("br label %" + true_label);
+    
+    // Trampoline block for false branch
+    if (indent_level_ > 0) indent_level_--;
+    if (is_inside_function_) {
+        function_body_buffer_ << jmp_false << ":\n";
+    } else {
+        ir_stream_ << jmp_false << ":\n";
+    }
+    indent_level_++;
+    emit_line("br label %" + false_label);
+    
+    // Return the trampoline labels for PHI node predecessors
+    return {jmp_true, jmp_false};
 }
 
 std::string IREmitter::emit_phi(const std::string &type,
@@ -369,6 +405,4 @@ void IREmitter::emit_raw(const std::string &text) {
     }
 }
 
-std::string IREmitter::indent() const {
-    return std::string(indent_level_ * 2, ' '); 
-}
+std::string IREmitter::indent() const { return std::string(indent_level_ * 2, ' '); }

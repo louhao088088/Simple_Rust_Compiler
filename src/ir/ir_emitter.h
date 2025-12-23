@@ -182,11 +182,14 @@ class IREmitter {
     void emit_br(const std::string &target_label);
 
     /**
-     * Conditional branch
-     * Example: br i1 %cond, label %true_bb, label %false_bb
+     * Conditional branch with trampoline blocks for long jumps
+     * Uses trampoline blocks to avoid RISC-V beq/bne ±4KB range limitation
+     * @return pair of (true_trampoline_label, false_trampoline_label) for PHI predecessors
+     * Example: br i1 %cond, label %jmp_true_N, label %jmp_false_N
      */
-    void emit_cond_br(const std::string &condition, const std::string &true_label,
-                      const std::string &false_label);
+    std::pair<std::string, std::string> emit_cond_br(const std::string &condition, 
+                                                      const std::string &true_label,
+                                                      const std::string &false_label);
 
     /**
      * PHI node (for control flow merging)
@@ -292,6 +295,7 @@ class IREmitter {
     size_t temp_counter_;
     size_t label_counter_;
     size_t stack_counter_;
+    size_t trampoline_counter_;  // Counter for branch trampoline labels
     int indent_level_;
 
     bool in_entry_block_;
